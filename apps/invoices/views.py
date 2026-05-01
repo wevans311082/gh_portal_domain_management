@@ -2,6 +2,7 @@
 import logging
 from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
 from django.http import HttpResponse
 from django.template.loader import render_to_string
 
@@ -9,12 +10,16 @@ from apps.billing.models import Invoice
 
 logger = logging.getLogger(__name__)
 
+_PAGE_SIZE = 20
+
 
 @login_required
 def invoice_list(request):
-    """List all invoices for the current user."""
-    invoices = Invoice.objects.filter(user=request.user).order_by("-created_at")
-    return render(request, "invoices/list.html", {"invoices": invoices})
+    """List all invoices for the current user — paginated."""
+    qs = Invoice.objects.filter(user=request.user).order_by("-created_at")
+    paginator = Paginator(qs, _PAGE_SIZE)
+    page_obj = paginator.get_page(request.GET.get("page"))
+    return render(request, "invoices/list.html", {"invoices": page_obj.object_list, "page_obj": page_obj})
 
 
 @login_required

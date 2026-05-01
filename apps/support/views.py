@@ -3,11 +3,14 @@ import logging
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.core.paginator import Paginator
 from django import forms
 
 from apps.support.models import SupportTicket, SupportTicketMessage, Department
 
 logger = logging.getLogger(__name__)
+
+_PAGE_SIZE = 20
 
 
 class TicketForm(forms.ModelForm):
@@ -29,9 +32,11 @@ class TicketReplyForm(forms.ModelForm):
 
 @login_required
 def ticket_list(request):
-    """List support tickets for current user."""
-    tickets = SupportTicket.objects.filter(user=request.user).order_by("-created_at")
-    return render(request, "support/ticket_list.html", {"tickets": tickets})
+    """List support tickets for current user — paginated."""
+    qs = SupportTicket.objects.filter(user=request.user).order_by("-created_at")
+    paginator = Paginator(qs, _PAGE_SIZE)
+    page_obj = paginator.get_page(request.GET.get("page"))
+    return render(request, "support/ticket_list.html", {"tickets": page_obj.object_list, "page_obj": page_obj})
 
 
 @login_required

@@ -2,6 +2,7 @@
 import logging
 import uuid
 from django.utils import timezone
+from django.db import transaction
 from celery import shared_task
 from celery.exceptions import MaxRetriesExceededError
 
@@ -56,14 +57,18 @@ def provision_hosting_account(self, service_id: int, job_id: int):
             email=service.user.email,
         )
 
-        service.status = Service.STATUS_ACTIVE
-        service.cpanel_username = username
-        service.save(update_fields=["status", "cpanel_username"])
+        # Wrap the database updates in a transaction so that if any save fails
+        # after the WHM account has been created we still have a consistent
+        # record — rather than a provisioned server account with no local record.
+        with transaction.atomic():
+            service.status = Service.STATUS_ACTIVE
+            service.cpanel_username = username
+            service.save(update_fields=["status", "cpanel_username"])
 
-        job.status = ProvisioningJob.STATUS_COMPLETED
-        job.completed_at = timezone.now()
-        job.result_data = {"username": username, "result": str(result)}
-        job.save(update_fields=["status", "completed_at", "result_data"])
+            job.status = ProvisioningJob.STATUS_COMPLETED
+            job.completed_at = timezone.now()
+            job.result_data = {"username": username, "result": str(result)}
+            job.save(update_fields=["status", "completed_at", "result_data"])
 
         # Import here to avoid circular imports
         from apps.notifications.services import send_notification

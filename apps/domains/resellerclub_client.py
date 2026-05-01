@@ -1,9 +1,15 @@
 """ResellerClub (LogicBoxes) API client for domain management."""
 import logging
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
+
+# Connection/read timeouts (seconds)
+_CONNECT_TIMEOUT = 10
+_READ_TIMEOUT = 30
 
 
 class ResellerClubError(Exception):
@@ -11,57 +17,77 @@ class ResellerClubError(Exception):
     pass
 
 
+def _build_session() -> requests.Session:
+    """Build a requests Session with retry logic and sensible timeouts."""
+    session = requests.Session()
+    retry = Retry(
+        total=3,
+        backoff_factor=0.5,
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=["GET", "POST"],
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+    return session
+
+
 class ResellerClubClient:
-    """HTTP API client for the ResellerClub/LogicBoxes domain registrar API."""
+    """
+    HTTP API client for the ResellerClub/LogicBoxes domain registrar API.
+
+    Credentials are transmitted via HTTP Basic Auth (Authorization header)
+    rather than as query-string parameters to prevent credential leakage
+    in server logs, browser history, CDN caches, and Referer headers.
+    """
 
     def __init__(self):
         self.reseller_id = settings.RESELLERCLUB_RESELLER_ID
         self.api_key = settings.RESELLERCLUB_API_KEY
-        self.base_url = settings.RESELLERCLUB_API_URL
-        self.session = requests.Session()
+        self.base_url = settings.RESELLERCLUB_API_URL.rstrip("/")
+        self.session = _build_session()
+        # Credentials sent via Basic Auth header — never in the URL
+        self.session.auth = (self.reseller_id, self.api_key)
+
+    def _check_response(self, data: dict, endpoint: str) -> dict:
+        """Raise ResellerClubError when the API returns a business-level error."""
+        if isinstance(data, dict) and data.get("status") == "ERROR":
+            error = data.get("message") or data.get("error") or "Unknown error"
+            logger.error(f"ResellerClub API error at {endpoint}: {error}")
+            raise ResellerClubError(f"ResellerClub error: {error}")
+        return data
 
     def _get(self, endpoint: str, params: dict = None) -> dict:
-        """Make a GET request to the ResellerClub API."""
-        params = params or {}
-        params["auth-userid"] = self.reseller_id
-        params["api-key"] = self.api_key
-
+        """Make an authenticated GET request to the ResellerClub API."""
         url = f"{self.base_url}/{endpoint}"
         try:
-            response = self.session.get(url, params=params, timeout=30)
+            response = self.session.get(
+                url,
+                params=params or {},
+                timeout=(_CONNECT_TIMEOUT, _READ_TIMEOUT),
+            )
             response.raise_for_status()
             data = response.json()
         except requests.RequestException as e:
-            logger.error(f"ResellerClub API request failed: {e}")
+            logger.error(f"ResellerClub GET {endpoint} failed: {e}")
             raise ResellerClubError(f"API request failed: {e}") from e
-
-        if isinstance(data, dict) and data.get("status") == "ERROR":
-            error = data.get("message", data.get("error", "Unknown error"))
-            logger.error(f"ResellerClub API error at {endpoint}: {error}")
-            raise ResellerClubError(f"ResellerClub error: {error}")
-
-        return data
+        return self._check_response(data, endpoint)
 
     def _post(self, endpoint: str, data: dict = None) -> dict:
-        """Make a POST request to the ResellerClub API."""
-        data = data or {}
-        data["auth-userid"] = self.reseller_id
-        data["api-key"] = self.api_key
-
+        """Make an authenticated POST request to the ResellerClub API."""
         url = f"{self.base_url}/{endpoint}"
         try:
-            response = self.session.post(url, data=data, timeout=30)
+            response = self.session.post(
+                url,
+                data=data or {},
+                timeout=(_CONNECT_TIMEOUT, _READ_TIMEOUT),
+            )
             response.raise_for_status()
             result = response.json()
         except requests.RequestException as e:
-            logger.error(f"ResellerClub API POST failed: {e}")
+            logger.error(f"ResellerClub POST {endpoint} failed: {e}")
             raise ResellerClubError(f"API POST failed: {e}") from e
-
-        if isinstance(result, dict) and result.get("status") == "ERROR":
-            error = result.get("message", result.get("error", "Unknown error"))
-            raise ResellerClubError(f"ResellerClub error: {error}")
-
-        return result
+        return self._check_response(result, endpoint)
 
     def check_availability(self, domain_names: list, tlds: list) -> dict:
         """

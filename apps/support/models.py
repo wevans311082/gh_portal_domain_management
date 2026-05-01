@@ -1,6 +1,38 @@
 from django.db import models
+from django.core.exceptions import ValidationError
 from apps.core.models import TimeStampedModel
 from apps.accounts.models import User
+
+# 5 MB hard limit for support attachments
+_MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024
+
+# Permitted MIME-type-mapped extensions (checked against the file name)
+_ALLOWED_EXTENSIONS = {
+    ".pdf", ".txt", ".log",
+    ".png", ".jpg", ".jpeg", ".gif", ".webp",
+    ".zip", ".tar", ".gz",
+    ".doc", ".docx", ".xls", ".xlsx", ".csv",
+}
+
+
+def _validate_attachment(upload):
+    """Validate the size and extension of a support ticket attachment."""
+    import os
+
+    # Size check
+    if upload.size > _MAX_ATTACHMENT_BYTES:
+        raise ValidationError(
+            f"Attachment must be smaller than {_MAX_ATTACHMENT_BYTES // (1024 * 1024)} MB. "
+            f"Your file is {upload.size // (1024 * 1024)} MB."
+        )
+
+    # Extension allow-list check
+    _, ext = os.path.splitext(upload.name.lower())
+    if ext not in _ALLOWED_EXTENSIONS:
+        raise ValidationError(
+            f"File type '{ext}' is not permitted. "
+            f"Allowed types: {', '.join(sorted(_ALLOWED_EXTENSIONS))}"
+        )
 
 
 class Department(TimeStampedModel):
@@ -68,7 +100,12 @@ class SupportTicketMessage(TimeStampedModel):
     user = models.ForeignKey(User, on_delete=models.PROTECT)
     content = models.TextField()
     is_internal = models.BooleanField(default=False)
-    attachment = models.FileField(upload_to="support/attachments/%Y/%m/", null=True, blank=True)
+    attachment = models.FileField(
+        upload_to="support/attachments/%Y/%m/",
+        null=True,
+        blank=True,
+        validators=[_validate_attachment],
+    )
 
     class Meta:
         ordering = ["created_at"]

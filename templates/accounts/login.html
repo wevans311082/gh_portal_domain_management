@@ -4,10 +4,37 @@
 
 {% block content %}
 <h2 class="text-2xl font-bold text-center mb-6">Sign in to your account</h2>
-<form method="post" action="{% url 'account_login' %}" class="space-y-4">
+
+{% if rate_limited %}
+<div class="bg-red-50 border border-red-300 text-red-700 rounded px-4 py-3 mb-4 text-sm">
+    Too many failed login attempts. Please wait a few minutes before trying again.
+</div>
+{% endif %}
+
+<form method="post" action="{% url 'accounts_custom:login' %}" class="space-y-4">
     {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit" class="w-full bg-orange-500 text-white py-3 rounded hover:bg-orange-600">Sign In</button>
+    {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+
+    <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Email address</label>
+        <input type="email" name="email" required autocomplete="email"
+               class="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-400">
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+        <input type="password" name="password" required autocomplete="current-password"
+               class="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-400">
+    </div>
+
+    <div class="flex justify-end">
+        <a href="{% url 'account_reset_password' %}" class="text-sm text-orange-500 hover:underline">Forgot password?</a>
+    </div>
+
+    <button type="submit" class="w-full bg-orange-500 text-white py-3 rounded hover:bg-orange-600 font-semibold">
+        Sign In
+    </button>
 </form>
-<p class="text-center mt-4 text-sm">Don't have an account? <a href="{% url 'accounts_custom:register' %}" class="text-orange-500">Register</a></p>
+<p class="text-center mt-4 text-sm">
+    Don't have an account? <a href="{% url 'accounts_custom:register' %}" class="text-orange-500 hover:underline">Register</a>
+</p>
 {% endblock %}

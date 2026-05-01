@@ -1,6 +1,9 @@
 """Payment views - Stripe, GoCardless, PayPal."""
+import hashlib
+import hmac
 import logging
 import json
+from django.conf import settings
 from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
@@ -8,6 +11,7 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
 from django.utils import timezone
+from django.db import transaction
 
 from apps.billing.models import Invoice
 from apps.payments.models import Payment, WebhookEvent
@@ -60,17 +64,19 @@ def stripe_webhook(request):
     event_id = event["id"]
     event_type = event["type"]
 
-    # Idempotency: skip already-processed events
-    if WebhookEvent.objects.filter(event_id=event_id).exists():
-        logger.info(f"Stripe webhook {event_id} already processed, skipping.")
-        return HttpResponse(status=200)
-
-    webhook_event = WebhookEvent.objects.create(
-        provider=Payment.PROVIDER_STRIPE,
-        event_type=event_type,
-        event_id=event_id,
-        payload=event,
-    )
+    # Atomic idempotency: use get_or_create to avoid TOCTOU race between workers
+    with transaction.atomic():
+        webhook_event, created = WebhookEvent.objects.get_or_create(
+            event_id=event_id,
+            defaults={
+                "provider": Payment.PROVIDER_STRIPE,
+                "event_type": event_type,
+                "payload": event,
+            },
+        )
+        if not created:
+            logger.info(f"Stripe webhook {event_id} already processed, skipping.")
+            return HttpResponse(status=200)
 
     try:
         _process_stripe_event(event, webhook_event)
@@ -168,8 +174,27 @@ def _handle_payment_intent_failed(pi: dict, webhook_event: WebhookEvent):
 @csrf_exempt
 @require_POST
 def gocardless_webhook(request):
-    """Handle GoCardless webhooks."""
+    """Handle GoCardless webhooks with HMAC signature verification."""
     payload = request.body
+
+    # Verify the webhook signature using the GoCardless webhook secret
+    webhook_secret = getattr(settings, "GOCARDLESS_WEBHOOK_SECRET", "")
+    if not webhook_secret:
+        logger.error("GOCARDLESS_WEBHOOK_SECRET is not configured; rejecting webhook.")
+        return HttpResponse(status=400)
+
+    provided_signature = request.headers.get("Webhook-Signature", "")
+    expected_signature = hmac.new(
+        webhook_secret.encode("utf-8"),
+        payload,
+        hashlib.sha256,
+    ).hexdigest()
+
+    if not hmac.compare_digest(provided_signature, expected_signature):
+        logger.warning(
+            "GoCardless webhook signature mismatch — possible spoofed request."
+        )
+        return HttpResponse(status=498)  # 498 = Token Required / Invalid
 
     try:
         events = json.loads(payload).get("events", [])
@@ -180,16 +205,18 @@ def gocardless_webhook(request):
         event_id = event.get("id", "")
         event_type = f"{event.get('resource_type', '')}.{event.get('action', '')}"
 
-        if WebhookEvent.objects.filter(event_id=event_id).exists():
-            continue
-
-        WebhookEvent.objects.create(
-            provider=Payment.PROVIDER_GOCARDLESS,
-            event_type=event_type,
-            event_id=event_id,
-            payload=event,
-            processed=True,
-            processed_at=timezone.now(),
-        )
+        with transaction.atomic():
+            _, created = WebhookEvent.objects.get_or_create(
+                event_id=event_id,
+                defaults={
+                    "provider": Payment.PROVIDER_GOCARDLESS,
+                    "event_type": event_type,
+                    "payload": event,
+                    "processed": True,
+                    "processed_at": timezone.now(),
+                },
+            )
+            if not created:
+                logger.info(f"GoCardless webhook {event_id} already processed, skipping.")
 
     return HttpResponse(status=200)
