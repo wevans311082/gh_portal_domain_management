@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ SITE_NAME }} - Reliable UK Web Hosting{% endblock %}
+
+{% block body %}
+<header class="bg-gray-900 text-white">
+    <nav class="container mx-auto px-4 py-4 flex justify-between items-center">
+        <h1 class="text-xl font-bold text-orange-400">{{ SITE_NAME }}</h1>
+        <div class="flex gap-4">
+            <a href="{% url 'core:pricing' %}" class="hover:text-orange-400">Pricing</a>
+            <a href="{% url 'account_login' %}" class="hover:text-orange-400">Login</a>
+            <a href="{% url 'accounts_custom:register' %}" class="bg-orange-500 px-4 py-2 rounded hover:bg-orange-600">Get Started</a>
+        </div>
+    </nav>
+    <div class="container mx-auto px-4 py-24 text-center">
+        <h2 class="text-5xl font-bold mb-6">Reliable UK Web Hosting</h2>
+        <p class="text-xl text-gray-300 mb-8">Fast, secure, and affordable hosting for your business.</p>
+        <a href="{% url 'core:pricing' %}" class="bg-orange-500 text-white px-8 py-4 rounded-lg text-lg hover:bg-orange-600">View Plans</a>
+    </div>
+</header>
+<main class="container mx-auto px-4 py-16">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div class="text-center p-6">
+            <div class="text-4xl mb-4">⚡</div>
+            <h3 class="text-xl font-semibold mb-2">Lightning Fast</h3>
+            <p class="text-gray-600">NVMe SSD storage and optimised servers.</p>
+        </div>
+        <div class="text-center p-6">
+            <div class="text-4xl mb-4">🔒</div>
+            <h3 class="text-xl font-semibold mb-2">Secure</h3>
+            <p class="text-gray-600">Free SSL certificates on all plans.</p>
+        </div>
+        <div class="text-center p-6">
+            <div class="text-4xl mb-4">🇬🇧</div>
+            <h3 class="text-xl font-semibold mb-2">UK Based</h3>
+            <p class="text-gray-600">All servers located in the UK.</p>
+        </div>
+    </div>
+</main>
+{% endblock %}

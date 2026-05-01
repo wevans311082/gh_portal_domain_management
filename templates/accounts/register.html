@@ -1,0 +1,19 @@
+{% extends "base_auth.html" %}
+
+{% block title %}Register - {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<h2 class="text-2xl font-bold text-center mb-6">Create your account</h2>
+<form method="post" class="space-y-4">
+    {% csrf_token %}
+    {% for field in form %}
+    <div>
+        <label class="block text-sm font-medium text-gray-700">{{ field.label }}</label>
+        {{ field }}
+        {% if field.errors %}<p class="text-red-500 text-sm mt-1">{{ field.errors.0 }}</p>{% endif %}
+    </div>
+    {% endfor %}
+    <button type="submit" class="w-full bg-orange-500 text-white py-3 rounded hover:bg-orange-600">Create Account</button>
+</form>
+<p class="text-center mt-4 text-sm">Already have an account? <a href="{% url 'account_login' %}" class="text-orange-500">Sign In</a></p>
+{% endblock %}
