@@ -36,6 +36,10 @@ def pricing(request):
     return render(request, "public/pricing.html", {"packages": packages})
 
 
+def contact(request):
+    return render(request, "public/contact.html")
+
+
 def handler404(request, exception):
     return render(request, "404.html", status=404)
 
