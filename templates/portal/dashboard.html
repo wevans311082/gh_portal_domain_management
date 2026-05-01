@@ -7,53 +7,125 @@
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
     <div class="bg-white rounded-lg shadow p-6">
         <h3 class="text-sm font-medium text-gray-500">Active Services</h3>
-        <p class="text-3xl font-bold mt-2">{{ services|length }}</p>
+        <p class="text-3xl font-bold mt-2">{{ active_services_count }}</p>
     </div>
     <div class="bg-white rounded-lg shadow p-6">
         <h3 class="text-sm font-medium text-gray-500">Domains</h3>
-        <p class="text-3xl font-bold mt-2">{{ domains|length }}</p>
+        <p class="text-3xl font-bold mt-2">{{ domains_count }}</p>
     </div>
     <div class="bg-white rounded-lg shadow p-6">
-        <h3 class="text-sm font-medium text-gray-500">Unpaid Invoices</h3>
-        <p class="text-3xl font-bold mt-2 text-red-500">{{ invoices|length }}</p>
+        <h3 class="text-sm font-medium text-gray-500">Outstanding Balance</h3>
+        <p class="text-3xl font-bold mt-2 {% if unpaid_amount %}text-red-500{% endif %}">£{{ unpaid_amount }}</p>
     </div>
     <div class="bg-white rounded-lg shadow p-6">
         <h3 class="text-sm font-medium text-gray-500">Open Tickets</h3>
-        <p class="text-3xl font-bold mt-2">{{ tickets|length }}</p>
+        <p class="text-3xl font-bold mt-2">{{ open_tickets_count }}</p>
     </div>
 </div>
 
+{% if expiring_domains %}
+<div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+    <h3 class="font-semibold text-yellow-800 mb-2">⚠️ Domains Expiring Soon</h3>
+    <ul class="space-y-1">
+        {% for domain in expiring_domains %}
+        <li class="text-sm text-yellow-700">
+            <a href="{% url 'domains:detail' pk=domain.pk %}" class="hover:underline font-medium">{{ domain.name }}</a>
+            — expires {{ domain.expires_at }}
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
     <div class="bg-white rounded-lg shadow p-6">
-        <h3 class="font-semibold mb-4">Recent Services</h3>
-        {% if services %}
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="font-semibold">Active Services</h3>
+            <a href="{% url 'portal:my_services' %}" class="text-sm text-orange-500 hover:underline">View all</a>
+        </div>
+        {% if active_services %}
         <ul class="divide-y">
-            {% for service in services %}
+            {% for service in active_services|slice:":5" %}
             <li class="py-3">
                 <p class="font-medium">{{ service.package.name }}</p>
-                <p class="text-sm text-gray-500">{{ service.domain_name }} - <span class="capitalize">{{ service.status }}</span></p>
+                <p class="text-sm text-gray-500">{{ service.domain_name }} — <span class="capitalize">{{ service.status }}</span></p>
             </li>
             {% endfor %}
         </ul>
         {% else %}
-        <p class="text-gray-500">No services yet.</p>
+        <p class="text-gray-500">No active services.</p>
         {% endif %}
     </div>
 
     <div class="bg-white rounded-lg shadow p-6">
-        <h3 class="font-semibold mb-4">Unpaid Invoices</h3>
-        {% if invoices %}
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="font-semibold">Unpaid Invoices</h3>
+            <a href="{% url 'invoices:list' %}" class="text-sm text-orange-500 hover:underline">View all</a>
+        </div>
+        {% if unpaid_invoices %}
         <ul class="divide-y">
-            {% for invoice in invoices %}
-            <li class="py-3 flex justify-between">
-                <span>Invoice #{{ invoice.number }}</span>
-                <span class="font-medium text-red-500">£{{ invoice.total }}</span>
+            {% for invoice in unpaid_invoices|slice:":5" %}
+            <li class="py-3 flex justify-between items-center">
+                <div>
+                    <a href="{% url 'invoices:detail' pk=invoice.pk %}" class="font-medium hover:underline">
+                        Invoice #{{ invoice.number }}
+                    </a>
+                    <p class="text-xs text-gray-500">Due {{ invoice.due_date }}</p>
+                </div>
+                <div class="text-right">
+                    <p class="font-medium text-red-500">£{{ invoice.total }}</p>
+                    <a href="{% url 'payments:stripe_checkout' invoice_id=invoice.pk %}"
+                       class="text-xs bg-orange-500 text-white px-2 py-1 rounded hover:bg-orange-600">
+                        Pay Now
+                    </a>
+                </div>
             </li>
             {% endfor %}
         </ul>
         {% else %}
-        <p class="text-gray-500">No outstanding invoices.</p>
+        <p class="text-gray-500">No outstanding invoices. ✓</p>
         {% endif %}
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="font-semibold">Open Tickets</h3>
+            <a href="{% url 'support:list' %}" class="text-sm text-orange-500 hover:underline">View all</a>
+        </div>
+        {% if open_tickets %}
+        <ul class="divide-y">
+            {% for ticket in open_tickets|slice:":5" %}
+            <li class="py-3">
+                <a href="{% url 'support:detail' pk=ticket.pk %}" class="font-medium hover:underline">
+                    #{{ ticket.id }}: {{ ticket.subject }}
+                </a>
+                <p class="text-xs text-gray-500 mt-1">
+                    <span class="capitalize">{{ ticket.status }}</span> —
+                    <span class="capitalize">{{ ticket.priority }}</span> priority
+                </p>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-gray-500">No open tickets.</p>
+        {% endif %}
+    </div>
+
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="font-semibold mb-4">Quick Actions</h3>
+        <div class="space-y-2">
+            <a href="{% url 'domains:search' %}" class="block w-full text-center bg-orange-500 text-white py-2 px-4 rounded hover:bg-orange-600">
+                Search &amp; Register Domain
+            </a>
+            <a href="{% url 'support:create' %}" class="block w-full text-center bg-gray-700 text-white py-2 px-4 rounded hover:bg-gray-800">
+                Open Support Ticket
+            </a>
+            <a href="{% url 'invoices:list' %}" class="block w-full text-center border border-gray-300 text-gray-700 py-2 px-4 rounded hover:bg-gray-50">
+                View Invoices
+            </a>
+        </div>
     </div>
 </div>
 {% endblock %}

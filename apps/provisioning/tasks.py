@@ -1,18 +1,108 @@
-from celery import shared_task
+"""Celery tasks for hosting provisioning."""
 import logging
+import uuid
+from django.utils import timezone
+from celery import shared_task
+from celery.exceptions import MaxRetriesExceededError
+
+from apps.services.models import Service
+from apps.provisioning.models import ProvisioningJob
+from apps.provisioning.whm_client import WHMClient, WHMClientError, generate_cpanel_username, generate_secure_password
 
 logger = logging.getLogger(__name__)
 
 
-@shared_task(bind=True, max_retries=3)
-def provision_service(self, job_id):
-    from .models import ProvisioningJob
+@shared_task(bind=True, max_retries=3, default_retry_delay=300)
+def provision_hosting_account(self, service_id: int, job_id: int):
+    """
+    Provision a cPanel hosting account for a service.
+    Idempotent - checks if already provisioned before proceeding.
+    """
     try:
+        service = Service.objects.select_related("user", "package").get(id=service_id)
         job = ProvisioningJob.objects.get(id=job_id)
-        job.status = ProvisioningJob.STATUS_IN_PROGRESS
-        job.celery_task_id = self.request.id
-        job.attempt_count += 1
-        job.save(update_fields=["status", "celery_task_id", "attempt_count"])
-        logger.info(f"Provisioning job {job_id} started")
-    except ProvisioningJob.DoesNotExist:
-        logger.error(f"ProvisioningJob {job_id} not found")
+    except (Service.DoesNotExist, ProvisioningJob.DoesNotExist) as e:
+        logger.error(f"Cannot find service or job: {e}")
+        return
+
+    # Idempotency check
+    if job.status == ProvisioningJob.STATUS_COMPLETED:
+        logger.info(f"Provisioning job {job_id} already completed, skipping.")
+        return
+
+    if job.attempt_count >= job.max_attempts:
+        job.status = ProvisioningJob.STATUS_FAILED
+        job.save(update_fields=["status"])
+        service.status = Service.STATUS_FAILED
+        service.save(update_fields=["status"])
+        logger.error(f"Provisioning job {job_id} exceeded max attempts.")
+        return
+
+    job.status = ProvisioningJob.STATUS_IN_PROGRESS
+    job.attempt_count += 1
+    job.celery_task_id = self.request.id
+    job.save(update_fields=["status", "attempt_count", "celery_task_id"])
+
+    try:
+        client = WHMClient()
+        username = generate_cpanel_username(service.domain_name or service.user.email.split("@")[0])
+        password = generate_secure_password()
+
+        result = client.create_account(
+            domain=service.domain_name,
+            username=username,
+            password=password,
+            package=service.package.whm_package_name,
+            email=service.user.email,
+        )
+
+        service.status = Service.STATUS_ACTIVE
+        service.cpanel_username = username
+        service.save(update_fields=["status", "cpanel_username"])
+
+        job.status = ProvisioningJob.STATUS_COMPLETED
+        job.completed_at = timezone.now()
+        job.result_data = {"username": username, "result": str(result)}
+        job.save(update_fields=["status", "completed_at", "result_data"])
+
+        # Import here to avoid circular imports
+        from apps.notifications.services import send_notification
+        send_notification(
+            template_name="hosting_provisioned",
+            user=service.user,
+            context={
+                "service": service,
+                "username": username,
+                "domain": service.domain_name,
+                "package": service.package.name,
+            },
+        )
+
+        logger.info(f"Provisioning completed for service {service_id}, username={username}")
+
+    except WHMClientError as e:
+        logger.error(f"WHM error provisioning service {service_id}: {e}")
+        job.last_error = str(e)
+        job.status = ProvisioningJob.STATUS_RETRY
+        job.save(update_fields=["last_error", "status"])
+
+        try:
+            raise self.retry(exc=e)
+        except MaxRetriesExceededError:
+            job.status = ProvisioningJob.STATUS_FAILED
+            job.save(update_fields=["status"])
+            service.status = Service.STATUS_FAILED
+            service.save(update_fields=["status"])
+            logger.error(f"Provisioning permanently failed for service {service_id}")
+
+
+def create_provisioning_job(service: Service) -> ProvisioningJob:
+    """Create a provisioning job and queue it."""
+    idempotency_key = f"provision-{service.id}-{uuid.uuid4().hex}"
+    job = ProvisioningJob.objects.create(
+        service=service,
+        idempotency_key=idempotency_key,
+        status=ProvisioningJob.STATUS_QUEUED,
+    )
+    provision_hosting_account.delay(service.id, job.id)
+    return job
