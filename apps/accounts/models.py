@@ -16,7 +16,24 @@ class UserManager(BaseUserManager):
     def create_superuser(self, email, password=None, **extra_fields):
         extra_fields.setdefault("is_staff", True)
         extra_fields.setdefault("is_superuser", True)
-        return self.create_user(email, password, **extra_fields)
+        user = self.create_user(email, password, **extra_fields)
+
+        # Ensure superadmins can sign in immediately even when SMTP is not
+        # configured by marking their e-mail as verified in allauth.
+        try:
+            from allauth.account.models import EmailAddress
+
+            EmailAddress.objects.update_or_create(
+                user=user,
+                email=user.email,
+                defaults={"verified": True, "primary": True},
+            )
+        except Exception:
+            # Keep superuser creation resilient even if allauth tables are
+            # unavailable during bootstrap/migrations.
+            pass
+
+        return user
 
 
 class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):

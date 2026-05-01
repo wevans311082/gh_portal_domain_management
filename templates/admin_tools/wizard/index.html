@@ -1,66 +1,61 @@
-﻿{% extends "base.html" %}
+﻿{% extends "base_admin.html" %}
 
-{% block title %}Initial Setup Wizard - {{ SITE_NAME }}{% endblock %}
+{% block title %}Setup Wizard - {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Initial Setup Wizard{% endblock %}
 
-{% block body %}
-<div class="min-h-screen bg-gray-100 py-12 px-4">
-<div class="max-w-3xl mx-auto">
-
-    <div class="text-center mb-10">
-        <h1 class="text-4xl font-extrabold text-gray-900">Welcome to {{ SITE_NAME }}</h1>
-        <p class="mt-2 text-lg text-gray-600">Complete the setup wizard to get your hosting portal ready.</p>
+{% block content %}
+<!-- Progress -->
+<div class="bg-white rounded-lg shadow p-6 mb-6">
+    <div class="flex justify-between text-sm text-gray-500 mb-2">
+        <span>{{ done_count }} of {{ total }} steps complete</span>
     </div>
-
-    <!-- Progress bar -->
-    <div class="bg-white rounded-lg shadow p-6 mb-8">
-        <div class="flex justify-between text-sm text-gray-500 mb-2">
-            <span>{{ done_count }} of {{ total }} steps complete</span>
-            <span>{{ done_count|floatformat:0 }}/{{ total }}</span>
-        </div>
-        <div class="w-full bg-gray-200 rounded-full h-2.5">
-            {% widthratio done_count total 100 as pct %}
-            <div class="bg-sky-600 h-2.5 rounded-full" style="width: {{ pct }}%"></div>
-        </div>
+    <div class="w-full bg-gray-200 rounded-full h-2">
+        {% widthratio done_count total 100 as pct %}
+        <div class="bg-sky-600 h-2 rounded-full" style="width: {{ pct }}%"></div>
     </div>
-
-    <!-- Steps list -->
-    <div class="space-y-3 mb-8">
-        {% for step in steps %}
-        <div class="bg-white rounded-lg shadow flex items-center gap-4 p-4 {% if step.done %}border-l-4 border-green-500{% elif step.key == next_step %}border-l-4 border-orange-500{% else %}border-l-4 border-gray-200{% endif %}">
-            <span class="text-2xl">{{ step.icon }}</span>
-            <div class="flex-1">
-                <p class="font-semibold {% if step.done %}text-green-700{% elif step.key == next_step %}text-sky-600{% else %}text-gray-700{% endif %}">
-                    {{ step.title }}
-                    {% if step.done %}<span class="text-xs font-normal text-green-500 ml-2">✓ Done</span>{% endif %}
-                </p>
-                <p class="text-sm text-gray-500">{{ step.description }}</p>
-            </div>
-            {% if not step.done %}
-            <a href="{% url 'admin_tools:wizard_step' step.key %}"
-               class="text-sm {% if step.key == next_step %}bg-sky-600 text-white px-3 py-1 rounded hover:bg-sky-700{% else %}text-gray-400 hover:text-gray-600{% endif %}">
-                {% if step.key == next_step %}Start →{% else %}Configure{% endif %}
-            </a>
-            {% endif %}
-        </div>
-        {% endfor %}
-    </div>
-
-    {% if next_step %}
-    <div class="text-center">
-        <a href="{% url 'admin_tools:wizard_step' next_step %}"
-           class="inline-block bg-sky-600 text-white px-8 py-3 rounded-lg hover:bg-sky-700 font-semibold text-lg">
-            Continue Setup →
-        </a>
-    </div>
-    {% else %}
-    <div class="text-center">
-        <a href="{% url 'admin_tools:dashboard' %}"
-           class="inline-block bg-green-500 text-white px-8 py-3 rounded-lg hover:bg-green-600 font-semibold text-lg">
-            🎉 Go to Dashboard
-        </a>
-    </div>
-    {% endif %}
-
 </div>
+
+<!-- Steps list -->
+<div class="space-y-3 mb-6">
+    {% for step in steps %}
+    <div class="bg-white rounded-lg shadow flex items-center gap-4 p-4
+                {% if step.done %}border-l-4 border-emerald-500
+                {% elif step.key == next_step %}border-l-4 border-sky-500
+                {% else %}border-l-4 border-gray-200{% endif %}">
+        <span class="text-2xl">{{ step.icon }}</span>
+        <div class="flex-1">
+            <p class="font-semibold
+               {% if step.done %}text-emerald-700
+               {% elif step.key == next_step %}text-sky-700
+               {% else %}text-gray-700{% endif %}">
+                {{ step.title }}
+                {% if step.done %}<span class="text-xs font-normal text-emerald-500 ml-2">✓ Done</span>{% endif %}
+            </p>
+            <p class="text-sm text-gray-500">{{ step.description }}</p>
+        </div>
+        {% if not step.done %}
+        <a href="{% url 'admin_tools:wizard_step' step.key %}"
+           class="text-sm {% if step.key == next_step %}bg-sky-600 text-white px-3 py-1.5 rounded hover:bg-sky-700{% else %}text-gray-400 hover:text-gray-600{% endif %}">
+            {% if step.key == next_step %}Start &rarr;{% else %}Configure{% endif %}
+        </a>
+        {% endif %}
+    </div>
+    {% endfor %}
 </div>
+
+{% if next_step %}
+<div class="text-center">
+    <a href="{% url 'admin_tools:wizard_step' next_step %}"
+       class="inline-block bg-sky-600 text-white px-8 py-3 rounded-lg hover:bg-sky-700 font-semibold">
+        Continue Setup &rarr;
+    </a>
+</div>
+{% else %}
+<div class="text-center">
+    <a href="{% url 'admin_tools:dashboard' %}"
+       class="inline-block bg-emerald-600 text-white px-8 py-3 rounded-lg hover:bg-emerald-700 font-semibold">
+        🎉 Go to Dashboard
+    </a>
+</div>
+{% endif %}
 {% endblock %}

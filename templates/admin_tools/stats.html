@@ -1,185 +1,154 @@
-{% extends "base.html" %}
+{% extends "base_admin.html" %}
 {% load core_tags %}
 
-{% block title %}Stats &amp; Metrics{% endblock %}
+{% block title %}Stats &amp; Metrics - {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Stats &amp; Metrics{% endblock %}
 
-{% block body %}
-<div class="min-h-full bg-slate-950 text-slate-100">
-  <div class="mx-auto max-w-7xl px-6 py-10 lg:px-8">
+{% block header_actions %}
+<a href="{% url 'admin_tools:dashboard' %}" class="text-sm font-medium text-sky-600 hover:text-sky-800">&larr; Dashboard</a>
+<a href="{% url 'admin_tools:task_management' %}" class="text-sm font-medium text-sky-600 hover:text-sky-800">Task Management</a>
+{% endblock %}
 
-    <!-- Header -->
-    <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between mb-10">
-      <div>
-        <p class="text-sm font-semibold uppercase tracking-[0.3em] text-cyan-300">Admin Tools</p>
-        <h1 class="mt-3 text-4xl font-black tracking-tight text-white">Stats &amp; Metrics</h1>
-        <p class="mt-2 text-sm text-slate-400">Revenue, domain health, task success and user growth.</p>
-      </div>
-      <div class="flex gap-3">
-        <a href="{% url 'admin_tools:dashboard' %}" class="rounded-full border border-slate-700 bg-slate-900 px-5 py-3 text-sm font-semibold text-slate-100 transition hover:border-slate-500 hover:bg-slate-800">
-          &larr; Dashboard
-        </a>
-        <a href="{% url 'admin_tools:task_management' %}" class="rounded-full border border-cyan-400/40 bg-cyan-400/10 px-5 py-3 text-sm font-semibold text-cyan-100 transition hover:border-cyan-300 hover:bg-cyan-400/20">
-          Task management
-        </a>
-      </div>
+{% block content %}
+<!-- KPI row -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-sm font-medium text-gray-500">Revenue (12 m)</h3>
+        <p class="text-3xl font-bold mt-2 text-gray-900">&pound;{{ total_revenue_12m|floatformat:2 }}</p>
     </div>
-
-    <!-- KPI summary row -->
-    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4 mb-10">
-      <section class="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-2xl shadow-slate-950/40">
-        <p class="text-sm text-slate-400">Revenue (12 m)</p>
-        <p class="mt-4 text-4xl font-black text-white">&pound;{{ total_revenue_12m|floatformat:2 }}</p>
-      </section>
-      <section class="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-2xl shadow-slate-950/40">
-        <p class="text-sm text-slate-400">Active domains</p>
-        <p class="mt-4 text-4xl font-black text-white">{{ active_domains }}</p>
-        <p class="mt-1 text-xs text-slate-500">{{ total_domains }} total</p>
-      </section>
-      <section class="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-2xl shadow-slate-950/40">
-        <p class="text-sm text-slate-400">New users (12 m)</p>
-        <p class="mt-4 text-4xl font-black text-white">{{ total_new_users_12m }}</p>
-        <p class="mt-1 text-xs text-slate-500">{{ total_users }} total</p>
-      </section>
-      <section class="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-2xl shadow-slate-950/40">
-        <p class="text-sm text-slate-400">Unpaid invoices</p>
-        <p class="mt-4 text-4xl font-black text-white">{{ unpaid_invoices }}</p>
-      </section>
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-sm font-medium text-gray-500">Active Domains</h3>
+        <p class="text-3xl font-bold mt-2 text-gray-900">{{ active_domains }}</p>
+        <p class="text-xs text-gray-400 mt-1">{{ total_domains }} total</p>
     </div>
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-sm font-medium text-gray-500">New Users (12 m)</h3>
+        <p class="text-3xl font-bold mt-2 text-gray-900">{{ total_new_users_12m }}</p>
+        <p class="text-xs text-gray-400 mt-1">{{ total_users }} total</p>
+    </div>
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-sm font-medium text-gray-500">Unpaid Invoices</h3>
+        <p class="text-3xl font-bold mt-2 {% if unpaid_invoices %}text-red-600{% else %}text-gray-900{% endif %}">{{ unpaid_invoices }}</p>
+    </div>
+</div>
 
-    <!-- Charts row -->
-    <div class="grid gap-6 xl:grid-cols-2 mb-10">
-
-      <!-- Revenue chart -->
-      <div class="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-2xl shadow-slate-950/40">
-        <h2 class="text-base font-semibold text-white mb-4">Monthly Revenue (last 12 months)</h2>
+<!-- Charts row -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="font-semibold text-gray-900 mb-4">Monthly Revenue (last 12 months)</h3>
         {% if revenue_labels %}
-        <div class="h-48 flex items-end gap-1" id="revenue-chart-bars">
-          {% for label, value in revenue_labels|zip_lists:revenue_values %}
-          <div class="flex-1 flex flex-col items-center gap-1"
-               title="{{ label }}: £{{ value|floatformat:2 }}">
-            <div class="w-full bg-cyan-500 rounded-t"
-                 style="height: {{ value|floatformat:0 }}px; max-height: 160px; min-height: 2px"></div>
-            <span class="text-[9px] text-slate-500 rotate-45 origin-left mt-1 block">{{ label }}</span>
-          </div>
-          {% endfor %}
+        <div class="h-40 flex items-end gap-1">
+            {% for label, value in revenue_labels|zip_lists:revenue_values %}
+            <div class="flex-1 flex flex-col items-center gap-1" title="{{ label }}: £{{ value|floatformat:2 }}">
+                <div class="w-full bg-sky-500 rounded-t" style="height: {{ value|floatformat:0 }}px; max-height: 120px; min-height: 2px"></div>
+                <span class="text-[9px] text-gray-400 rotate-45 origin-left mt-1 block">{{ label }}</span>
+            </div>
+            {% endfor %}
         </div>
-        <!-- Fallback: canvas for JS chart -->
-        <canvas id="revenueChart" class="hidden"></canvas>
         {% else %}
-        <p class="text-sm text-slate-500 mt-2">No paid invoices in the last 12 months.</p>
+        <p class="text-sm text-gray-400">No paid invoices in the last 12 months.</p>
         {% endif %}
-      </div>
+    </div>
 
-      <!-- Signup chart -->
-      <div class="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-2xl shadow-slate-950/40">
-        <h2 class="text-base font-semibold text-white mb-4">New Signups (last 12 months)</h2>
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="font-semibold text-gray-900 mb-4">New Signups (last 12 months)</h3>
         {% if signup_labels %}
-        <div class="h-48 flex items-end gap-1">
-          {% for label, value in signup_labels|zip_lists:signup_values %}
-          <div class="flex-1 flex flex-col items-center gap-1"
-               title="{{ label }}: {{ value }} signups">
-            <div class="w-full bg-emerald-500 rounded-t"
-                 style="height: {{ value }}0px; max-height: 160px; min-height: 2px"></div>
-            <span class="text-[9px] text-slate-500 rotate-45 origin-left mt-1 block">{{ label }}</span>
-          </div>
-          {% endfor %}
+        <div class="h-40 flex items-end gap-1">
+            {% for label, value in signup_labels|zip_lists:signup_values %}
+            <div class="flex-1 flex flex-col items-center gap-1" title="{{ label }}: {{ value }} signups">
+                <div class="w-full bg-emerald-500 rounded-t" style="height: {{ value }}0px; max-height: 120px; min-height: 2px"></div>
+                <span class="text-[9px] text-gray-400 rotate-45 origin-left mt-1 block">{{ label }}</span>
+            </div>
+            {% endfor %}
         </div>
         {% else %}
-        <p class="text-sm text-slate-500 mt-2">No signups recorded in the last 12 months.</p>
+        <p class="text-sm text-gray-400">No signups recorded in the last 12 months.</p>
         {% endif %}
-      </div>
     </div>
+</div>
 
-    <!-- Domain status + Renewal stats -->
-    <div class="grid gap-6 xl:grid-cols-2 mb-10">
-
-      <!-- Domain status breakdown -->
-      <div class="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-2xl shadow-slate-950/40">
-        <h2 class="text-base font-semibold text-white mb-4">Domain Status Breakdown</h2>
-        <ul class="space-y-2">
-          {% for item in domain_status_counts %}
-          <li class="flex items-center justify-between text-sm">
-            <span class="capitalize text-slate-300">{{ item.status }}</span>
-            <span class="font-semibold text-white">{{ item.count }}</span>
-          </li>
-          {% empty %}
-          <li class="text-sm text-slate-500">No domains yet.</li>
-          {% endfor %}
+<!-- Domain status + Renewal stats -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="font-semibold text-gray-900 mb-4">Domain Status Breakdown</h3>
+        <ul class="divide-y">
+            {% for item in domain_status_counts %}
+            <li class="flex justify-between py-2 text-sm">
+                <span class="capitalize text-gray-500">{{ item.status }}</span>
+                <span class="font-semibold text-gray-900">{{ item.count }}</span>
+            </li>
+            {% empty %}
+            <li class="text-sm text-gray-400">No domains yet.</li>
+            {% endfor %}
         </ul>
-      </div>
-
-      <!-- Renewal stats -->
-      <div class="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-2xl shadow-slate-950/40">
-        <h2 class="text-base font-semibold text-white mb-4">Domain Renewals</h2>
-        <div class="grid grid-cols-3 gap-4 text-center">
-          <div>
-            <p class="text-3xl font-black text-emerald-400">{{ renewal_counts.completed }}</p>
-            <p class="text-xs text-slate-400 mt-1">Completed</p>
-          </div>
-          <div>
-            <p class="text-3xl font-black text-amber-400">{{ renewal_counts.pending }}</p>
-            <p class="text-xs text-slate-400 mt-1">In progress</p>
-          </div>
-          <div>
-            <p class="text-3xl font-black text-rose-400">{{ renewal_counts.failed }}</p>
-            <p class="text-xs text-slate-400 mt-1">Failed</p>
-          </div>
-        </div>
-      </div>
     </div>
 
-    <!-- Task health -->
-    <div class="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-2xl shadow-slate-950/40 mb-10">
-      <h2 class="text-base font-semibold text-white mb-4">Task Health (last 7 days)</h2>
-      <div class="grid grid-cols-3 gap-4 text-center">
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="font-semibold text-gray-900 mb-4">Domain Renewals</h3>
+        <div class="grid grid-cols-3 gap-4 text-center">
+            <div>
+                <p class="text-3xl font-bold text-emerald-600">{{ renewal_counts.completed }}</p>
+                <p class="text-xs text-gray-500 mt-1">Completed</p>
+            </div>
+            <div>
+                <p class="text-3xl font-bold text-yellow-600">{{ renewal_counts.pending }}</p>
+                <p class="text-xs text-gray-500 mt-1">In progress</p>
+            </div>
+            <div>
+                <p class="text-3xl font-bold text-red-600">{{ renewal_counts.failed }}</p>
+                <p class="text-xs text-gray-500 mt-1">Failed</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Task health -->
+<div class="bg-white rounded-lg shadow p-6 mb-6">
+    <h3 class="font-semibold text-gray-900 mb-4">Task Health (last 7 days)</h3>
+    <div class="grid grid-cols-3 gap-4 text-center">
         {% for bar in task_chart_bars %}
         <div>
-          <p class="text-3xl font-black {% if bar.color == 'bg-emerald-500' %}text-emerald-400{% elif bar.color == 'bg-rose-500' %}text-rose-400{% else %}text-amber-400{% endif %}">
-            {{ bar.count }}
-          </p>
-          <p class="text-xs text-slate-400 mt-1">{{ bar.label }}</p>
+            <p class="text-3xl font-bold {% if bar.color == 'bg-emerald-500' %}text-emerald-600{% elif bar.color == 'bg-rose-500' %}text-red-600{% else %}text-yellow-600{% endif %}">{{ bar.count }}</p>
+            <p class="text-xs text-gray-500 mt-1">{{ bar.label }}</p>
         </div>
         {% endfor %}
-      </div>
     </div>
+</div>
 
-    <!-- Expiring domains table -->
-    <div class="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-2xl shadow-slate-950/40">
-      <h2 class="text-base font-semibold text-white mb-4">Domains Expiring in Next 30 Days</h2>
-      {% if expiring_soon %}
-      <div class="overflow-x-auto">
-        <table class="min-w-full text-sm">
-          <thead>
-            <tr class="text-left text-xs uppercase tracking-wider text-slate-400">
-              <th class="pb-3 pr-6">Domain</th>
-              <th class="pb-3 pr-6">Owner</th>
-              <th class="pb-3 pr-6">Expires</th>
-              <th class="pb-3">Auto-renew</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-800">
-            {% for domain in expiring_soon %}
-            <tr>
-              <td class="py-2 pr-6 font-medium text-white">{{ domain.name }}</td>
-              <td class="py-2 pr-6 text-slate-300">{{ domain.user.email }}</td>
-              <td class="py-2 pr-6 text-slate-300">{{ domain.expires_at|date:"d M Y" }}</td>
-              <td class="py-2">
-                {% if domain.auto_renew %}
-                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-emerald-900/60 text-emerald-300">On</span>
-                {% else %}
-                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-rose-900/60 text-rose-300">Off</span>
-                {% endif %}
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
+<!-- Expiring domains -->
+<div class="bg-white rounded-lg shadow p-6">
+    <h3 class="font-semibold text-gray-900 mb-4">Domains Expiring in Next 30 Days</h3>
+    {% if expiring_soon %}
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200 text-sm">
+            <thead>
+                <tr class="text-left text-gray-500">
+                    <th class="pb-3 pr-6 font-semibold">Domain</th>
+                    <th class="pb-3 pr-6 font-semibold">Owner</th>
+                    <th class="pb-3 pr-6 font-semibold">Expires</th>
+                    <th class="pb-3 font-semibold">Auto-renew</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for domain in expiring_soon %}
+                <tr>
+                    <td class="py-2 pr-6 font-medium text-gray-900">{{ domain.name }}</td>
+                    <td class="py-2 pr-6 text-gray-500">{{ domain.user.email }}</td>
+                    <td class="py-2 pr-6 text-gray-500">{{ domain.expires_at|date:"d M Y" }}</td>
+                    <td class="py-2">
+                        {% if domain.auto_renew %}
+                        <span class="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">On</span>
+                        {% else %}
+                        <span class="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">Off</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
         </table>
-      </div>
-      {% else %}
-      <p class="text-sm text-slate-500">No domains expiring in the next 30 days.</p>
-      {% endif %}
     </div>
-
-  </div>
+    {% else %}
+    <p class="text-sm text-gray-400">No domains expiring in the next 30 days.</p>
+    {% endif %}
 </div>
 {% endblock %}

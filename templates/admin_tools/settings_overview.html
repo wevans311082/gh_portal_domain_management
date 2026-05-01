@@ -1,0 +1,54 @@
+{% extends "base_admin.html" %}
+
+{% block title %}Settings &amp; Config — {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Settings &amp; Configuration{% endblock %}
+
+{% block content %}
+<p class="text-sm text-slate-500 mb-5">
+    Read-only view of application configuration. Secrets are redacted.
+    Edit values in your <code class="font-mono bg-slate-100 px-1 py-0.5 rounded">.env</code> file and restart the server.
+</p>
+
+<div class="space-y-5">
+    {% for section, values in cfg.items %}
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="px-5 py-3.5 bg-slate-50 border-b border-slate-200">
+            <h2 class="font-semibold text-slate-800 text-sm">{{ section }}</h2>
+        </div>
+        <table class="w-full text-sm">
+            <tbody class="divide-y divide-slate-100">
+                {% for key, value in values.items %}
+                <tr class="hover:bg-slate-50 transition-colors">
+                    <td class="px-5 py-3 font-mono text-xs font-semibold text-slate-700 w-64 align-top">{{ key }}</td>
+                    <td class="px-5 py-3 text-xs text-slate-600 break-all">
+                        {% if "redacted" in value|stringformat:"s" %}
+                        <span class="text-slate-400 italic">{{ value }}</span>
+                        {% elif value == True %}
+                        <span class="inline-flex items-center gap-1 text-emerald-700 font-medium">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            True
+                        </span>
+                        {% elif value == False %}
+                        <span class="inline-flex items-center gap-1 text-red-600 font-medium">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            False
+                        </span>
+                        {% else %}
+                        <span class="font-mono">{{ value }}</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="mt-5 bg-amber-50 border border-amber-200 rounded-xl p-4">
+    <p class="text-xs text-amber-700 font-medium">
+        ⚠️ This page is for authorised admin use only. Do not share screenshots containing configuration details.
+        Secrets are redacted above but ensure your browser history and sessions are secure.
+    </p>
+</div>
+{% endblock %}

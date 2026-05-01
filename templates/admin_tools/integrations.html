@@ -1,0 +1,53 @@
+{% extends "base_admin.html" %}
+
+{% block title %}Integration Status — Admin Tools{% endblock %}
+{% block page_title %}Integration Diagnostics{% endblock %}
+
+{% block header_actions %}
+<a href="{% url 'admin_tools:dashboard' %}" class="text-sm text-sky-600 hover:underline font-medium">← Dashboard</a>
+{% endblock %}
+
+{% block content %}
+<p class="text-sm text-sky-500 mb-6">
+    Results below show the outcome of one lightweight test probe per integration.
+    Click an integration for detailed multi-call diagnostics.
+</p>
+
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+    {% for probe in probes %}
+    {% with slug=probe.label|lower|cut:' '|cut:'/'|cut:'-'|slugify %}
+    {% comment %}Map label to URL slug{% endcomment %}
+    {% endwith %}
+    <div class="bg-white rounded-xl shadow-sm border {% if probe.ok %}border-sky-100{% else %}border-red-200{% endif %} p-5 flex flex-col">
+        <div class="flex items-center justify-between mb-3">
+            <h3 class="font-semibold text-sky-900 text-sm">{{ probe.label }}</h3>
+            {% if probe.ok %}
+            <span class="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 text-xs px-2.5 py-1 rounded-full font-medium">
+                ✓ Connected
+            </span>
+            {% else %}
+            <span class="inline-flex items-center gap-1 bg-red-100 text-red-700 text-xs px-2.5 py-1 rounded-full font-medium">
+                ✗ Error
+            </span>
+            {% endif %}
+        </div>
+        <p class="text-xs text-sky-400 mb-3">{{ probe.elapsed_ms }} ms</p>
+        {% if probe.error %}
+        <p class="text-xs text-red-600 bg-red-50 rounded-lg p-2 mb-3 break-words">{{ probe.error }}</p>
+        {% endif %}
+        <!-- Detail link: map labels to URL slugs -->
+        {% if probe.label == "ResellerClub" %}
+        <a href="{% url 'admin_tools:integration_detail' 'resellerclub' %}" class="mt-auto text-xs text-sky-600 hover:underline font-medium">View details →</a>
+        {% elif probe.label == "Cloudflare" %}
+        <a href="{% url 'admin_tools:integration_detail' 'cloudflare' %}" class="mt-auto text-xs text-sky-600 hover:underline font-medium">View details →</a>
+        {% elif probe.label == "Companies House" %}
+        <a href="{% url 'admin_tools:integration_detail' 'companies-house' %}" class="mt-auto text-xs text-sky-600 hover:underline font-medium">View details →</a>
+        {% elif probe.label == "WHM / cPanel" %}
+        <a href="{% url 'admin_tools:integration_detail' 'whm' %}" class="mt-auto text-xs text-sky-600 hover:underline font-medium">View details →</a>
+        {% elif probe.label == "Stripe" %}
+        <a href="{% url 'admin_tools:integration_detail' 'stripe' %}" class="mt-auto text-xs text-sky-600 hover:underline font-medium">View details →</a>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

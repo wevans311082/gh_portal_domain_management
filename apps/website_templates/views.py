@@ -32,7 +32,12 @@ def gallery(request):
     if category_filter:
         qs = qs.filter(category=category_filter)
     if search_q:
-        qs = qs.filter(name__icontains=search_q)
+        from django.db.models import Q
+        qs = qs.filter(
+            Q(name__icontains=search_q) |
+            Q(description__icontains=search_q) |
+            Q(category__icontains=search_q)
+        )
 
     categories = WebsiteTemplate.CATEGORY_CHOICES
 
@@ -53,6 +58,7 @@ def gallery(request):
             "category_filter": category_filter,
             "search_q": search_q,
             "my_installs": list(my_installs),
+            "total_in_db": WebsiteTemplate.objects.filter(is_active=True).count(),
         },
     )
 

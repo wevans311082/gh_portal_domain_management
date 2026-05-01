@@ -1,16 +1,16 @@
-{% extends "base.html" %}
+{% extends "base_admin.html" %}
 
 {% block title %}Reset Setup Wizard - {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Reset Setup Wizard{% endblock %}
 
-{% block body %}
-<div class="min-h-screen bg-gray-100 flex items-center justify-center px-4">
-<div class="max-w-md w-full">
+{% block content %}
+<div class="max-w-md mx-auto">
     <div class="bg-white rounded-lg shadow p-8 text-center space-y-5">
         <span class="text-5xl">⚠️</span>
-        <h2 class="text-2xl font-bold text-gray-900">Reset setup wizard?</h2>
+        <h2 class="text-xl font-bold text-gray-900">Reset setup wizard?</h2>
         <p class="text-sm text-gray-600">
             This will clear all recorded wizard progress. Your existing configuration and data will
-            <strong>not</strong> be changed — only the wizard's completion record will be wiped.
+            <strong>not</strong> be changed &mdash; only the wizard's completion record will be wiped.
         </p>
         <form method="post" class="space-y-3">
             {% csrf_token %}
@@ -19,9 +19,7 @@
                 Yes, reset the wizard
             </button>
         </form>
-        <a href="{% url 'admin_tools:wizard_index' %}"
-           class="block text-sm text-gray-500 hover:underline">Cancel</a>
+        <a href="{% url 'admin_tools:wizard_index' %}" class="block text-sm text-gray-500 hover:underline">Cancel</a>
     </div>
-</div>
 </div>
 {% endblock %}

@@ -1,0 +1,78 @@
+{% extends "base_admin.html" %}
+
+{% block title %}Users & Accounts — {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Users &amp; Accounts{% endblock %}
+
+{% block content %}
+<!-- Summary -->
+<div class="grid grid-cols-3 gap-4 mb-6">
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+        <p class="text-xs text-slate-500 font-medium uppercase tracking-wide mb-1">Total Users</p>
+        <p class="text-3xl font-bold text-slate-800">{{ total_users }}</p>
+    </div>
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+        <p class="text-xs text-slate-500 font-medium uppercase tracking-wide mb-1">Staff Members</p>
+        <p class="text-3xl font-bold text-indigo-700">{{ staff_count }}</p>
+    </div>
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+        <p class="text-xs text-slate-500 font-medium uppercase tracking-wide mb-1">Superadmins</p>
+        <p class="text-3xl font-bold text-indigo-700">{{ superuser_count }}</p>
+    </div>
+</div>
+
+<!-- Search -->
+<div class="bg-white rounded-xl border border-slate-200 shadow-sm p-4 mb-5">
+    <form method="get" class="flex gap-3">
+        <input type="text" name="q" value="{{ search_q }}" placeholder="Search by email or name…"
+               class="border border-slate-200 rounded-lg px-3 py-2 text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+        <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700">Search</button>
+        {% if search_q %}<a href="{% url 'admin_tools:users' %}" class="border border-slate-200 text-slate-600 px-4 py-2 rounded-lg text-sm hover:bg-slate-50">Clear</a>{% endif %}
+        <a href="{% url 'admin:accounts_user_add' %}" class="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-700">+ New User</a>
+    </form>
+</div>
+
+<!-- User table -->
+<div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+    <table class="w-full text-sm">
+        <thead class="bg-slate-50 border-b border-slate-200">
+            <tr>
+                <th class="px-4 py-3 text-left font-semibold text-slate-600">Email</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-600">Name</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-600">Joined</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-600">Flags</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-600">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+            {% for u in page_obj %}
+            <tr class="hover:bg-slate-50 transition-colors">
+                <td class="px-4 py-3 font-medium text-slate-800">{{ u.email }}</td>
+                <td class="px-4 py-3 text-slate-600">{{ u.full_name|default:"—" }}</td>
+                <td class="px-4 py-3 text-slate-400 text-xs">{{ u.created_at|date:"d M Y" }}</td>
+                <td class="px-4 py-3">
+                    <div class="flex gap-1 flex-wrap">
+                        {% if u.is_superuser %}<span class="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-medium">Super</span>{% endif %}
+                        {% if u.is_staff %}<span class="text-xs bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded font-medium">Staff</span>{% endif %}
+                        {% if not u.is_active %}<span class="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-medium">Inactive</span>{% endif %}
+                        {% if u.mfa_enabled %}<span class="text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-medium">2FA</span>{% endif %}
+                    </div>
+                </td>
+                <td class="px-4 py-3">
+                    <a href="{% url 'admin:accounts_user_change' u.pk %}" class="text-xs text-indigo-600 hover:underline">Edit in Admin</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="px-4 py-8 text-center text-slate-400 text-sm">No users found.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% if page_obj.has_other_pages %}
+    <div class="px-4 py-3 border-t border-slate-200 flex items-center gap-2 text-sm">
+        {% if page_obj.has_previous %}<a href="?page={{ page_obj.previous_page_number }}{% if search_q %}&q={{ search_q }}{% endif %}" class="px-3 py-1.5 border border-slate-200 rounded hover:bg-slate-50">← Prev</a>{% endif %}
+        <span class="text-slate-500">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}<a href="?page={{ page_obj.next_page_number }}{% if search_q %}&q={{ search_q }}{% endif %}" class="px-3 py-1.5 border border-slate-200 rounded hover:bg-slate-50">Next →</a>{% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

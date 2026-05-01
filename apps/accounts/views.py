@@ -110,6 +110,8 @@ def custom_login(request):
 
         if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
             return redirect(next_url)
+        if user.is_staff:
+            return redirect("admin_tools:dashboard")
         return redirect("portal:dashboard")
 
     return render(request, "accounts/login.html", {"next": next_url})
@@ -142,6 +144,8 @@ def mfa_verify(request):
                 login(request, pending_user, backend="apps.accounts.backends.EmailBackend")
                 if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
                     return redirect(next_url)
+                if pending_user.is_staff:
+                    return redirect("admin_tools:dashboard")
                 return redirect("portal:dashboard")
             else:
                 logger.warning("Invalid MFA token for user %s", pending_user.pk)

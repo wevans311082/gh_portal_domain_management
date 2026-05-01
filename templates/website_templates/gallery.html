@@ -108,9 +108,22 @@
     <svg class="w-16 h-16 mx-auto text-sky-200 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
     </svg>
+    {% if search_q or category_filter %}
     <h3 class="text-lg font-semibold text-sky-900 mb-1">No templates found</h3>
     <p class="text-sky-500 text-sm mb-4">Try adjusting your search or category filter.</p>
     <a href="{% url 'website_templates:gallery' %}" class="text-sky-600 hover:underline text-sm">Clear filters</a>
+    {% elif total_in_db == 0 and request.user.is_staff %}
+    <h3 class="text-lg font-semibold text-sky-900 mb-1">No templates imported yet</h3>
+    <p class="text-sky-500 text-sm mb-4">The template library needs to be indexed from the ZIP archive folder.</p>
+    <a href="{% url 'admin_tools:template_scan' %}"
+       class="inline-block bg-sky-600 text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-sky-700">
+        Import Templates Now
+    </a>
+    {% else %}
+    <h3 class="text-lg font-semibold text-sky-900 mb-1">No templates found</h3>
+    <p class="text-sky-500 text-sm mb-4">Try adjusting your search or category filter.</p>
+    <a href="{% url 'website_templates:gallery' %}" class="text-sky-600 hover:underline text-sm">Clear filters</a>
+    {% endif %}
 </div>
 {% endif %}
 {% endblock %}

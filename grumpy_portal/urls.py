@@ -3,12 +3,15 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 
+from apps.accounts import views as account_views
+
 # Admin URL slug is configurable via DJANGO_ADMIN_URL env var (defaults to a
 # non-guessable path; change it for every deployment).
 _ADMIN_URL = getattr(settings, "DJANGO_ADMIN_URL", "manage-site-a3f7c2/")
 
 urlpatterns = [
     path(_ADMIN_URL, admin.site.urls),
+    path("accounts/login/", account_views.custom_login, name="account_login"),
     path("accounts/", include("allauth.urls")),
     path("my-account/", include("apps.accounts.urls")),
     path("", include("apps.core.urls")),
