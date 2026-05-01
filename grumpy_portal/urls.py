@@ -20,6 +20,7 @@ urlpatterns = [
     path("domains/", include("apps.domains.urls")),
     path("dns/", include("apps.dns.urls")),
     path("support/", include("apps.support.urls")),
+    path("hosting/", include("apps.provisioning.urls")),
     path("admin-tools/", include("apps.admin_tools.urls")),
     path("website-templates/", include("apps.website_templates.urls")),
 ]

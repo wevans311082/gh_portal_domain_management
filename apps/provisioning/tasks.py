@@ -111,3 +111,84 @@ def create_provisioning_job(service: Service) -> ProvisioningJob:
     )
     provision_hosting_account.delay(service.id, job.id)
     return job
+
+
+# ── Email account tasks ───────────────────────────────────────────────────────
+
+@shared_task
+def create_email_account_task(service_id: int, email_user: str, domain: str, password: str, quota_mb: int = 500):
+    """Create a cPanel email account on behalf of a customer."""
+    try:
+        service = Service.objects.get(id=service_id)
+    except Service.DoesNotExist:
+        logger.error(f"create_email_account_task: Service {service_id} not found")
+        return
+
+    if not service.cpanel_username:
+        logger.error(f"create_email_account_task: Service {service_id} has no cpanel_username")
+        return
+
+    try:
+        client = WHMClient()
+        client.create_email_account(
+            cpanel_username=service.cpanel_username,
+            email_user=email_user,
+            domain=domain,
+            password=password,
+            quota_mb=quota_mb,
+        )
+        logger.info(f"Email {email_user}@{domain} created for service {service_id}")
+    except WHMClientError as e:
+        logger.error(f"Failed to create email {email_user}@{domain} for service {service_id}: {e}")
+        raise
+
+
+@shared_task
+def delete_email_account_task(service_id: int, email_user: str, domain: str):
+    """Delete a cPanel email account on behalf of a customer."""
+    try:
+        service = Service.objects.get(id=service_id)
+    except Service.DoesNotExist:
+        logger.error(f"delete_email_account_task: Service {service_id} not found")
+        return
+
+    if not service.cpanel_username:
+        return
+
+    try:
+        client = WHMClient()
+        client.delete_email_account(
+            cpanel_username=service.cpanel_username,
+            email_user=email_user,
+            domain=domain,
+        )
+        logger.info(f"Email {email_user}@{domain} deleted for service {service_id}")
+    except WHMClientError as e:
+        logger.error(f"Failed to delete email {email_user}@{domain} for service {service_id}: {e}")
+        raise
+
+
+# ── Database tasks ────────────────────────────────────────────────────────────
+
+@shared_task
+def create_database_task(service_id: int, db_name: str):
+    """Create a MySQL database for a customer's cPanel account."""
+    try:
+        service = Service.objects.get(id=service_id)
+    except Service.DoesNotExist:
+        logger.error(f"create_database_task: Service {service_id} not found")
+        return
+
+    if not service.cpanel_username:
+        logger.error(f"create_database_task: Service {service_id} has no cpanel_username")
+        return
+
+    # cPanel automatically prefixes the db name with the username
+    full_name = f"{service.cpanel_username}_{db_name}"
+    try:
+        client = WHMClient()
+        client.create_database(cpanel_username=service.cpanel_username, db_name=full_name)
+        logger.info(f"Database {full_name} created for service {service_id}")
+    except WHMClientError as e:
+        logger.error(f"Failed to create database {full_name} for service {service_id}: {e}")
+        raise

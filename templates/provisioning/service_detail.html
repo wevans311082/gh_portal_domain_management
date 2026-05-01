@@ -1,0 +1,133 @@
+{% extends "base_portal.html" %}
+{% load static %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto px-4 py-8 space-y-8">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between">
+    <div>
+      <a href="{% url 'provisioning:service_list' %}" class="text-sm text-sky-600 hover:underline">&larr; All services</a>
+      <h1 class="text-2xl font-bold text-gray-900 mt-1">{{ service.domain_name|default:"Hosting Service" }}</h1>
+      <p class="text-sm text-gray-500">
+        {{ service.package.name }} &middot;
+        <span class="{% if service.status == 'active' %}text-green-700{% else %}text-yellow-700{% endif %}">
+          {{ service.get_status_display }}
+        </span>
+        {% if service.cpanel_username %}
+          &middot; cPanel user: <code class="text-xs bg-gray-100 px-1 rounded">{{ service.cpanel_username }}</code>
+        {% endif %}
+      </p>
+    </div>
+  </div>
+
+  {% if messages %}
+  <div class="space-y-2">
+    {% for message in messages %}
+    <div class="rounded-md px-4 py-3 text-sm
+      {% if message.tags == 'success' %}bg-green-50 text-green-800 border border-green-200
+      {% elif message.tags == 'error' %}bg-red-50 text-red-800 border border-red-200
+      {% else %}bg-blue-50 text-blue-800 border border-blue-200{% endif %}">
+      {{ message }}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Disk quota -->
+  {% if quota %}
+  <div class="bg-white rounded-lg border border-gray-200 shadow-sm p-5">
+    <h2 class="text-base font-semibold text-gray-900 mb-3">Disk Usage</h2>
+    {% with used=quota.megabytes_used limit=quota.megabytes_limit %}
+    {% if limit and limit != "unlimited" %}
+    {% widthratio used|default:0 limit 100 as pct %}
+    <div class="flex items-center gap-4">
+      <div class="flex-1 bg-gray-200 rounded-full h-2.5">
+        <div class="bg-sky-500 h-2.5 rounded-full transition-all" style="width: {{ pct|default:0 }}%"></div>
+      </div>
+      <span class="text-sm text-gray-600 whitespace-nowrap">{{ used|default:0 }} / {{ limit }} MB</span>
+    </div>
+    {% else %}
+    <p class="text-sm text-gray-600">{{ used|default:0 }} MB used &mdash; unlimited</p>
+    {% endif %}
+    {% endwith %}
+  </div>
+  {% endif %}
+
+  <!-- Email accounts -->
+  <div class="bg-white rounded-lg border border-gray-200 shadow-sm">
+    <div class="px-5 py-4 flex items-center justify-between border-b border-gray-100">
+      <h2 class="text-base font-semibold text-gray-900">Email Accounts</h2>
+      {% if service.cpanel_username %}
+      <a href="{% url 'provisioning:email_create' service.id %}"
+         class="inline-flex items-center gap-1 rounded-md bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-500 transition-colors">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        Add email
+      </a>
+      {% endif %}
+    </div>
+
+    {% if email_accounts %}
+    <ul class="divide-y divide-gray-100">
+      {% for acct in email_accounts %}
+      <li class="px-5 py-3 flex items-center justify-between">
+        <div>
+          <p class="text-sm font-medium text-gray-900">{{ acct.user }}@{{ acct.domain }}</p>
+          <p class="text-xs text-gray-400">
+            {{ acct.diskusedmb|default:"0" }} MB used
+            {% if acct.diskquota and acct.diskquota != "unlimited" %}
+              / {{ acct.diskquota }} MB
+            {% endif %}
+          </p>
+        </div>
+        <form method="post" action="{% url 'provisioning:email_delete' service.id %}"
+              onsubmit="return confirm('Delete {{ acct.user }}@{{ acct.domain }}?')">
+          {% csrf_token %}
+          <input type="hidden" name="email_user" value="{{ acct.user }}">
+          <input type="hidden" name="domain" value="{{ acct.domain }}">
+          <button type="submit"
+                  class="text-xs text-red-600 hover:text-red-800 font-medium">Delete</button>
+        </form>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="px-5 py-4 text-sm text-gray-500">No email accounts yet.</p>
+    {% endif %}
+  </div>
+
+  <!-- Databases -->
+  <div class="bg-white rounded-lg border border-gray-200 shadow-sm">
+    <div class="px-5 py-4 flex items-center justify-between border-b border-gray-100">
+      <h2 class="text-base font-semibold text-gray-900">MySQL Databases</h2>
+      {% if service.cpanel_username %}
+      <a href="{% url 'provisioning:database_create' service.id %}"
+         class="inline-flex items-center gap-1 rounded-md bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-500 transition-colors">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        Add database
+      </a>
+      {% endif %}
+    </div>
+
+    {% if databases %}
+    <ul class="divide-y divide-gray-100">
+      {% for db in databases %}
+      <li class="px-5 py-3">
+        <p class="text-sm font-medium text-gray-900">{{ db.database }}</p>
+        {% if db.diskusage %}
+        <p class="text-xs text-gray-400">{{ db.diskusage }} MB</p>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="px-5 py-4 text-sm text-gray-500">No databases yet.</p>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

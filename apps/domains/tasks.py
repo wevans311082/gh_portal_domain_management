@@ -316,3 +316,93 @@ def execute_domain_renewal(renewal_id: int):
         renewal.status = DomainRenewal.STATUS_FAILED
         renewal.last_error = str(exc)
         renewal.save(update_fields=["status", "last_error"])
+
+
+@shared_task
+def process_auto_renewals(days_ahead: int = 7):
+    """
+    Beat task: find active domains with auto_renew=True expiring within *days_ahead*
+    days that don't already have a pending/paid/processing renewal, then create an
+    invoice + DomainRenewal record and fire execute_domain_renewal via the normal
+    Stripe webhook path.
+
+    Because the invoice starts as UNPAID we also immediately mark it PAID here
+    (auto-renew means the card on file should be charged separately; this task
+    handles registrar-side renewal for managed accounts).  If you integrate
+    Stripe billing, remove the direct status flip and let the webhook handle it.
+    """
+    from decimal import Decimal
+    from apps.billing.models import Invoice, InvoiceLineItem
+    from django.utils import timezone as tz
+
+    today = tz.now().date()
+    cutoff = today + timedelta(days=days_ahead)
+
+    domains = Domain.objects.select_related("user").filter(
+        status=Domain.STATUS_ACTIVE,
+        auto_renew=True,
+        expires_at__range=(today, cutoff),
+    )
+
+    queued = 0
+    for domain in domains:
+        # Skip if a non-failed renewal already exists
+        has_open_renewal = DomainRenewal.objects.filter(
+            domain=domain,
+            status__in=[
+                DomainRenewal.STATUS_PENDING_PAYMENT,
+                DomainRenewal.STATUS_PAID,
+                DomainRenewal.STATUS_PROCESSING,
+                DomainRenewal.STATUS_COMPLETED,
+            ],
+        ).exists()
+        if has_open_renewal:
+            continue
+
+        pricing = None
+        try:
+            from apps.domains.models import TLDPricing
+            pricing = TLDPricing.objects.get(tld=domain.tld, is_active=True)
+        except Exception:
+            logger.warning("process_auto_renewals: no pricing for .%s, skipping %s", domain.tld, domain.name)
+            continue
+
+        renewal_years = 1
+        renewal_price = (pricing.renewal_price * Decimal(str(renewal_years))).quantize(Decimal("0.01"))
+
+        # Build invoice number inline (mirrors the view helper)
+        invoice_number = f"AR-{tz.now():%Y%m%d%H%M%S%f}-{domain.user_id}"
+
+        invoice = Invoice.objects.create(
+            user=domain.user,
+            number=invoice_number,
+            status=Invoice.STATUS_PAID,  # auto-renew — treat as already authorised
+            vat_rate=Decimal("0.00"),
+            due_date=today,
+            billing_name=domain.user.full_name if hasattr(domain.user, "full_name") else "",
+            billing_address="",
+            paid_at=tz.now(),
+        )
+        InvoiceLineItem.objects.create(
+            invoice=invoice,
+            description=f"Auto-renewal: {domain.name} (1 year)",
+            quantity=1,
+            unit_price=renewal_price,
+        )
+        invoice.calculate_totals()
+
+        renewal = DomainRenewal.objects.create(
+            domain=domain,
+            user=domain.user,
+            invoice=invoice,
+            renewal_years=renewal_years,
+            total_price=renewal_price,
+            status=DomainRenewal.STATUS_PAID,
+        )
+
+        execute_domain_renewal.delay(renewal.id)
+        queued += 1
+        logger.info("process_auto_renewals: queued renewal for %s (expiry %s)", domain.name, domain.expires_at)
+
+    logger.info("process_auto_renewals: queued %s renewal(s)", queued)
+    return queued

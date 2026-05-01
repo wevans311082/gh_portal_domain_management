@@ -1,0 +1,42 @@
+{% extends "base_portal.html" %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-8">
+  <h1 class="text-2xl font-bold text-gray-900 mb-6">Provisioning Jobs</h1>
+
+  {% if jobs %}
+  <div class="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-200">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Service</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Attempts</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {% for job in jobs %}
+        <tr>
+          <td class="px-4 py-3 text-sm text-gray-900">{{ job.service.domain_name|default:"—" }}</td>
+          <td class="px-4 py-3">
+            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium
+              {% if job.status == 'completed' %}bg-green-100 text-green-800
+              {% elif job.status == 'failed' %}bg-red-100 text-red-800
+              {% elif job.status == 'in_progress' %}bg-blue-100 text-blue-800
+              {% else %}bg-gray-100 text-gray-700{% endif %}">
+              {{ job.get_status_display }}
+            </span>
+          </td>
+          <td class="px-4 py-3 text-sm text-gray-500">{{ job.attempt_count }} / {{ job.max_attempts }}</td>
+          <td class="px-4 py-3 text-sm text-gray-500">{{ job.created_at|date:"d M Y H:i" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="text-sm text-gray-500">No provisioning jobs found.</p>
+  {% endif %}
+</div>
+{% endblock %}

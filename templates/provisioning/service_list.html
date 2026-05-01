@@ -1,0 +1,57 @@
+{% extends "base_portal.html" %}
+{% load static %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto px-4 py-8">
+
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">Hosting Services</h1>
+      <p class="text-sm text-gray-500 mt-1">Manage your cPanel hosting accounts.</p>
+    </div>
+  </div>
+
+  {% if messages %}
+  <div class="mb-4 space-y-2">
+    {% for message in messages %}
+    <div class="rounded-md px-4 py-3 text-sm
+      {% if message.tags == 'success' %}bg-green-50 text-green-800 border border-green-200
+      {% elif message.tags == 'error' %}bg-red-50 text-red-800 border border-red-200
+      {% else %}bg-blue-50 text-blue-800 border border-blue-200{% endif %}">
+      {{ message }}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if services %}
+  <div class="space-y-4">
+    {% for service in services %}
+    <a href="{% url 'provisioning:service_detail' service.id %}"
+       class="block bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow px-5 py-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="font-semibold text-gray-900">{{ service.domain_name|default:"No domain" }}</p>
+          <p class="text-sm text-gray-500">{{ service.package.name }} &middot; {{ service.get_billing_period_display }}</p>
+        </div>
+        <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium
+          {% if service.status == 'active' %}bg-green-100 text-green-800
+          {% elif service.status == 'suspended' %}bg-yellow-100 text-yellow-800
+          {% else %}bg-gray-100 text-gray-700{% endif %}">
+          {{ service.get_status_display }}
+        </span>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="text-center py-20 text-gray-500">
+    <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 12h14M12 5l7 7-7 7"/>
+    </svg>
+    <p class="font-medium">No hosting services yet.</p>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

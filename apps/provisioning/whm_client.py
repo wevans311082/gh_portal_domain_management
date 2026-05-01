@@ -107,6 +107,95 @@ class WHMClient:
         data = self._call("listaccts")
         return data.get("acct", [])
 
+    # ── cPanel UAPI proxy methods ────────────────────────────────────────────
+    # WHM can proxy cPanel UAPI calls on behalf of any user via:
+    #   GET /execute/{Module}/{function}?cpanel_user={username}
+
+    def _cpanel_call(self, cpanel_username: str, module: str, function: str, params: dict = None) -> dict:
+        """Proxy a cPanel UAPI call on behalf of *cpanel_username* via WHM."""
+        url = f"https://{self.host}:{self.port}/execute/{module}/{function}"
+        query = {"cpanel_user": cpanel_username}
+        if params:
+            query.update(params)
+
+        try:
+            response = self.session.get(url, params=query, timeout=30)
+            response.raise_for_status()
+            data = response.json()
+        except requests.RequestException as e:
+            logger.error(f"cPanel UAPI request failed ({module}/{function}): {e}")
+            raise WHMClientError(f"cPanel UAPI request failed: {e}") from e
+
+        if data.get("status") == 0:
+            errors = data.get("errors") or ["Unknown cPanel error"]
+            logger.error(f"cPanel UAPI error {module}/{function}: {errors}")
+            raise WHMClientError(f"cPanel error: {errors[0]}")
+
+        return data
+
+    # ── Email accounts ───────────────────────────────────────────────────────
+
+    def list_email_accounts(self, cpanel_username: str) -> list[dict]:
+        """Return all email accounts with disk usage for *cpanel_username*."""
+        data = self._cpanel_call(cpanel_username, "Email", "list_pops_with_disk")
+        return data.get("data", [])
+
+    def create_email_account(
+        self,
+        cpanel_username: str,
+        email_user: str,
+        domain: str,
+        password: str,
+        quota_mb: int = 500,
+    ) -> dict:
+        """Create a new email account under *domain* on the cPanel account."""
+        logger.info(f"Creating email {email_user}@{domain} for cPanel user {cpanel_username}")
+        return self._cpanel_call(
+            cpanel_username,
+            "Email",
+            "add_pop",
+            {
+                "email": email_user,
+                "domain": domain,
+                "password": password,
+                "quota": quota_mb,
+            },
+        )
+
+    def delete_email_account(self, cpanel_username: str, email_user: str, domain: str) -> dict:
+        """Delete an email account."""
+        logger.info(f"Deleting email {email_user}@{domain} for cPanel user {cpanel_username}")
+        return self._cpanel_call(
+            cpanel_username,
+            "Email",
+            "delete_pop",
+            {"email": email_user, "domain": domain},
+        )
+
+    # ── MySQL databases ──────────────────────────────────────────────────────
+
+    def list_databases(self, cpanel_username: str) -> list[dict]:
+        """Return all MySQL databases for *cpanel_username*."""
+        data = self._cpanel_call(cpanel_username, "Mysql", "list_databases")
+        return data.get("data", [])
+
+    def create_database(self, cpanel_username: str, db_name: str) -> dict:
+        """Create a MySQL database (name is prefixed with the cPanel username)."""
+        logger.info(f"Creating database {db_name} for cPanel user {cpanel_username}")
+        return self._cpanel_call(cpanel_username, "Mysql", "create_database", {"name": db_name})
+
+    def delete_database(self, cpanel_username: str, db_name: str) -> dict:
+        """Delete a MySQL database."""
+        logger.info(f"Deleting database {db_name} for cPanel user {cpanel_username}")
+        return self._cpanel_call(cpanel_username, "Mysql", "delete_database", {"name": db_name})
+
+    # ── Disk / quota ─────────────────────────────────────────────────────────
+
+    def get_quota(self, cpanel_username: str) -> dict:
+        """Return disk quota info for *cpanel_username* via cPanel UAPI."""
+        data = self._cpanel_call(cpanel_username, "DiskUsage", "get_quota")
+        return data.get("data", {})
+
 
 def generate_cpanel_username(domain: str) -> str:
     """Generate a valid 8-char cPanel username from a domain name."""

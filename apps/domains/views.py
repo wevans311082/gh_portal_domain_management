@@ -1,4 +1,4 @@
-"""Domain management views."""
+﻿"""Domain management views."""
 from decimal import Decimal
 import logging
 import re
@@ -12,8 +12,8 @@ from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
 from apps.billing.models import Invoice, InvoiceLineItem
-from apps.domains.forms import DomainRegistrationForm
-from apps.domains.models import Domain, DomainOrder, DomainRenewal, TLDPricing
+from apps.domains.forms import DomainContactForm, DomainRegistrationForm
+from apps.domains.models import Domain, DomainContact, DomainOrder, DomainRenewal, TLDPricing
 from apps.domains.resellerclub_client import ResellerClubClient, ResellerClubError
 from apps.domains.services import DomainContactService
 
@@ -227,7 +227,7 @@ def domain_register(request):
 
 @login_required
 def my_domains(request):
-    """Client portal: list user's domains — paginated."""
+    """Client portal: list user's domains â€" paginated."""
     from django.core.paginator import Paginator
     qs = Domain.objects.filter(user=request.user).order_by("name")
     paginator = Paginator(qs, 20)
@@ -258,8 +258,8 @@ def domain_renew(request, pk):
     """
     Customer-facing renewal checkout.
 
-    GET  — show a confirmation page with the renewal price.
-    POST — create a DomainRenewal + Invoice, redirect to Stripe checkout.
+    GET  â€" show a confirmation page with the renewal price.
+    POST â€" create a DomainRenewal + Invoice, redirect to Stripe checkout.
     """
     domain = get_object_or_404(Domain, pk=pk, user=request.user)
 
@@ -320,3 +320,100 @@ def domain_renew(request, pk):
         "years": years,
         "renewal_price": renewal_price,
     })
+
+
+# â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+# Domain Contact portal UI
+# â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+
+@login_required
+def contact_list(request):
+    """List the current user's domain contacts."""
+    contacts = DomainContact.objects.filter(user=request.user).order_by("-is_default", "label")
+    return render(request, "domains/contacts/list.html", {"contacts": contacts})
+
+
+@login_required
+def contact_create(request):
+    """Create a new domain contact."""
+    if request.method == "POST":
+        form = DomainContactForm(request.POST)
+        if form.is_valid():
+            contact = form.save(commit=False)
+            contact.user = request.user
+            if contact.is_default:
+                # Demote any existing default first
+                DomainContact.objects.filter(user=request.user, is_default=True).update(is_default=False)
+            contact.save()
+            messages.success(request, f'Contact "{contact.label}" created.')
+            return redirect("domains:contact_list")
+    else:
+        # Pre-fill from profile if no contacts yet
+        service = DomainContactService()
+        initial = {}
+        if not request.user.domain_contacts.exists():
+            initial = service.build_default_contact(request.user)
+            initial["is_default"] = True
+        form = DomainContactForm(initial=initial)
+
+    return render(request, "domains/contacts/form.html", {"form": form, "action": "Create"})
+
+
+@login_required
+def contact_edit(request, pk):
+    """Edit an existing domain contact."""
+    contact = get_object_or_404(DomainContact, pk=pk, user=request.user)
+    was_default = contact.is_default  # capture before form._post_clean mutates instance
+
+    if request.method == "POST":
+        form = DomainContactForm(request.POST, instance=contact)
+        if form.is_valid():
+            if form.cleaned_data["is_default"] and not was_default:
+                DomainContact.objects.filter(user=request.user, is_default=True).update(is_default=False)
+            form.save()
+            messages.success(request, f'Contact "{contact.label}" updated.')
+            return redirect("domains:contact_list")
+    else:
+        form = DomainContactForm(instance=contact)
+
+    return render(request, "domains/contacts/form.html", {
+        "form": form,
+        "contact": contact,
+        "action": "Edit",
+    })
+
+
+@login_required
+@require_POST
+def contact_delete(request, pk):
+    """Delete a domain contact (blocked if it is in use by an active domain order)."""
+    contact = get_object_or_404(DomainContact, pk=pk, user=request.user)
+
+    # Prevent deletion if contact is attached to any order
+    in_use = (
+        contact.registration_orders.exists()
+        or contact.admin_orders.exists()
+        or contact.tech_orders.exists()
+        or contact.billing_orders.exists()
+    )
+    if in_use:
+        messages.error(request, f'"{contact.label}" is attached to a domain order and cannot be deleted.')
+        return redirect("domains:contact_list")
+
+    label = contact.label
+    contact.delete()
+    messages.success(request, f'Contact "{label}" deleted.')
+    return redirect("domains:contact_list")
+
+
+@login_required
+@require_POST
+def contact_set_default(request, pk):
+    """Make a contact the default without editing it."""
+    contact = get_object_or_404(DomainContact, pk=pk, user=request.user)
+    DomainContact.objects.filter(user=request.user, is_default=True).update(is_default=False)
+    contact.is_default = True
+    contact.save(update_fields=["is_default"])
+    messages.success(request, f'"{contact.label}" is now your default contact.')
+    return redirect("domains:contact_list")
+

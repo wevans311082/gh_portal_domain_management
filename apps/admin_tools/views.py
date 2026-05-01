@@ -1,6 +1,8 @@
 from datetime import timedelta
 
 from django.contrib.admin.views.decorators import staff_member_required
+from django.db.models import Count, Sum
+from django.db.models.functions import TruncMonth
 from django.shortcuts import render
 from django.urls import reverse
 from django.utils import timezone
@@ -9,6 +11,7 @@ from django_celery_results.models import TaskResult
 
 from apps.accounts.models import User
 from apps.billing.models import Invoice
+from apps.domains.models import Domain, DomainRenewal
 from apps.services.models import Service
 
 
@@ -77,3 +80,88 @@ def task_management(request):
         "name"
     )[:25]
     return render(request, "admin_tools/task_management.html", context)
+
+
+@staff_member_required
+def stats(request):
+    """Admin statistics dashboard: revenue, domain counts, expiring domains, task health."""
+    today = timezone.now().date()
+    twelve_months_ago = timezone.now() - timedelta(days=365)
+
+    # ── Revenue by month (last 12 months, paid invoices) ─────────────────────
+    monthly_revenue = (
+        Invoice.objects
+        .filter(status=Invoice.STATUS_PAID, paid_at__gte=twelve_months_ago)
+        .annotate(month=TruncMonth("paid_at"))
+        .values("month")
+        .annotate(revenue=Sum("total"))
+        .order_by("month")
+    )
+    revenue_labels = [r["month"].strftime("%b %Y") for r in monthly_revenue]
+    revenue_values = [float(r["revenue"] or 0) for r in monthly_revenue]
+    total_revenue_12m = sum(revenue_values)
+
+    # ── Domain counts by status ───────────────────────────────────────────────
+    domain_status_counts = (
+        Domain.objects
+        .values("status")
+        .annotate(count=Count("id"))
+        .order_by("status")
+    )
+    total_domains = Domain.objects.count()
+    active_domains = Domain.objects.filter(status=Domain.STATUS_ACTIVE).count()
+
+    # ── Domains expiring in next 30 days ──────────────────────────────────────
+    expiring_soon = Domain.objects.select_related("user").filter(
+        status=Domain.STATUS_ACTIVE,
+        expires_at__range=(today, today + timedelta(days=30)),
+    ).order_by("expires_at")
+
+    # ── New signups by month ──────────────────────────────────────────────────
+    monthly_signups = (
+        User.objects
+        .filter(created_at__gte=twelve_months_ago)
+        .annotate(month=TruncMonth("created_at"))
+        .values("month")
+        .annotate(count=Count("id"))
+        .order_by("month")
+    )
+    signup_labels = [r["month"].strftime("%b %Y") for r in monthly_signups]
+    signup_values = [r["count"] for r in monthly_signups]
+    total_new_users_12m = sum(signup_values)
+
+    # ── Renewal stats ─────────────────────────────────────────────────────────
+    renewal_counts = {
+        "completed": DomainRenewal.objects.filter(status=DomainRenewal.STATUS_COMPLETED).count(),
+        "failed": DomainRenewal.objects.filter(status=DomainRenewal.STATUS_FAILED).count(),
+        "pending": DomainRenewal.objects.filter(
+            status__in=[DomainRenewal.STATUS_PENDING_PAYMENT, DomainRenewal.STATUS_PAID, DomainRenewal.STATUS_PROCESSING]
+        ).count(),
+    }
+
+    # ── Task health (last 7 days) ─────────────────────────────────────────────
+    task_summary = _build_task_summary()
+
+    context = {
+        # Revenue
+        "revenue_labels": revenue_labels,
+        "revenue_values": revenue_values,
+        "total_revenue_12m": total_revenue_12m,
+        # Domains
+        "domain_status_counts": list(domain_status_counts),
+        "total_domains": total_domains,
+        "active_domains": active_domains,
+        "expiring_soon": expiring_soon,
+        # Signups
+        "signup_labels": signup_labels,
+        "signup_values": signup_values,
+        "total_new_users_12m": total_new_users_12m,
+        "total_users": User.objects.count(),
+        # Renewals
+        "renewal_counts": renewal_counts,
+        # Services
+        "active_services": Service.objects.filter(status="active").count(),
+        "unpaid_invoices": Invoice.objects.filter(status=Invoice.STATUS_UNPAID).count(),
+    }
+    context.update(task_summary)
+    return render(request, "admin_tools/stats.html", context)
