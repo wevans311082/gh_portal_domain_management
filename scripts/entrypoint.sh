@@ -1,0 +1,11 @@
+#!/bin/bash
+set -e
+
+echo "Waiting for database..."
+python manage.py wait_for_db
+
+echo "Running migrations..."
+python manage.py migrate
+
+echo "Starting server..."
+exec "$@"

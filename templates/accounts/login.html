@@ -1,0 +1,13 @@
+{% extends "base_auth.html" %}
+
+{% block title %}Login - {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<h2 class="text-2xl font-bold text-center mb-6">Sign in to your account</h2>
+<form method="post" action="{% url 'account_login' %}" class="space-y-4">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" class="w-full bg-orange-500 text-white py-3 rounded hover:bg-orange-600">Sign In</button>
+</form>
+<p class="text-center mt-4 text-sm">Don't have an account? <a href="{% url 'accounts_custom:register' %}" class="text-orange-500">Register</a></p>
+{% endblock %}

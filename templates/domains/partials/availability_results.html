@@ -1,0 +1,37 @@
+{% if results %}
+<div class="bg-white rounded-lg shadow divide-y">
+    <div class="px-4 py-3 text-sm text-gray-500">
+        Results for <strong>{{ query }}</strong>
+    </div>
+    {% for result in results %}
+    <div class="px-4 py-4 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            {% if result.available is None %}
+            <span class="w-3 h-3 rounded-full bg-gray-300 flex-shrink-0"></span>
+            {% elif result.available %}
+            <span class="w-3 h-3 rounded-full bg-green-500 flex-shrink-0"></span>
+            {% else %}
+            <span class="w-3 h-3 rounded-full bg-red-500 flex-shrink-0"></span>
+            {% endif %}
+            <span class="font-medium text-gray-900">{{ result.domain }}</span>
+        </div>
+        <div class="flex items-center gap-3">
+            <span class="text-sm
+                {% if result.available is None %}text-gray-400
+                {% elif result.available %}text-green-600 font-semibold
+                {% else %}text-red-500{% endif %}">
+                {% if result.available is None %}Unknown
+                {% elif result.available %}Available
+                {% else %}Taken{% endif %}
+            </span>
+            {% if result.available %}
+            <a href="{% url 'account_login' %}?next={% url 'domains:search' %}"
+               class="bg-orange-500 text-white text-sm px-3 py-1 rounded hover:bg-orange-600">
+                Register
+            </a>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}

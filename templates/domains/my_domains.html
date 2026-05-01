@@ -1,0 +1,68 @@
+{% extends "base_portal.html" %}
+
+{% block title %}My Domains - {{ SITE_NAME }}{% endblock %}
+{% block page_title %}My Domains{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-6">
+    <p class="text-gray-600">{{ domains|length }} domain{% if domains|length != 1 %}s{% endif %} registered</p>
+    <a href="{% url 'domains:search' %}" class="bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600">
+        + Register Domain
+    </a>
+</div>
+
+{% if domains %}
+<div class="bg-white rounded-lg shadow overflow-hidden">
+    <table class="w-full text-sm">
+        <thead class="bg-gray-50 border-b">
+            <tr>
+                <th class="px-4 py-3 text-left font-semibold text-gray-700">Domain</th>
+                <th class="px-4 py-3 text-left font-semibold text-gray-700">Status</th>
+                <th class="px-4 py-3 text-left font-semibold text-gray-700">Expires</th>
+                <th class="px-4 py-3 text-left font-semibold text-gray-700">Auto-Renew</th>
+                <th class="px-4 py-3 text-left font-semibold text-gray-700">DNS</th>
+                <th class="px-4 py-3"></th>
+            </tr>
+        </thead>
+        <tbody class="divide-y">
+            {% for domain in domains %}
+            <tr class="hover:bg-gray-50">
+                <td class="px-4 py-3 font-medium">{{ domain.name }}</td>
+                <td class="px-4 py-3">
+                    <span class="px-2 py-0.5 rounded-full text-xs font-medium
+                        {% if domain.status == 'active' %}bg-green-100 text-green-800
+                        {% elif domain.status == 'expired' %}bg-red-100 text-red-800
+                        {% elif domain.status == 'suspended' %}bg-yellow-100 text-yellow-800
+                        {% else %}bg-gray-100 text-gray-700{% endif %}">
+                        {{ domain.get_status_display }}
+                    </span>
+                </td>
+                <td class="px-4 py-3 text-gray-600">{{ domain.expires_at|default:"—" }}</td>
+                <td class="px-4 py-3">
+                    {% if domain.auto_renew %}
+                    <span class="text-green-600">✓ On</span>
+                    {% else %}
+                    <span class="text-gray-400">Off</span>
+                    {% endif %}
+                </td>
+                <td class="px-4 py-3 text-gray-600 capitalize">{{ domain.dns_provider }}</td>
+                <td class="px-4 py-3 text-right">
+                    <a href="{% url 'domains:detail' pk=domain.pk %}"
+                       class="text-orange-500 hover:underline text-sm">Manage</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="bg-white rounded-lg shadow p-12 text-center">
+    <div class="text-5xl mb-4">🌐</div>
+    <h3 class="text-lg font-semibold text-gray-700 mb-2">No domains yet</h3>
+    <p class="text-gray-500 mb-6">Register your first domain to get started.</p>
+    <a href="{% url 'domains:search' %}" class="bg-orange-500 text-white px-6 py-2 rounded hover:bg-orange-600">
+        Search Domains
+    </a>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block body %}
+<div class="flex h-full">
+    <!-- Sidebar -->
+    <aside class="w-64 bg-gray-900 text-white flex-shrink-0">
+        <div class="p-4">
+            <h1 class="text-xl font-bold text-orange-400">{{ SITE_NAME }}</h1>
+        </div>
+        <nav class="mt-4">
+            <a href="{% url 'portal:dashboard' %}" class="block px-4 py-2 hover:bg-gray-700">Dashboard</a>
+            <a href="{% url 'domains:my_domains' %}" class="block px-4 py-2 hover:bg-gray-700">Domains</a>
+            <a href="{% url 'invoices:list' %}" class="block px-4 py-2 hover:bg-gray-700">Invoices</a>
+            <a href="{% url 'support:list' %}" class="block px-4 py-2 hover:bg-gray-700">Support</a>
+        </nav>
+    </aside>
+    <!-- Main content -->
+    <main class="flex-1 overflow-auto">
+        <header class="bg-white shadow px-6 py-4 flex justify-between items-center">
+            <h2 class="text-lg font-semibold">{% block page_title %}{% endblock %}</h2>
+            <div class="flex items-center gap-4">
+                <span class="text-sm text-gray-600">{{ request.user.email }}</span>
+                <a href="{% url 'account_logout' %}" class="text-sm text-red-500 hover:underline">Logout</a>
+            </div>
+        </header>
+        <div class="p-6">
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+</div>
+{% endblock %}

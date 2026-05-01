@@ -1,0 +1,78 @@
+{% extends "base_portal.html" %}
+
+{% block title %}Open Support Ticket - {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Open Support Ticket{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <a href="{% url 'support:list' %}" class="text-sm text-gray-500 hover:underline">← Back to Tickets</a>
+</div>
+
+<div class="max-w-2xl">
+    <div class="bg-white rounded-lg shadow p-6">
+        <form method="post">
+            {% csrf_token %}
+
+            <div class="space-y-4">
+                <div>
+                    <label for="id_subject" class="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+                    {{ form.subject.errors }}
+                    <input type="text" name="subject" id="id_subject"
+                           value="{{ form.subject.value|default:'' }}"
+                           class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-orange-500"
+                           placeholder="Briefly describe your issue">
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label for="id_department" class="block text-sm font-medium text-gray-700 mb-1">Department</label>
+                        {{ form.department.errors }}
+                        <select name="department" id="id_department"
+                                class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-orange-500">
+                            <option value="">— Select —</option>
+                            {% for dept in departments %}
+                            <option value="{{ dept.pk }}"
+                                {% if form.department.value == dept.pk|stringformat:"s" %}selected{% endif %}>
+                                {{ dept.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label for="id_priority" class="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                        {{ form.priority.errors }}
+                        <select name="priority" id="id_priority"
+                                class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-orange-500">
+                            {% for value, label in form.fields.priority.choices %}
+                            <option value="{{ value }}"
+                                {% if form.priority.value == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label for="id_message" class="block text-sm font-medium text-gray-700 mb-1">Message</label>
+                    <textarea name="message" id="id_message" rows="6"
+                              class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-orange-500"
+                              placeholder="Please describe your issue in detail..."></textarea>
+                </div>
+            </div>
+
+            <div class="mt-6 flex gap-3">
+                <button type="submit"
+                        class="bg-orange-500 text-white px-6 py-2 rounded hover:bg-orange-600 font-medium">
+                    Submit Ticket
+                </button>
+                <a href="{% url 'support:list' %}"
+                   class="border border-gray-300 text-gray-700 px-6 py-2 rounded hover:bg-gray-50">
+                    Cancel
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

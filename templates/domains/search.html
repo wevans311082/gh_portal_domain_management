@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Domain Search - {{ SITE_NAME }}{% endblock %}
+
+{% block extra_head %}
+<script src="https://unpkg.com/htmx.org@1.9.10"></script>
+{% endblock %}
+
+{% block body %}
+<header class="bg-gray-900 text-white">
+    <nav class="container mx-auto px-4 py-4 flex justify-between items-center">
+        <a href="{% url 'core:home' %}" class="text-xl font-bold text-orange-400">{{ SITE_NAME }}</a>
+        <div class="flex gap-4">
+            <a href="{% url 'account_login' %}" class="hover:text-orange-400">Login</a>
+        </div>
+    </nav>
+</header>
+
+<main class="container mx-auto px-4 py-16">
+    <div class="max-w-2xl mx-auto text-center mb-12">
+        <h1 class="text-4xl font-bold text-gray-900 mb-4">Find Your Perfect Domain</h1>
+        <p class="text-lg text-gray-600">Search for your domain name and check availability across popular extensions.</p>
+    </div>
+
+    <div class="max-w-2xl mx-auto mb-8">
+        <div class="flex gap-2">
+            <input
+                type="text"
+                id="domain-search-input"
+                name="q"
+                placeholder="Enter domain name..."
+                class="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-lg focus:outline-none focus:border-orange-500"
+                hx-get="{% url 'domains:check' %}"
+                hx-target="#availability-results"
+                hx-trigger="input changed delay:600ms, search"
+                hx-indicator="#search-indicator"
+            >
+            <button
+                class="bg-orange-500 text-white px-6 py-3 rounded-lg hover:bg-orange-600 font-semibold"
+                onclick="document.getElementById('domain-search-input').dispatchEvent(new Event('search'))"
+            >
+                Search
+            </button>
+        </div>
+        <div id="search-indicator" class="htmx-indicator text-center py-2 text-gray-500">
+            Checking availability...
+        </div>
+    </div>
+
+    <div class="max-w-2xl mx-auto mb-8">
+        <p class="text-sm text-gray-500 mb-3">Popular extensions:</p>
+        <div class="flex flex-wrap gap-2">
+            {% for tld in popular_tlds %}
+            <button
+                class="px-3 py-1 border border-gray-300 rounded-full text-sm hover:bg-orange-50 hover:border-orange-400"
+                onclick="
+                    var input = document.getElementById('domain-search-input');
+                    var base = input.value.split('.')[0] || '';
+                    if (base) { input.value = base + '.{{ tld }}'; input.dispatchEvent(new Event('input')); }
+                "
+            >.{{ tld }}</button>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div id="availability-results" class="max-w-2xl mx-auto"></div>
+</main>
+{% endblock %}

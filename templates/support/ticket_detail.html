@@ -1,0 +1,123 @@
+{% extends "base_portal.html" %}
+
+{% block title %}Ticket #{{ ticket.id }} - {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Ticket #{{ ticket.id }}: {{ ticket.subject }}{% endblock %}
+
+{% block content %}
+<div class="mb-4 flex justify-between items-center">
+    <a href="{% url 'support:list' %}" class="text-sm text-gray-500 hover:underline">← Back to Tickets</a>
+    <div class="flex gap-2 text-sm">
+        <span class="px-2 py-0.5 rounded-full font-medium
+            {% if ticket.status == 'open' %}bg-blue-100 text-blue-800
+            {% elif ticket.status == 'resolved' or ticket.status == 'closed' %}bg-green-100 text-green-800
+            {% elif ticket.status == 'awaiting_client' %}bg-yellow-100 text-yellow-800
+            {% else %}bg-gray-100 text-gray-700{% endif %}">
+            {{ ticket.get_status_display }}
+        </span>
+        <span class="px-2 py-0.5 rounded-full font-medium
+            {% if ticket.priority == 'urgent' %}bg-red-100 text-red-800
+            {% elif ticket.priority == 'high' %}bg-orange-100 text-orange-800
+            {% else %}bg-gray-100 text-gray-700{% endif %}">
+            {{ ticket.get_priority_display }}
+        </span>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+    <!-- Message Thread -->
+    <div class="lg:col-span-3 space-y-4">
+        {% for msg in ticket_messages %}
+        <div class="bg-white rounded-lg shadow p-5
+            {% if msg.user == ticket.user %}border-l-4 border-orange-400{% else %}border-l-4 border-gray-300{% endif %}">
+            <div class="flex justify-between items-center mb-3">
+                <div class="flex items-center gap-2">
+                    <span class="font-medium text-sm">
+                        {% if msg.user == ticket.user %}
+                            {{ msg.user.get_full_name|default:msg.user.email }}
+                            <span class="text-gray-400 font-normal">(You)</span>
+                        {% else %}
+                            {{ msg.user.get_full_name|default:"Support" }}
+                            <span class="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">Staff</span>
+                        {% endif %}
+                    </span>
+                </div>
+                <span class="text-xs text-gray-400">{{ msg.created_at|date:"d M Y H:i" }}</span>
+            </div>
+            <div class="text-sm text-gray-700 whitespace-pre-wrap">{{ msg.content }}</div>
+            {% if msg.attachment %}
+            <div class="mt-3 text-sm">
+                <a href="{{ msg.attachment.url }}" class="text-orange-500 hover:underline">
+                    📎 {{ msg.attachment.name|cut:"support/attachments/" }}
+                </a>
+            </div>
+            {% endif %}
+        </div>
+        {% empty %}
+        <div class="bg-white rounded-lg shadow p-8 text-center text-gray-500">
+            No messages yet.
+        </div>
+        {% endfor %}
+
+        <!-- Reply Form -->
+        {% if ticket.status != 'closed' and ticket.status != 'resolved' %}
+        <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="font-semibold mb-4">Reply</h3>
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                {{ form.content.errors }}
+                <textarea name="content" rows="5"
+                          class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-orange-500 mb-3"
+                          placeholder="Type your reply..."></textarea>
+                <div class="flex items-center gap-4">
+                    <div>
+                        <label class="text-sm text-gray-600">Attachment (optional)</label>
+                        <input type="file" name="attachment" class="block text-sm text-gray-500 mt-1">
+                    </div>
+                    <button type="submit"
+                            class="ml-auto bg-orange-500 text-white px-6 py-2 rounded hover:bg-orange-600 font-medium">
+                        Send Reply
+                    </button>
+                </div>
+            </form>
+        </div>
+        {% else %}
+        <div class="bg-gray-50 rounded-lg border border-gray-200 p-4 text-sm text-gray-500 text-center">
+            This ticket is {{ ticket.get_status_display|lower }}. Contact us to reopen it.
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Ticket Info -->
+    <div class="space-y-4">
+        <div class="bg-white rounded-lg shadow p-5 text-sm">
+            <h3 class="font-semibold mb-3 text-gray-700">Ticket Details</h3>
+            <dl class="space-y-2">
+                <div>
+                    <dt class="text-gray-500">Department</dt>
+                    <dd class="font-medium">{{ ticket.department|default:"General" }}</dd>
+                </div>
+                <div>
+                    <dt class="text-gray-500">Opened</dt>
+                    <dd class="font-medium">{{ ticket.created_at|date:"d M Y" }}</dd>
+                </div>
+                <div>
+                    <dt class="text-gray-500">Last Updated</dt>
+                    <dd class="font-medium">{{ ticket.updated_at|date:"d M Y H:i" }}</dd>
+                </div>
+                {% if ticket.related_domain %}
+                <div>
+                    <dt class="text-gray-500">Related Domain</dt>
+                    <dd class="font-medium">{{ ticket.related_domain.name }}</dd>
+                </div>
+                {% endif %}
+                {% if ticket.related_service %}
+                <div>
+                    <dt class="text-gray-500">Related Service</dt>
+                    <dd class="font-medium">{{ ticket.related_service.package.name }}</dd>
+                </div>
+                {% endif %}
+            </dl>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>{{ SITE_NAME }}</title></head>
+<body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#333;">
+<h2 style="color:#f97316;">{{ SITE_NAME }}</h2>
+<p>Dear {{ user.get_full_name|default:user.email }},</p>
+<p>Great news! Your hosting account has been set up and is ready to use.</p>
+<ul>
+  <li><strong>Domain:</strong> {{ domain }}</li>
+  <li><strong>Package:</strong> {{ package }}</li>
+  <li><strong>cPanel Username:</strong> {{ username }}</li>
+</ul>
+<p>You can now log into cPanel to manage your hosting account.</p>
+<hr><p style="font-size:12px;color:#666;">© {{ SITE_NAME }}</p>
+</body></html>

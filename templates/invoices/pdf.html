@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Invoice #{{ invoice.number }}</title>
+    <style>
+        body { font-family: Arial, sans-serif; font-size: 12px; color: #333; margin: 40px; }
+        h1 { color: #f97316; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th { background: #f3f4f6; text-align: left; padding: 8px; border-bottom: 2px solid #e5e7eb; }
+        td { padding: 8px; border-bottom: 1px solid #e5e7eb; }
+        .totals { width: 250px; margin-left: auto; }
+        .totals td { padding: 4px 8px; }
+        .total-row { font-weight: bold; font-size: 14px; border-top: 2px solid #333; }
+        .status { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: bold; }
+        .status-paid { background: #d1fae5; color: #065f46; }
+        .status-unpaid { background: #fef3c7; color: #92400e; }
+        .status-overdue { background: #fee2e2; color: #991b1b; }
+    </style>
+</head>
+<body>
+    <table style="border: none; margin-top: 0;">
+        <tr>
+            <td style="border: none; padding: 0; width: 50%;">
+                <h1 style="margin: 0;">{{ SITE_NAME }}</h1>
+                <p style="margin: 4px 0 0; color: #6b7280;">Tax Invoice</p>
+            </td>
+            <td style="border: none; padding: 0; text-align: right;">
+                <h2 style="margin: 0; font-size: 18px;">Invoice #{{ invoice.number }}</h2>
+                <span class="status status-{{ invoice.status }}">{{ invoice.get_status_display }}</span>
+            </td>
+        </tr>
+    </table>
+
+    <hr style="border: 1px solid #e5e7eb; margin: 20px 0;">
+
+    <table style="border: none; margin-top: 0;">
+        <tr>
+            <td style="border: none; padding: 0; width: 50%; vertical-align: top;">
+                <p style="margin: 0 0 4px; font-weight: bold; color: #6b7280;">BILLED TO</p>
+                <p style="margin: 0;">{{ invoice.billing_name|default:invoice.user.get_full_name }}</p>
+                {% if invoice.billing_address %}
+                <p style="margin: 4px 0; white-space: pre-line;">{{ invoice.billing_address }}</p>
+                {% endif %}
+                <p style="margin: 4px 0;">{{ invoice.user.email }}</p>
+            </td>
+            <td style="border: none; padding: 0; text-align: right; vertical-align: top;">
+                <p style="margin: 0;"><strong>Invoice Date:</strong> {{ invoice.created_at|date:"d M Y" }}</p>
+                {% if invoice.due_date %}<p style="margin: 4px 0;"><strong>Due Date:</strong> {{ invoice.due_date }}</p>{% endif %}
+                {% if invoice.paid_at %}<p style="margin: 4px 0; color: #059669;"><strong>Paid On:</strong> {{ invoice.paid_at|date:"d M Y" }}</p>{% endif %}
+            </td>
+        </tr>
+    </table>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Description</th>
+                <th style="text-align: right;">Qty</th>
+                <th style="text-align: right;">Unit Price</th>
+                <th style="text-align: right;">Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in invoice.line_items.all %}
+            <tr>
+                <td>{{ item.description }}</td>
+                <td style="text-align: right;">{{ item.quantity }}</td>
+                <td style="text-align: right;">£{{ item.unit_price }}</td>
+                <td style="text-align: right;">£{{ item.line_total }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <table class="totals" style="margin-top: 10px;">
+        <tr>
+            <td>Subtotal</td>
+            <td style="text-align: right;">£{{ invoice.subtotal }}</td>
+        </tr>
+        {% if invoice.vat_amount %}
+        <tr>
+            <td>VAT ({{ invoice.vat_rate }}%)</td>
+            <td style="text-align: right;">£{{ invoice.vat_amount }}</td>
+        </tr>
+        {% endif %}
+        <tr class="total-row">
+            <td>Total</td>
+            <td style="text-align: right;">£{{ invoice.total }}</td>
+        </tr>
+    </table>
+
+    {% if invoice.notes %}
+    <hr style="border: 1px solid #e5e7eb; margin: 20px 0;">
+    <p><strong>Notes:</strong> {{ invoice.notes }}</p>
+    {% endif %}
+</body>
+</html>

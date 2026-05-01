@@ -1,0 +1,53 @@
+{% extends "base_portal.html" %}
+
+{% block title %}My Services - {{ SITE_NAME }}{% endblock %}
+{% block page_title %}My Services{% endblock %}
+
+{% block content %}
+{% if services %}
+<div class="bg-white rounded-lg shadow overflow-hidden">
+    <table class="w-full text-sm">
+        <thead class="bg-gray-50 border-b">
+            <tr>
+                <th class="px-4 py-3 text-left font-semibold text-gray-700">Package</th>
+                <th class="px-4 py-3 text-left font-semibold text-gray-700">Domain</th>
+                <th class="px-4 py-3 text-left font-semibold text-gray-700">Status</th>
+                <th class="px-4 py-3 text-left font-semibold text-gray-700">Billing</th>
+                <th class="px-4 py-3 text-left font-semibold text-gray-700">Next Due</th>
+                <th class="px-4 py-3 text-left font-semibold text-gray-700">cPanel User</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y">
+            {% for service in services %}
+            <tr class="hover:bg-gray-50">
+                <td class="px-4 py-3 font-medium">{{ service.package.name }}</td>
+                <td class="px-4 py-3 text-gray-600">{{ service.domain_name|default:"—" }}</td>
+                <td class="px-4 py-3">
+                    <span class="px-2 py-0.5 rounded-full text-xs font-medium
+                        {% if service.status == 'active' %}bg-green-100 text-green-800
+                        {% elif service.status == 'suspended' %}bg-yellow-100 text-yellow-800
+                        {% elif service.status == 'cancelled' or service.status == 'terminated' %}bg-red-100 text-red-800
+                        {% elif service.status == 'failed' %}bg-red-100 text-red-800
+                        {% else %}bg-gray-100 text-gray-700{% endif %}">
+                        {{ service.get_status_display }}
+                    </span>
+                </td>
+                <td class="px-4 py-3 text-gray-600 capitalize">{{ service.billing_period }}</td>
+                <td class="px-4 py-3 text-gray-600">{{ service.next_due_date|default:"—" }}</td>
+                <td class="px-4 py-3 font-mono text-xs text-gray-600">{{ service.cpanel_username|default:"—" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="bg-white rounded-lg shadow p-12 text-center">
+    <div class="text-5xl mb-4">🖥️</div>
+    <h3 class="text-lg font-semibold text-gray-700 mb-2">No services yet</h3>
+    <p class="text-gray-500 mb-6">Sign up for a hosting package to get started.</p>
+    <a href="{% url 'core:pricing' %}" class="bg-orange-500 text-white px-6 py-2 rounded hover:bg-orange-600">
+        View Plans
+    </a>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,132 @@
+{% extends "base_portal.html" %}
+
+{% block title %}Invoice #{{ invoice.number }} - {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Invoice #{{ invoice.number }}{% endblock %}
+
+{% block content %}
+<div class="mb-4 flex justify-between items-center">
+    <a href="{% url 'invoices:list' %}" class="text-sm text-gray-500 hover:underline">← Back to Invoices</a>
+    <div class="flex gap-2">
+        <a href="{% url 'invoices:pdf' pk=invoice.pk %}"
+           class="border border-gray-300 text-gray-700 px-4 py-2 rounded text-sm hover:bg-gray-50">
+            Download PDF
+        </a>
+        {% if invoice.status == 'unpaid' or invoice.status == 'overdue' %}
+        <a href="{% url 'payments:stripe_checkout' invoice_id=invoice.pk %}"
+           class="bg-orange-500 text-white px-4 py-2 rounded text-sm hover:bg-orange-600">
+            Pay Now
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="bg-white rounded-lg shadow p-8">
+    <!-- Header -->
+    <div class="flex justify-between items-start mb-8">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">{{ SITE_NAME }}</h1>
+            <p class="text-gray-500 text-sm mt-1">Invoice #{{ invoice.number }}</p>
+        </div>
+        <div class="text-right">
+            <span class="px-3 py-1 rounded-full text-sm font-medium
+                {% if invoice.status == 'paid' %}bg-green-100 text-green-800
+                {% elif invoice.status == 'overdue' %}bg-red-100 text-red-800
+                {% elif invoice.status == 'unpaid' %}bg-yellow-100 text-yellow-800
+                {% else %}bg-gray-100 text-gray-700{% endif %}">
+                {{ invoice.get_status_display }}
+            </span>
+        </div>
+    </div>
+
+    <!-- Billing Info -->
+    <div class="grid grid-cols-2 gap-8 mb-8 text-sm">
+        <div>
+            <h3 class="font-semibold text-gray-700 mb-2">Billed To</h3>
+            <p class="text-gray-600">{{ invoice.billing_name|default:invoice.user.get_full_name }}</p>
+            {% if invoice.billing_address %}
+            <p class="text-gray-600 whitespace-pre-line">{{ invoice.billing_address }}</p>
+            {% endif %}
+            <p class="text-gray-600">{{ invoice.user.email }}</p>
+        </div>
+        <div class="text-right">
+            <dl class="space-y-1">
+                <div class="flex justify-between gap-8">
+                    <dt class="text-gray-500">Invoice Date</dt>
+                    <dd class="font-medium">{{ invoice.created_at|date:"d M Y" }}</dd>
+                </div>
+                {% if invoice.due_date %}
+                <div class="flex justify-between gap-8">
+                    <dt class="text-gray-500">Due Date</dt>
+                    <dd class="font-medium">{{ invoice.due_date }}</dd>
+                </div>
+                {% endif %}
+                {% if invoice.paid_at %}
+                <div class="flex justify-between gap-8">
+                    <dt class="text-gray-500">Paid On</dt>
+                    <dd class="font-medium text-green-600">{{ invoice.paid_at|date:"d M Y" }}</dd>
+                </div>
+                {% endif %}
+            </dl>
+        </div>
+    </div>
+
+    <!-- Line Items -->
+    <table class="w-full text-sm mb-6">
+        <thead class="border-b-2 border-gray-200">
+            <tr>
+                <th class="py-2 text-left font-semibold text-gray-700">Description</th>
+                <th class="py-2 text-right font-semibold text-gray-700">Qty</th>
+                <th class="py-2 text-right font-semibold text-gray-700">Unit Price</th>
+                <th class="py-2 text-right font-semibold text-gray-700">Total</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y">
+            {% for item in invoice.line_items.all %}
+            <tr>
+                <td class="py-3 text-gray-700">{{ item.description }}</td>
+                <td class="py-3 text-right text-gray-600">{{ item.quantity }}</td>
+                <td class="py-3 text-right text-gray-600">£{{ item.unit_price }}</td>
+                <td class="py-3 text-right font-medium">£{{ item.line_total }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Totals -->
+    <div class="flex justify-end">
+        <dl class="w-64 text-sm space-y-2">
+            <div class="flex justify-between">
+                <dt class="text-gray-500">Subtotal</dt>
+                <dd class="font-medium">£{{ invoice.subtotal }}</dd>
+            </div>
+            {% if invoice.vat_amount %}
+            <div class="flex justify-between">
+                <dt class="text-gray-500">VAT ({{ invoice.vat_rate }}%)</dt>
+                <dd class="font-medium">£{{ invoice.vat_amount }}</dd>
+            </div>
+            {% endif %}
+            <div class="flex justify-between border-t pt-2 text-base">
+                <dt class="font-semibold">Total</dt>
+                <dd class="font-bold">£{{ invoice.total }}</dd>
+            </div>
+            {% if invoice.amount_paid and invoice.amount_paid != invoice.total %}
+            <div class="flex justify-between text-green-600">
+                <dt>Amount Paid</dt>
+                <dd>£{{ invoice.amount_paid }}</dd>
+            </div>
+            <div class="flex justify-between font-semibold text-red-500">
+                <dt>Balance Due</dt>
+                <dd>£{{ invoice.amount_outstanding }}</dd>
+            </div>
+            {% endif %}
+        </dl>
+    </div>
+
+    {% if invoice.notes %}
+    <div class="mt-8 pt-6 border-t text-sm text-gray-600">
+        <p class="font-medium mb-1">Notes</p>
+        <p>{{ invoice.notes }}</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
