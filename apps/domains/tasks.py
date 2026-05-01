@@ -19,6 +19,31 @@ logger = logging.getLogger(__name__)
 TLD_PRICING_SYNC_TASK_NAME = "Sync TLD pricing"
 TLD_PRICING_SYNC_TASK_PATH = "apps.domains.tasks.sync_tld_pricing"
 
+AUTO_RENEW_TASK_NAME = "Process auto-renewals"
+AUTO_RENEW_TASK_PATH = "apps.domains.tasks.process_auto_renewals"
+
+
+def ensure_auto_renew_schedule():
+    """Register the daily process_auto_renewals beat task (idempotent)."""
+    schedule, _ = IntervalSchedule.objects.get_or_create(
+        every=24,
+        period=IntervalSchedule.HOURS,
+    )
+    task, created = PeriodicTask.objects.update_or_create(
+        name=AUTO_RENEW_TASK_NAME,
+        defaults={
+            "task": AUTO_RENEW_TASK_PATH,
+            "interval": schedule,
+            "enabled": True,
+        },
+    )
+    logger.info(
+        "%s auto-renew beat task: %s",
+        "Registered" if created else "Updated",
+        AUTO_RENEW_TASK_NAME,
+    )
+    return task
+
 
 def ensure_tld_pricing_sync_schedule(settings_obj=None):
     settings_obj = settings_obj or DomainPricingSettings.get_solo()

@@ -181,10 +181,7 @@
     <div class="container mx-auto px-4 max-w-3xl">
         <h2 class="text-3xl font-bold text-center mb-12">Frequently Asked Questions</h2>
         <div class="space-y-4" x-data="{}">
-            {% with faqs='Can I upgrade my plan later?|Yes, you can upgrade at any time from your client portal. Changes take effect immediately.|Do you offer a money-back guarantee?|We offer a 30-day money-back guarantee on all hosting plans, no questions asked.|Is there a setup fee?|No. There are no setup fees on any of our hosting plans.|Can I use my existing domain?|Absolutely. You can point your existing domain to our nameservers, or transfer it to us.|Do you support WordPress?|Yes. All our hosting plans support WordPress and most other popular CMS platforms.' %}
-            {% for faq_pair in faqs|split:"|" %}
-            {% endfor %}
-            {% endwith %}
+
 
             <div x-data="{ open: false }">
                 <button @click="open = !open"

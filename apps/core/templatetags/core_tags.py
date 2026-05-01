@@ -35,3 +35,12 @@ def pct_of(value, total):
         return round((float(value) / float(total)) * 100)
     except (TypeError, ValueError, ZeroDivisionError):
         return 0
+
+
+@register.filter
+def split(value, sep=","):
+    """Split a string by sep: {{ value|split:'|' }}"""
+    try:
+        return value.split(sep)
+    except AttributeError:
+        return []

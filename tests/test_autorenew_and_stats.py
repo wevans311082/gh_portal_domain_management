@@ -275,3 +275,28 @@ def test_currency_filter():
     from apps.core.templatetags.core_tags import currency
     assert currency(9.99) == "£9.99"
     assert currency("bad") == "bad"
+
+
+# ─────────────────────────────────────────────
+# ensure_auto_renew_schedule Beat registration
+# ─────────────────────────────────────────────
+
+@pytest.mark.django_db
+def test_ensure_auto_renew_schedule_creates_periodic_task():
+    from apps.domains.tasks import ensure_auto_renew_schedule, AUTO_RENEW_TASK_NAME
+    from django_celery_beat.models import PeriodicTask
+
+    task = ensure_auto_renew_schedule()
+    assert task.name == AUTO_RENEW_TASK_NAME
+    assert task.enabled is True
+    assert task.interval.every == 24
+
+
+@pytest.mark.django_db
+def test_ensure_auto_renew_schedule_is_idempotent():
+    from apps.domains.tasks import ensure_auto_renew_schedule, AUTO_RENEW_TASK_NAME
+    from django_celery_beat.models import PeriodicTask
+
+    ensure_auto_renew_schedule()
+    ensure_auto_renew_schedule()  # second call must not raise or duplicate
+    assert PeriodicTask.objects.filter(name=AUTO_RENEW_TASK_NAME).count() == 1
