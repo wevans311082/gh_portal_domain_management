@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}Task Management{% endblock %}
+
+{% block body %}
+<div class="min-h-full bg-stone-100 text-stone-900">
+    <div class="mx-auto max-w-7xl px-6 py-10 lg:px-8">
+        <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+                <p class="text-sm font-semibold uppercase tracking-[0.3em] text-amber-700">Celery operations</p>
+                <h1 class="mt-3 text-4xl font-black tracking-tight text-stone-950">Task management</h1>
+                <p class="mt-3 max-w-3xl text-sm text-stone-600">
+                    Review current schedules, inspect recent task outcomes, and use the linked admin screens to change timings.
+                </p>
+            </div>
+            <div class="flex flex-wrap gap-3">
+                <a href="{{ periodic_task_admin_url }}" class="rounded-full bg-stone-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-stone-800">Periodic tasks</a>
+                <a href="{{ interval_schedule_admin_url }}" class="rounded-full border border-stone-300 bg-white px-5 py-3 text-sm font-semibold text-stone-900 transition hover:border-stone-400">Interval schedules</a>
+                <a href="{{ crontab_schedule_admin_url }}" class="rounded-full border border-stone-300 bg-white px-5 py-3 text-sm font-semibold text-stone-900 transition hover:border-stone-400">Crontab schedules</a>
+                <a href="{{ task_result_admin_url }}" class="rounded-full border border-stone-300 bg-white px-5 py-3 text-sm font-semibold text-stone-900 transition hover:border-stone-400">Task results</a>
+            </div>
+        </div>
+
+        <div class="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <section class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-stone-200">
+                <p class="text-sm text-stone-500">Enabled tasks</p>
+                <p class="mt-4 text-4xl font-black text-stone-950">{{ enabled_periodic_tasks }}</p>
+            </section>
+            <section class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-stone-200">
+                <p class="text-sm text-stone-500">Disabled tasks</p>
+                <p class="mt-4 text-4xl font-black text-stone-950">{{ disabled_periodic_tasks }}</p>
+            </section>
+            <section class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-stone-200">
+                <p class="text-sm text-stone-500">Crontab schedules</p>
+                <p class="mt-4 text-4xl font-black text-stone-950">{{ crontab_schedules }}</p>
+            </section>
+            <section class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-stone-200">
+                <p class="text-sm text-stone-500">Interval schedules</p>
+                <p class="mt-4 text-4xl font-black text-stone-950">{{ interval_schedules }}</p>
+            </section>
+        </div>
+
+        <div class="mt-8 grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+            <section class="rounded-[2rem] bg-white p-6 shadow-sm ring-1 ring-stone-200">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-semibold text-amber-700">Schedules</p>
+                        <h2 class="mt-1 text-2xl font-bold text-stone-950">Active periodic tasks</h2>
+                    </div>
+                    <a href="{{ periodic_task_admin_url }}" class="text-sm font-semibold text-stone-700 hover:text-stone-950">Manage in admin</a>
+                </div>
+                <div class="mt-6 overflow-x-auto">
+                    <table class="min-w-full divide-y divide-stone-200 text-sm">
+                        <thead>
+                            <tr class="text-left text-stone-500">
+                                <th class="px-3 py-3 font-semibold">Name</th>
+                                <th class="px-3 py-3 font-semibold">Task</th>
+                                <th class="px-3 py-3 font-semibold">Schedule</th>
+                                <th class="px-3 py-3 font-semibold">Enabled</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-stone-100">
+                            {% for task in periodic_tasks %}
+                            <tr>
+                                <td class="px-3 py-4 font-medium text-stone-950">{{ task.name }}</td>
+                                <td class="px-3 py-4 text-stone-600">{{ task.task }}</td>
+                                <td class="px-3 py-4 text-stone-600">
+                                    {% if task.crontab %}
+                                        {{ task.crontab }}
+                                    {% elif task.interval %}
+                                        Every {{ task.interval.every }} {{ task.interval.period }}
+                                    {% else %}
+                                        Manual or one-off
+                                    {% endif %}
+                                </td>
+                                <td class="px-3 py-4">
+                                    {% if task.enabled %}
+                                    <span class="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">Enabled</span>
+                                    {% else %}
+                                    <span class="inline-flex rounded-full bg-stone-200 px-3 py-1 text-xs font-semibold text-stone-700">Disabled</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="px-3 py-8 text-center text-stone-500">No periodic tasks are configured yet.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="rounded-[2rem] bg-stone-950 p-6 text-stone-100 shadow-sm">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-semibold uppercase tracking-[0.25em] text-amber-300">Recent executions</p>
+                        <h2 class="mt-1 text-2xl font-bold text-white">Latest task results</h2>
+                    </div>
+                    <a href="{{ task_result_admin_url }}" class="text-sm font-semibold text-amber-200 hover:text-white">Open full history</a>
+                </div>
+                <div class="mt-6 space-y-3">
+                    {% for result in recent_results %}
+                    <article class="rounded-2xl border border-white/10 bg-white/5 p-4">
+                        <div class="flex items-start justify-between gap-4">
+                            <div>
+                                <p class="font-semibold text-white">{{ result.task_name|default:result.task_id }}</p>
+                                <p class="mt-1 text-xs text-stone-400">{{ result.date_done|date:"Y-m-d H:i" }}</p>
+                            </div>
+                            <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold {% if result.status == 'SUCCESS' %}bg-emerald-400/15 text-emerald-200{% elif result.status == 'FAILURE' %}bg-rose-400/15 text-rose-200{% else %}bg-amber-400/15 text-amber-200{% endif %}">
+                                {{ result.status }}
+                            </span>
+                        </div>
+                    </article>
+                    {% empty %}
+                    <p class="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-stone-300">No task results have been recorded yet.</p>
+                    {% endfor %}
+                </div>
+            </section>
+        </div>
+    </div>
+</div>
+{% endblock %}

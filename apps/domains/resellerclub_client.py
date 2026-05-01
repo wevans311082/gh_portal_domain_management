@@ -119,6 +119,18 @@ class ResellerClubClient:
         }
         return self._get("products/customer-price", params)
 
+    def get_tld_pricing(self, tld: str, years: int = 1, action: str = "registration") -> dict:
+        """Get pricing metadata for a TLD without needing a specific domain name."""
+        return self.get_price(domain_name=f"example.{tld}", tld=tld, action=action, years=years)
+
+    def get_tld_costs(self, tld: str, years: int = 1) -> dict:
+        """Return registration, renewal, and transfer pricing payloads for a TLD."""
+        return {
+            "registration": self.get_tld_pricing(tld=tld, years=years, action="registration"),
+            "renewal": self.get_tld_pricing(tld=tld, years=years, action="renewal"),
+            "transfer": self.get_tld_pricing(tld=tld, years=years, action="transfer"),
+        }
+
     def register_domain(
         self,
         domain_name: str,
@@ -201,3 +213,16 @@ class ResellerClubClient:
             "type": record_type,
         }
         return self._post("dns/manage/delete-record", data)
+
+    def create_contact(self, payload: dict) -> dict:
+        """Create a domain contact in ResellerClub."""
+        return self._post("contacts/add", payload)
+
+    def update_contact(self, contact_id: str, payload: dict) -> dict:
+        """Update an existing domain contact in ResellerClub."""
+        data = {"contact-id": contact_id, **payload}
+        return self._post("contacts/modify", data)
+
+    def get_contact(self, contact_id: str) -> dict:
+        """Fetch a single domain contact from ResellerClub."""
+        return self._get("contacts/details", {"contact-id": contact_id})

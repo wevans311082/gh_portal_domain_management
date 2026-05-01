@@ -21,6 +21,10 @@ class CloudflareService:
         response.raise_for_status()
         return response.json()
 
+    def create_zone(self, zone_name, jump_start=False):
+        data = {"name": zone_name, "jump_start": jump_start}
+        return self._request("POST", "zones", json=data)
+
     def get_zone(self, zone_id):
         return self._request("GET", f"zones/{zone_id}")
 

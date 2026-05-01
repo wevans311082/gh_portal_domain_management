@@ -29,6 +29,8 @@ THIRD_PARTY_APPS = [
     "allauth",
     "allauth.account",
     "allauth.socialaccount",
+    "django_celery_beat",
+    "django_celery_results",
     "django_extensions",
 ]
 
@@ -168,6 +170,9 @@ CELERY_TIMEZONE = "Europe/London"
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = 30 * 60
 CELERY_RESULT_EXPIRES = 60 * 60 * 24 * 7  # 7 days — prevents unbounded Redis growth
+CELERY_RESULT_EXTENDED = True
+CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
+CELERY_TASK_DEFAULT_QUEUE = "default"
 
 # ---------------------------------------------------------------------------
 # Website Templates
@@ -224,11 +229,14 @@ WHM_USERNAME = env("WHM_USERNAME", default="root")
 WHM_API_TOKEN = env("WHM_API_TOKEN", default="")
 
 RESELLERCLUB_RESELLER_ID = env("RESELLERCLUB_RESELLER_ID", default="")
+RESELLERCLUB_CUSTOMER_ID = env("RESELLERCLUB_CUSTOMER_ID", default="")
 RESELLERCLUB_API_KEY = env("RESELLERCLUB_API_KEY", default="")
 RESELLERCLUB_API_URL = env("RESELLERCLUB_API_URL", default="https://test.httpapi.com/api")
 
 CLOUDFLARE_API_TOKEN = env("CLOUDFLARE_API_TOKEN", default="")
 CLOUDFLARE_EMAIL = env("CLOUDFLARE_EMAIL", default="")
+PLATFORM_WWW_TARGET = env("PLATFORM_WWW_TARGET", default="")
+WHM_NAMESERVERS = env.list("WHM_NAMESERVERS", default=[])
 
 COMPANIES_HOUSE_API_KEY = env("COMPANIES_HOUSE_API_KEY", default="")
 

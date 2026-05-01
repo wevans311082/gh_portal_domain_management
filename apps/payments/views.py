@@ -14,6 +14,8 @@ from django.utils import timezone
 from django.db import transaction
 
 from apps.billing.models import Invoice
+from apps.domains.models import DomainOrder
+from apps.domains.tasks import register_domain_order
 from apps.payments.models import Payment, WebhookEvent
 from apps.payments.stripe_service import StripeService
 
@@ -137,10 +139,22 @@ def _handle_checkout_completed(session: dict, webhook_event: WebhookEvent):
         invoice.amount_paid = invoice.total
         invoice.paid_at = timezone.now()
         invoice.save(update_fields=["status", "amount_paid", "paid_at"])
+        _queue_paid_domain_orders(invoice)
 
         logger.info(f"Invoice {invoice_id} marked as paid via Stripe checkout.")
     except Invoice.DoesNotExist:
         logger.error(f"Invoice {invoice_id} not found for Stripe checkout.session.completed")
+
+
+def _queue_paid_domain_orders(invoice: Invoice):
+    pending_orders = DomainOrder.objects.filter(
+        invoice=invoice,
+        status__in=[DomainOrder.STATUS_PENDING_PAYMENT, DomainOrder.STATUS_DRAFT, DomainOrder.STATUS_PAID],
+    )
+    for order in pending_orders:
+        order.status = DomainOrder.STATUS_PAID
+        order.save(update_fields=["status", "updated_at"])
+        register_domain_order.delay(order.id)
 
 
 def _handle_invoice_paid(stripe_invoice: dict, webhook_event: WebhookEvent):
@@ -151,6 +165,7 @@ def _handle_invoice_paid(stripe_invoice: dict, webhook_event: WebhookEvent):
         invoice.status = Invoice.STATUS_PAID
         invoice.paid_at = timezone.now()
         invoice.save(update_fields=["status", "paid_at"])
+        _queue_paid_domain_orders(invoice)
         logger.info(f"Stripe invoice {stripe_invoice_id} marked paid.")
     except Invoice.DoesNotExist:
         logger.debug(f"No local invoice found for Stripe invoice {stripe_invoice_id}")

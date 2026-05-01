@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}Operations Dashboard{% endblock %}
+
+{% block body %}
+<div class="min-h-full bg-slate-950 text-slate-100">
+    <div class="mx-auto max-w-7xl px-6 py-10 lg:px-8">
+        <div class="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+                <p class="text-sm font-semibold uppercase tracking-[0.3em] text-cyan-300">Admin Tools</p>
+                <h1 class="mt-3 text-4xl font-black tracking-tight text-white">Operations dashboard</h1>
+                <p class="mt-3 max-w-3xl text-sm text-slate-300">
+                    Service health, billing pressure, and Celery workload in one place.
+                </p>
+            </div>
+            <div class="flex gap-3">
+                <a href="{% url 'admin_tools:task_management' %}" class="rounded-full border border-cyan-400/40 bg-cyan-400/10 px-5 py-3 text-sm font-semibold text-cyan-100 transition hover:border-cyan-300 hover:bg-cyan-400/20">
+                    Open task management
+                </a>
+                <a href="{{ periodic_task_admin_url }}" class="rounded-full border border-slate-700 bg-slate-900 px-5 py-3 text-sm font-semibold text-slate-100 transition hover:border-slate-500 hover:bg-slate-800">
+                    Edit schedules
+                </a>
+            </div>
+        </div>
+
+        <div class="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <section class="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-2xl shadow-slate-950/40">
+                <p class="text-sm text-slate-400">Total users</p>
+                <p class="mt-4 text-4xl font-black text-white">{{ total_users }}</p>
+            </section>
+            <section class="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-2xl shadow-slate-950/40">
+                <p class="text-sm text-slate-400">Active services</p>
+                <p class="mt-4 text-4xl font-black text-white">{{ active_services }}</p>
+            </section>
+            <section class="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-2xl shadow-slate-950/40">
+                <p class="text-sm text-slate-400">Unpaid invoices</p>
+                <p class="mt-4 text-4xl font-black text-white">{{ unpaid_invoices }}</p>
+            </section>
+            <section class="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-2xl shadow-slate-950/40">
+                <p class="text-sm text-slate-400">Failed tasks</p>
+                <p class="mt-4 text-4xl font-black text-rose-300">{{ failed_task_results }}</p>
+            </section>
+        </div>
+
+        <div class="mt-8 grid gap-6 xl:grid-cols-[1.4fr_1fr]">
+            <section class="rounded-[2rem] border border-slate-800 bg-slate-900/80 p-6 shadow-2xl shadow-slate-950/40">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-semibold text-cyan-300">Task outcomes</p>
+                        <h2 class="mt-1 text-2xl font-bold text-white">Last 7 days</h2>
+                    </div>
+                    <a href="{{ task_result_admin_url }}" class="text-sm font-semibold text-cyan-200 hover:text-white">View results</a>
+                </div>
+                <div class="mt-8 grid grid-cols-3 gap-4 items-end h-72">
+                    {% for bar in task_chart_bars %}
+                    <div class="flex h-full flex-col justify-end rounded-3xl border border-slate-800 bg-slate-950/70 p-4">
+                        <div class="flex-1 flex items-end">
+                            <div class="w-full rounded-t-3xl {{ bar.color }} transition-all" style="height: {{ bar.height }}%;"></div>
+                        </div>
+                        <div class="mt-4">
+                            <p class="text-3xl font-black text-white">{{ bar.count }}</p>
+                            <p class="text-sm text-slate-400">{{ bar.label }}</p>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </section>
+
+            <section class="rounded-[2rem] border border-slate-800 bg-slate-900/80 p-6 shadow-2xl shadow-slate-950/40">
+                <p class="text-sm font-semibold uppercase tracking-[0.25em] text-cyan-300">Scheduler estate</p>
+                <div class="mt-6 space-y-4">
+                    <div class="flex items-center justify-between rounded-2xl bg-slate-950/70 px-4 py-4">
+                        <span class="text-sm text-slate-300">Enabled periodic tasks</span>
+                        <span class="text-2xl font-black text-white">{{ enabled_periodic_tasks }}</span>
+                    </div>
+                    <div class="flex items-center justify-between rounded-2xl bg-slate-950/70 px-4 py-4">
+                        <span class="text-sm text-slate-300">Disabled periodic tasks</span>
+                        <span class="text-2xl font-black text-white">{{ disabled_periodic_tasks }}</span>
+                    </div>
+                    <div class="flex items-center justify-between rounded-2xl bg-slate-950/70 px-4 py-4">
+                        <span class="text-sm text-slate-300">Interval schedules</span>
+                        <span class="text-2xl font-black text-white">{{ interval_schedules }}</span>
+                    </div>
+                    <div class="flex items-center justify-between rounded-2xl bg-slate-950/70 px-4 py-4">
+                        <span class="text-sm text-slate-300">Crontab schedules</span>
+                        <span class="text-2xl font-black text-white">{{ crontab_schedules }}</span>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+</div>
+{% endblock %}

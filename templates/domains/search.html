@@ -51,15 +51,20 @@
     <div class="max-w-2xl mx-auto mb-8">
         <p class="text-sm text-gray-500 mb-3">Popular extensions:</p>
         <div class="flex flex-wrap gap-2">
-            {% for tld in popular_tlds %}
+            {% for featured in featured_tlds %}
             <button
-                class="px-3 py-1 border border-gray-300 rounded-full text-sm hover:bg-orange-50 hover:border-orange-400"
+                class="px-3 py-2 border border-gray-300 rounded-2xl text-left text-sm hover:bg-orange-50 hover:border-orange-400"
                 onclick="
                     var input = document.getElementById('domain-search-input');
                     var base = input.value.split('.')[0] || '';
-                    if (base) { input.value = base + '.{{ tld }}'; input.dispatchEvent(new Event('input')); }
+                    if (base) { input.value = base + '.{{ featured.tld }}'; input.dispatchEvent(new Event('input')); }
                 "
-            >.{{ tld }}</button>
+            >
+                <span class="block font-semibold text-gray-800">.{{ featured.tld }}</span>
+                <span class="block text-xs text-gray-500">
+                    {% if featured.price %}from GBP {{ featured.price|floatformat:2 }}/yr{% else %}price pending sync{% endif %}
+                </span>
+            </button>
             {% endfor %}
         </div>
     </div>
