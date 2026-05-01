@@ -1,4 +1,4 @@
-{% extends "base_portal.html" %}
+﻿{% extends "base_portal.html" %}
 
 {% block title %}Ticket #{{ ticket.id }} - {{ SITE_NAME }}{% endblock %}
 {% block page_title %}Ticket #{{ ticket.id }}: {{ ticket.subject }}{% endblock %}
@@ -16,7 +16,7 @@
         </span>
         <span class="px-2 py-0.5 rounded-full font-medium
             {% if ticket.priority == 'urgent' %}bg-red-100 text-red-800
-            {% elif ticket.priority == 'high' %}bg-orange-100 text-orange-800
+            {% elif ticket.priority == 'high' %}bg-sky-100 text-sky-800
             {% else %}bg-gray-100 text-gray-700{% endif %}">
             {{ ticket.get_priority_display }}
         </span>
@@ -41,12 +41,12 @@
                         {% endif %}
                     </span>
                 </div>
-                <span class="text-xs text-gray-400">{{ msg.created_at|date:"d M Y H:i" }}</span>
+                <span class="text-xs text-sky-300">{{ msg.created_at|date:"d M Y H:i" }}</span>
             </div>
             <div class="text-sm text-gray-700 whitespace-pre-wrap">{{ msg.content }}</div>
             {% if msg.attachment %}
             <div class="mt-3 text-sm">
-                <a href="{{ msg.attachment.url }}" class="text-orange-500 hover:underline">
+                <a href="{{ msg.attachment.url }}" class="text-sky-600 hover:underline">
                     📎 {{ msg.attachment.name|cut:"support/attachments/" }}
                 </a>
             </div>
@@ -74,7 +74,7 @@
                         <input type="file" name="attachment" class="block text-sm text-gray-500 mt-1">
                     </div>
                     <button type="submit"
-                            class="ml-auto bg-orange-500 text-white px-6 py-2 rounded hover:bg-orange-600 font-medium">
+                            class="ml-auto bg-sky-600 text-white px-6 py-2 rounded hover:bg-sky-700 font-medium">
                         Send Reply
                     </button>
                 </div>

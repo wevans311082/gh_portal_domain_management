@@ -1,4 +1,4 @@
-{% extends "base_portal.html" %}
+﻿{% extends "base_portal.html" %}
 
 {% block page_title %}My Profile{% endblock %}
 
@@ -19,7 +19,7 @@
             </div>
             {% endfor %}
             <button type="submit"
-                    class="bg-orange-500 text-white px-5 py-2 rounded hover:bg-orange-600 font-semibold">
+                    class="bg-sky-600 text-white px-5 py-2 rounded hover:bg-sky-700 font-semibold">
                 Save Changes
             </button>
         </form>
@@ -64,7 +64,7 @@
             </span>
         </div>
         <a href="{% url 'accounts_custom:mfa_setup' %}"
-           class="inline-block bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600 text-sm font-semibold">
+           class="inline-block bg-sky-600 text-white px-4 py-2 rounded hover:bg-sky-700 text-sm font-semibold">
             Enable Two-Factor Authentication
         </a>
         {% endif %}

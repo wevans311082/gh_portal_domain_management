@@ -1,4 +1,4 @@
-{% extends "base_portal.html" %}
+﻿{% extends "base_portal.html" %}
 
 {% block title %}Invoice #{{ invoice.number }} - {{ SITE_NAME }}{% endblock %}
 {% block page_title %}Invoice #{{ invoice.number }}{% endblock %}
@@ -13,7 +13,7 @@
         </a>
         {% if invoice.status == 'unpaid' or invoice.status == 'overdue' %}
         <a href="{% url 'payments:stripe_checkout' invoice_id=invoice.pk %}"
-           class="bg-orange-500 text-white px-4 py-2 rounded text-sm hover:bg-orange-600">
+           class="bg-sky-600 text-white px-4 py-2 rounded text-sm hover:bg-sky-700">
             Pay Now
         </a>
         {% endif %}

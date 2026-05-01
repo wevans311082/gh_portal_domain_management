@@ -1,0 +1,165 @@
+<!--
+Author: W3layouts
+Author URL: http://w3layouts.com
+License: Creative Commons Attribution 3.0 Unported
+License URL: http://creativecommons.org/licenses/by/3.0/
+-->
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Creative Digital Agency a Corporate Category Flat Bootstrap Responsive Website Template | 404 :: w3layouts</title>
+	<!--fonts-->
+		<link href="https://fonts.googleapis.com/css?family=Dosis:200,300,400,500,600,700,800' rel='stylesheet' type='text/css'>
+		<link href="https://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800' rel='stylesheet' type='text/css'>
+	<!--//fonts-->
+		<link href="css/bootstrap.css" rel="stylesheet" type="text/css" media="all" />
+			<link href="css/style.css" rel="stylesheet" type="text/css" media="all" />
+
+	<!-- for-mobile-apps -->
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+		<meta name="keywords" content="Creative Digital Agency Responsive web template, Bootstrap Web Templates, Flat Web Templates, Andriod Compatible web template, 
+		Smartphone Compatible web template, free webdesigns for Nokia, Samsung, LG, SonyErricsson, Motorola web design" />
+		<script type="application/x-javascript"> addEventListener("load", function() { setTimeout(hideURLbar, 0); }, false); function hideURLbar(){ window.scrollTo(0,1); } </script>
+	<!-- //for-mobile-apps -->
+	<!-- js -->
+		<script type="text/javascript" src="js/jquery.min.js"></script>
+	<!-- js -->
+	<!-- start-smooth-scrolling -->
+		<script type="text/javascript" src="js/move-top.js"></script>
+		<script type="text/javascript" src="js/easing.js"></script>
+		<script type="text/javascript">
+			jQuery(document).ready(function($) {
+				$(".scroll").click(function(event){		
+					event.preventDefault();
+					$('html,body').animate({scrollTop:$(this.hash).offset().top},1000);
+				});
+			});
+		</script>
+	<!-- start-smooth-scrolling -->
+
+</head>
+<body>
+<!-- banner -->
+<div class="banner page-head">
+	<div class="container">
+		<div class="header-grids">
+			<div class="container">
+				<div class="fixed-header">
+					<div class="header-left">
+						<a href="index.html"><img src="images/logo.png" alt=""/></a>
+					</div>
+					<div class="header-right">
+						<span class="menu"><img src="images/menu.png" alt=""/></span>
+								<ul class="nav1">
+									<li><a href="index.html">HOME</a></li>
+									<li><a href="works.html">WORKS</a></li>
+									<li><a href="industries.html">INDUSTRIES</a></li>
+									<li><a href="services.html">SERVICES</a></li>	
+									<li><a class="active" href="404.html">NEWS</a></li>
+									<li><a href="about.html">WHO WE ARE</a></li>
+									<li><a href="contact.html">CONTACT</a></li>
+								</ul>
+								<!-- script for menu -->
+									<script> 
+										$( "span.menu" ).click(function() {
+										$( "ul.nav1" ).slideToggle( 300, function() {
+										 // Animation complete.
+										});
+										});
+									</script>
+								<!-- //script for menu -->
+								<!-- script-for sticky-nav -->
+								<script>
+								$(document).ready(function() {
+									 var navoffeset=$(".header-grids").offset().top;
+									 $(window).scroll(function(){
+										var scrollpos=$(window).scrollTop(); 
+										if(scrollpos >=navoffeset){
+											$(".header-grids").addClass("fixed");
+										}else{
+											$(".header-grids").removeClass("fixed");
+										}
+									 });
+									 
+								});
+								</script>
+							<!-- /script-for sticky-nav -->
+
+					</div>
+					<div class="clearfix"></div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+<!-- //banner -->
+<!-- 404-page -->
+<div class="error-page">
+	<div class="container">
+		<div class="error-info">
+			<h3>4<span>0</span>4</h3>
+			<p>Oops!! Page not found!!</p>
+			<p>Please try one of the following pages...</p>
+			<a class="hvr-rectangle-out button" href="index.html">HOME PAGE</a>
+		</div>
+	</div>
+</div>
+<!-- //404-page -->
+<!-- footer -->
+<div class="footer">
+	<div class="container">
+		<div class="footer-grids">
+			
+			<div class="col-md-3 footer-grid">
+				<h4>ADDRESS</h4>
+				<ul>
+					<li>ABC Agency Creative</li>
+					<li>4111 Deer Haven Drive Greenville, SC 29601 </li>
+					<li>Hours: Mon-Fri 9am - 6:00pm</li>
+				</ul>
+			</div>
+			<div class="col-md-3 footer-grid">
+				<h4>GET IN TOUCH</h4>
+				<ul>
+					<li>Tel: +1 234-567-890</li>
+					<li>Fax: +1 646-216-9789</li>
+					<li>Email: <a href="mailto:info@example.com">info@yourdomain.com </a></li>
+				</ul>
+			</div>
+			<div class="col-md-3 footer-grid">
+				<h4>SUBSCRIBE TO OUR MAILING LIST</h4>
+				<form>
+					<input type="email" value="Enter your email" onfocus="this.value = '';" onblur="if (this.value == '') {this.value = 'Enter your email';}" required="">
+					<input type="submit" value=" ">
+				</form>
+			</div>
+			<div class="col-md-3 footer-grid">
+				<h3>AGENCY CREATIVE</h3>
+				<p>Copyright &copy; 2015 Creative Digital Agency. Template by <a href="https://w3layouts.com/"> W3layouts</a></p>
+			</div>
+			<div class="clearfix"></div>
+		</div>
+	</div>
+</div>
+<!-- //footer -->
+<!-- here stars scrolling icon -->
+	<script type="text/javascript">
+		$(document).ready(function() {
+			/*
+				var defaults = {
+				containerID: 'toTop', // fading element id
+				containerHoverID: 'toTopHover', // fading element hover id
+				scrollSpeed: 1200,
+				easingType: 'linear' 
+				};
+			*/
+								
+			$().UItoTop({ easingType: 'easeOutQuart' });
+								
+			});
+	</script>
+<!-- //here ends scrolling icon -->
+
+</body>
+</html>

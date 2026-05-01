@@ -1,42 +1,92 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% load static %}
 
 {% block body %}
 <div class="flex h-full">
     <!-- Sidebar -->
-    <aside class="w-64 bg-gray-900 text-white flex-shrink-0">
-        <div class="p-4">
-            <h1 class="text-xl font-bold text-orange-400">{{ SITE_NAME }}</h1>
+    <aside class="w-64 bg-sky-800 text-white flex-shrink-0 flex flex-col shadow-lg">
+        <!-- Brand -->
+        <div class="px-5 py-5 border-b border-sky-700">
+            <h1 class="text-lg font-bold text-white tracking-tight">{{ SITE_NAME }}</h1>
+            <p class="text-xs text-sky-300 mt-0.5">Client Portal</p>
         </div>
-        <nav class="mt-4">
-            <a href="{% url 'portal:dashboard' %}" class="block px-4 py-2 hover:bg-gray-700">Dashboard</a>
-            <a href="{% url 'domains:my_domains' %}" class="block px-4 py-2 hover:bg-gray-700">Domains</a>
-            <a href="{% url 'invoices:list' %}" class="block px-4 py-2 hover:bg-gray-700">Invoices</a>
-            <a href="{% url 'support:list' %}" class="block px-4 py-2 hover:bg-gray-700">Support</a>
+        <!-- Main navigation -->
+        <nav class="flex-1 mt-2 px-2 space-y-0.5">
+            <a href="{% url 'portal:dashboard' %}"
+               class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-sky-100 hover:bg-sky-700 hover:text-white transition-colors">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                Dashboard
+            </a>
+            <a href="{% url 'portal:my_services' %}"
+               class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-sky-100 hover:bg-sky-700 hover:text-white transition-colors">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2"/></svg>
+                My Services
+            </a>
+            <a href="{% url 'domains:my_domains' %}"
+               class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-sky-100 hover:bg-sky-700 hover:text-white transition-colors">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"/></svg>
+                Domains
+            </a>
+            <a href="{% url 'invoices:list' %}"
+               class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-sky-100 hover:bg-sky-700 hover:text-white transition-colors">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                Invoices
+            </a>
+            <a href="{% url 'support:list' %}"
+               class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-sky-100 hover:bg-sky-700 hover:text-white transition-colors">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                Support
+            </a>
+            <a href="{% url 'website_templates:gallery' %}"
+               class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-sky-100 hover:bg-sky-700 hover:text-white transition-colors">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                Website Templates
+            </a>
         </nav>
+        <!-- Staff section -->
         {% if request.user.is_staff %}
-        <div class="mt-4 border-t border-gray-700 pt-4">
-            <p class="px-4 text-xs text-gray-400 uppercase tracking-wide mb-1">Admin</p>
-            <a href="{% url 'admin_tools:dashboard' %}" class="block px-4 py-2 hover:bg-gray-700 text-sm">Admin Tools</a>
-            <a href="{% url 'admin_tools:wizard_index' %}" class="block px-4 py-2 hover:bg-gray-700 text-sm">Setup Wizard</a>
+        <div class="border-t border-sky-700 px-2 py-2">
+            <p class="px-3 text-xs text-sky-400 uppercase tracking-wider mb-1 font-semibold">Staff</p>
+            <a href="{% url 'admin_tools:dashboard' %}"
+               class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-sky-100 hover:bg-sky-700 hover:text-white transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                Admin Tools
+            </a>
+            <a href="{% url 'admin_tools:wizard_index' %}"
+               class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-sky-100 hover:bg-sky-700 hover:text-white transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                Setup Wizard
+            </a>
         </div>
         {% endif %}
+        <!-- User footer -->
+        <div class="border-t border-sky-700 px-2 py-3">
+            <a href="{% url 'accounts_custom:profile' %}"
+               class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-sky-100 hover:bg-sky-700 hover:text-white transition-colors">
+                <div class="w-7 h-7 rounded-full bg-sky-600 flex items-center justify-center text-xs font-bold uppercase flex-shrink-0">
+                    {{ request.user.email|first }}
+                </div>
+                <div class="min-w-0">
+                    <p class="truncate text-xs font-medium">{{ request.user.email }}</p>
+                    {% if request.user.mfa_enabled %}<p class="text-xs text-sky-300">🔒 2FA on</p>{% endif %}
+                </div>
+            </a>
+            <a href="{% url 'account_logout' %}"
+               class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs text-sky-300 hover:text-red-300 transition-colors">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                Sign out
+            </a>
+        </div>
     </aside>
     <!-- Main content -->
-    <main class="flex-1 overflow-auto">
-        <header class="bg-white shadow px-6 py-4 flex justify-between items-center">
-            <h2 class="text-lg font-semibold">{% block page_title %}{% endblock %}</h2>
-            <div class="flex items-center gap-4">
-                <a href="{% url 'accounts_custom:profile' %}" class="text-sm text-gray-600 hover:underline">
-                    {{ request.user.email }}
-                    {% if request.user.mfa_enabled %}
-                    <span title="Two-factor authentication enabled" class="ml-1 text-green-500 text-xs">🔒</span>
-                    {% endif %}
-                </a>
-                <a href="{% url 'account_logout' %}" class="text-sm text-red-500 hover:underline">Logout</a>
+    <main class="flex-1 overflow-auto flex flex-col">
+        <header class="bg-white border-b border-sky-100 px-6 py-3 flex justify-between items-center flex-shrink-0 shadow-sm">
+            <h2 class="text-base font-semibold text-sky-900">{% block page_title %}{% endblock %}</h2>
+            <div class="flex items-center gap-3 text-sm text-sky-700">
+                {% block header_actions %}{% endblock %}
             </div>
         </header>
-        <div class="p-6">
+        <div class="flex-1 p-6 overflow-auto">
             {% block content %}{% endblock %}
         </div>
     </main>

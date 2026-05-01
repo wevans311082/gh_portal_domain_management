@@ -1,4 +1,4 @@
-{% if results %}
+﻿{% if results %}
 <div class="bg-white rounded-lg shadow divide-y">
     <div class="px-4 py-3 text-sm text-gray-500">
         Results for <strong>{{ query }}</strong>
@@ -26,7 +26,7 @@
             </span>
             {% if result.available %}
             <a href="{% url 'account_login' %}?next={% url 'domains:search' %}"
-               class="bg-orange-500 text-white text-sm px-3 py-1 rounded hover:bg-orange-600">
+               class="bg-sky-600 text-white text-sm px-3 py-1 rounded hover:bg-sky-700">
                 Register
             </a>
             {% endif %}

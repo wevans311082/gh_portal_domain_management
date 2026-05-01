@@ -1,4 +1,4 @@
-{% extends "base_portal.html" %}
+﻿{% extends "base_portal.html" %}
 
 {% block title %}Invoices - {{ SITE_NAME }}{% endblock %}
 {% block page_title %}Invoices{% endblock %}
@@ -21,7 +21,7 @@
             {% for invoice in invoices %}
             <tr class="hover:bg-gray-50">
                 <td class="px-4 py-3 font-medium">
-                    <a href="{% url 'invoices:detail' pk=invoice.pk %}" class="text-orange-500 hover:underline">
+                    <a href="{% url 'invoices:detail' pk=invoice.pk %}" class="text-sky-600 hover:underline">
                         #{{ invoice.number }}
                     </a>
                 </td>
@@ -41,7 +41,7 @@
                     <a href="{% url 'invoices:pdf' pk=invoice.pk %}" class="text-gray-500 hover:text-gray-700 text-xs">PDF</a>
                     {% if invoice.status in 'unpaid overdue' %}
                     <a href="{% url 'payments:stripe_checkout' invoice_id=invoice.pk %}"
-                       class="bg-orange-500 text-white text-xs px-2 py-1 rounded hover:bg-orange-600">
+                       class="bg-sky-600 text-white text-xs px-2 py-1 rounded hover:bg-sky-700">
                         Pay
                     </a>
                     {% endif %}

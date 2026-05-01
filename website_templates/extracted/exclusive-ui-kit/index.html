@@ -1,0 +1,652 @@
+<!--
+Author: W3layouts
+Author URL: http://w3layouts.com
+License: Creative Commons Attribution 3.0 Unported
+License URL: http://creativecommons.org/licenses/by/3.0/
+-->
+<!DOCTYPE html>
+<html>
+<head>
+<title>Exclusive Ui Kit Flat Bootstarp Resposive Website Template| Home :: w3layouts</title>
+<link href="css/bootstrap.css" rel='stylesheet' type='text/css' />
+<!-- Custom Theme files -->
+<link href="css/style.css" rel="stylesheet" type="text/css" media="all" />
+<!-- Custom Theme files -->
+<script src="js/jquery.min.js"></script>
+<!-- Custom Theme files -->
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="keywords" content="Exclusive Ui Kit Responsive web template, Bootstrap Web Templates, Flat Web Templates, Andriod Compatible web template, 
+Smartphone Compatible web template, free webdesigns for Nokia, Samsung, LG, SonyErricsson, Motorola web design" />
+<script type="application/x-javascript"> addEventListener("load", function() { setTimeout(hideURLbar, 0); }, false); function hideURLbar(){ window.scrollTo(0,1); } </script>
+<!--webfont-->
+<link href="https://fonts.googleapis.com/css?family=Lato:100,300,400,700,900,100italic,300italic,400italic,700italic,900italic' rel='stylesheet' type='text/css'>
+<!-- start equalizer -->		  
+<link href="css/jquery-ui.css" rel="stylesheet" type="text/css" media="all" />
+<script src="js/jquery-ui.min.js"></script>
+<script>var __links = document.querySelectorAll('a');function __linkClick(e) { parent.window.postMessage(this.href, '*');} ;for (var i = 0, l = __links.length; i < l; i++) {if ( __links[i].getAttribute('data-t') == '_blank' ) { __links[i].addEventListener('click', __linkClick, false);}}</script>
+<script>
+$(function() {
+	 
+	    $( "#eq > span" ).each(function() {	   
+	      var value = parseInt( $( this ).text(), 10 );
+	      $( this ).empty().slider({
+	        value: value,
+	        range: "min",
+	        animate: true,
+	        orientation: "vertical"
+	      });
+	    });
+	  });
+</script>
+<script>
+(function($){
+	$.fn.percentPie = function(options){
+
+		var settings = $.extend({
+			width: 100,
+			trackColor: "EEEEEE",
+			barColor: "777777",
+			barWeight: 30,
+			startPercent: 0,
+			endPercent: 1,
+			fps: 60
+		}, options);
+
+		this.css({
+			width: settings.width,
+			height: settings.width
+		});
+
+		var	that = this,
+			hoverPolice = false,
+			canvasWidth = settings.width,
+			canvasHeight = canvasWidth,
+			id = $('canvas').length,
+			canvasElement = $('<canvas id="'+ id +'" width="' + canvasWidth + '" height="' + canvasHeight + '"></canvas>'),
+			canvas = canvasElement.get(0).getContext("2d"),
+			centerX = canvasWidth/2,
+			centerY = canvasHeight/2,
+			radius = settings.width/2 - settings.barWeight/2;
+			counterClockwise = false,
+			fps = 1000 / settings.fps,
+			update = .01;
+			this.angle = settings.startPercent;
+
+		this.drawArc = function(startAngle, percentFilled, color){
+			var drawingArc = true;
+			canvas.beginPath();
+			canvas.arc(centerX, centerY, radius, (Math.PI/180)*(startAngle * 360 - 90), (Math.PI/180)*(percentFilled * 360 - 90), counterClockwise);
+			canvas.strokeStyle = color;
+			canvas.lineWidth = settings.barWeight;
+			canvas.stroke();
+			drawingArc = false;
+		}
+
+		this.fillChart = function(stop){
+			var loop = setInterval(function(){
+				hoverPolice = true;
+				canvas.clearRect(0, 0, canvasWidth, canvasHeight);
+
+				that.drawArc(0, 360, settings.trackColor);
+				that.angle += update;
+				that.drawArc(settings.startPercent, that.angle, settings.barColor);
+
+				if(that.angle > stop){
+					clearInterval(loop);
+					hoverPolice = false;
+				}
+			}, fps);
+		}
+
+		this.mouseover(function(){
+			if(hoverPolice == false){
+				that.angle = settings.startPercent;
+				that.fillChart(settings.endPercent);
+			}
+		});
+
+		this.fillChart(settings.endPercent);
+		this.append(canvasElement);
+		return this;
+	}
+}(jQuery));
+
+$(document).ready(function() {
+
+	$('.google').percentPie({
+		width: 100,
+		trackColor: "444444",
+		barColor: "71CF97",
+		barWeight: 20,
+		endPercent: .9,
+		fps: 60
+	});
+  
+  $('.moz').percentPie({
+		width: 100,
+		trackColor: "444444",
+		barColor: "2EB0E2",
+		barWeight: 20,
+		endPercent: .75,
+		fps: 60
+	});
+  
+  $('.safari').percentPie({
+		width: 100,
+		trackColor: "444444",
+		barColor: "#e51937",
+		barWeight: 20,
+		endPercent: .5,
+		fps: 60
+	});
+    
+});
+</script>
+<script src="js/jquery.bxslider.min.js"></script>
+<link href="css/jquery.bxslider.css" rel="stylesheet" />
+	<script>
+		$(document).ready(function(){
+			  $('.bxslider').bxSlider();
+		});
+	</script>
+</head>
+<body>
+	<div class="container">
+		<div class="col-md-12">
+		<div class="logo">
+			<a href="index.html"><h1>exclusive ui kit</h1></a>
+		</div>
+		<div class="top-menu">
+		<span class="menu"><img src="images/menu.png" alt=""> </span>
+			<ul>
+				<li><a href="#">PORTFOLIO</a></li>
+				<li><a class="active" href="#">ABOUT ME</a></li>
+				<li><a href="#">WORKS</a></li>
+				<li><a href="#">CLIENTS</a></li>
+				<li><a href="#">BLOG</a></li>
+				<li><a href="#">CONTACT</a></li>
+			</ul>
+		</div>
+		<!--script for menu-->
+		<script>
+			$("span.menu").click(function(){
+			$(".top-menu ul").slideToggle(500, function(){
+				});
+				});
+		</script>
+		<!--script for menu-->
+		</div>
+		<div class="clearfix"></div>
+		<div class="total-info">
+			<div class="col-md-4 grid_1">
+				<div class="hire-me">
+					<h3>HIRE ME</h3>
+					<div class="project">
+						<div>
+							<span>PROJECT</span>
+							<input type="text" class="text" value="Add your project name here" onfocus="this.value = '';" onblur="if (this.value == '') {this.value = 'Add your project name here';}">
+						</div>
+						<div>
+							<span>MESSAGE</span>
+							<textarea value="Add your message here" onfocus="this.value = '';" onblur="if (this.value == '') {this.value = 'Add your message here';}">Add your message here</textarea>
+						</div>
+					</div>
+					<ul class="dropdown-menu1">
+						<li><a href="">
+							<p>
+								<label for="amount" class="amount">BUDGET</label>
+								<span class="amount">$ 100 000 – 135 000</span>
+							</p>                
+							<div id="slider-range"></div>							
+								<input type="text" id="amount" style="border: 0; color: #7c8389; font-weight: bold;" />
+							</a></li>			
+					</ul>
+					<!---->
+					 <script type="text/javascript" src="js/jquery-ui.min.js"></script>
+
+						  <link rel="stylesheet" type="text/css" href="css/jquery-ui.css">
+
+					<script type='text/javascript'>//<![CDATA[ 
+					$(window).load(function(){
+					 $( "#slider-range" ).slider({
+								range: true,
+								min: 0,
+								max: 400000,
+								values: [ 8500, 350000 ],
+								slide: function( event, ui ) {  $( "#amount" ).val( "$" + ui.values[ 0 ] + " - $" + ui.values[ 1 ] );
+								}
+					 });
+					$( "#amount" ).val( "$" + $( "#slider-range" ).slider( "values", 0 ) + " - $" + $( "#slider-range" ).slider( "values", 1 ) );
+
+					});//]]>  
+
+					</script>
+
+
+					<!---->
+					<div class="send-inquiry">
+						<input type="submit" value="SEND INQUIRY">
+					</div>
+				</div>
+				<div class="login">
+					<h4>Login</h4>
+					<p>Enter now with your social <span>network account</span></p>
+					<div class="login-grids">
+						<div class="login-top">
+							<ul>
+								<li><a href="#" class="facebook"> </a></li>
+								<li><a href="#" class="vk"> </a></li>
+							</ul>
+						</div>
+						<div class="login-top login-bottom">
+							<ul>
+								<li><a href="#" class="ok"> </a></li>
+								<li><a href="#" class="twitter"> </a></li>
+							</ul>
+						</div>
+					</div>
+					<p class="account">i don’t have an account</p>
+					<a href="#">Use E-mail</a>
+				</div>
+				 <ul class="menu">
+		<li class="item1"><a href="#">Dropdown Menu<i class="menu-down"><img src="images/down.png" alt="" /></i> </a>
+			<ul class="cute">
+				<li class="subitem1"><a href="#">Inbox </a></li>
+				<li class="subitem2"><a href="#">Sent </a></li>
+				<li class="subitem3"><a href="#">Draft </a></li>
+				<li class="subitem3"><a href="#">Trash</a></li>
+			</ul>
+		</li>
+		<li class="item2"><a href="#">Dropdown Menu <i class="menu-down"><img src="images/down.png" alt="" /> </i></a>
+			<ul class="cute">
+				<li class="subitem1"><a href="#">Inbox </a></li>
+				<li class="subitem2"><a href="#">Sent </a></li>
+				<li class="subitem3"><a href="#">Draft </a></li>
+				<li class="subitem3"><a href="#">Trash</a></li>
+			</ul>
+		</li>		
+		
+	</ul>
+		<!--initiate accordion-->
+		<script type="text/javascript">
+			$(function() {
+			    var menu_ul = $('.menu > li > ul'),
+			           menu_a  = $('.menu > li > a');
+			    menu_ul.hide();
+			    menu_a.click(function(e) {
+			        e.preventDefault();
+			        if(!$(this).hasClass('active')) {
+			            menu_a.removeClass('active');
+			            menu_ul.filter(':visible').slideUp('normal');
+			            $(this).addClass('active').next().stop(true,true).slideDown('normal');
+			        } else {
+			            $(this).removeClass('active');
+			            $(this).next().stop(true,true).slideUp('normal');
+			        }
+			    });
+			
+			});
+		</script>
+		<!---->
+
+				<div class="search">
+					<h3>SEARCH</h3>
+					<div class="search-box">
+						<form> 
+							<input type="text" class="text" value="You can search here" onfocus="this.value = '';" onblur="if (this.value == '') {this.value = 'You can search here';}">
+							<input type="submit" value>
+						</form> 
+					</div>
+				</div>
+				<div class="clearfix"></div>
+				<div class="circles">
+					<h3>STATUS RECENT PROJECTS</h3>
+						<div class="demo">
+      <div class="demo-1" data-percent="45">
+	  <div class="title">
+		<h4>MEIER</h4>
+		<p>STAIRS</p>
+	  </div>
+	  </div>
+      <div class="demo-2" data-percent="95">
+	   <div class="title2">
+		<h4>JOHNSON</h4>
+		<p>exterior wall </p>
+	  </div>
+	  </div>
+      <div class="demo-3" data-percent="100">
+	   <div class="title1">
+		<h4>Junghanns</h4>
+	  </div>
+	  </div>
+	  <div class="clearfix"></div>
+    </div>	
+    <script src="js/jquery.circlechart.js"></script>
+<script>
+$('.demo-1').percentcircle({
+animate : false,
+diameter : 100,
+guage: 3,
+coverBg: '#fff',
+bgColor: '#d9d9d9',
+fillColor: '#2b3e4e',
+percentSize: '15px',
+percentWeight: 'normal'
+});
+
+$('.demo-2').percentcircle({
+animate : false,
+diameter : 100,
+guage: 3,
+coverBg: '#fff',
+bgColor: '#d9d9d9',
+fillColor: '#84754e',
+percentSize: '15px',
+percentWeight: 'normal'
+});
+
+$('.demo-3').percentcircle({
+animate : false,
+diameter : 100,
+guage: 3,
+coverBg: '#fff',
+bgColor: '#a6192e',
+fillColor: '#a6192e',
+percentSize: '18px',
+percentWeight: 'normal'
+});		
+			
+	</script><script type="text/javascript">
+
+  var _gaq = _gaq || [];
+  _gaq.push(['_setAccount', 'UA-36251023-1']);
+  _gaq.push(['_setDomainName', 'jqueryscript.net']);
+  _gaq.push(['_trackPageview']);
+
+  (function() {
+    var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+    ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+    var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+  })();
+
+</script>
+					</div>
+				<div class=""></div>
+			</div>
+			<div class="col-md-4 grid_2">
+				<div class="register">
+					<h4>register now</h4>
+					<p>Get connected and receive fresh news from our brand</p>
+					<form>
+						<input type="text" placeholder="E-mail address" required="">
+						<input type="password" placeholder="Password" required="">
+						<input type="password" placeholder="Password again" required="">
+						<input type="submit" value="GET CONNECTED">
+					</form>
+				</div>	
+				<div class="weather-slider">
+				<div class=" weather">
+					<span class="time">14:45 pm</span>
+					<!-- requried-jsfiles-for owl -->
+							<link href="css/owl.carousel.css" rel="stylesheet">
+							    <script src="js/owl.carousel.js"></script>
+							        <script>
+									    $(document).ready(function() {
+									      $("#owl-demo").owlCarousel({
+									        items : 1,
+									        lazyLoad : true,
+									        autoPlay : true,
+									        navigation : true,
+									        navigationText :  true,
+									        pagination : true,
+									      });
+									    });
+									  </script>
+							 <!-- //requried-jsfiles-for owl -->
+
+		<!-- start content_slider -->
+					<div id="example1">
+						<div id="owl-demo" class="owl-carousel text-center">
+							<div class="item">
+								<h1>24<em>o</em></h1>
+								<p><i></i>Clear</p>
+							</div>
+							<div class="item">
+								<h1>24<em>o</em></h1>
+								<p><i></i>Clear</p>
+							</div>
+							<div class="item">
+								<h1>24<em>o</em></h1>
+								<p><i></i>Clear</p>
+							</div>
+							<div class="item">
+								<h1>24<em>o</em></h1>
+								<p><i></i>Clear</p>
+							</div>							
+						</div>
+					</div>
+				</div>
+				<div class="san">
+					<h3><a href="#">San Francisco</a></h3>
+					<small>California</small>
+				</div>
+				</div>
+				<div class="span-middle">
+					<div class="ribbons text-center">
+							<div class="ribbon-wrapper1">
+		<div class="ribbon-front1">
+			<!-- ribbon text goes here -->
+		</div>
+		<div class="ribbon-edge-topleft1"></div>
+		<div class="ribbon-edge-topright1"></div>
+		<div class="ribbon-edge-bottomleft1"></div>
+		<div class="ribbon-edge-bottomright1"></div>
+		<div class="ribbon-back-left1"></div>
+		<div class="ribbon-back-right1"></div>
+	</div>
+
+							<div class="ribbon-wrapper">
+		<div class="ribbon-front">
+			<!-- ribbon text goes here -->
+		</div>
+		<div class="ribbon-edge-topleft2"></div>
+		<div class="ribbon-edge-topleft"></div>
+		<div class="ribbon-edge-topright"></div>
+		<div class="ribbon-edge-bottomleft"></div>
+		<div class="ribbon-edge-bottomright"></div>
+		<div class="ribbon-back-left"></div>
+		<div class="ribbon-back-left2"></div>
+		<div class="ribbon-back-right"></div>
+	</div>
+
+						</div>
+					<div id="container">
+			  <div id="loader"></div>
+			  <p class="para">Loading...</p>
+			</div>
+					<div id="container">
+			  <div id="loader"></div>
+			  <p class="para">Loading...</p>
+			</div>
+					<div id="container">
+			  <div id="loader"></div>
+			  <p class="para">Loading...</p>
+			</div>
+					<div id="container">
+			  <div id="loader"></div>
+			  <p class="para">Loading...</p>
+			</div>
+			<div class="clearfix"></div>
+			<!-- start equalizer -->
+				<div class="wrapper">
+					<div class="wrp-eq cf">
+						<div id="eq">				
+							<span>25</span>				
+							<span>75</span>				
+							<span>35</span>				
+							<span>65</span>			
+						</div>
+					</div>
+				</div>	
+			<!-- end equalizer -->
+			<div id="preview"></div>
+			  <form id="opts">
+				<input type="text" name="lines" min="5" max="16" step="2" value="12">
+			  </form>
+  <link rel="stylesheet" type="text/css" href="css/fd-slider.css">
+  <script type="text/javascript" src="js/fd-slider.js"></script>
+		</div>
+				</div>
+			<div class="col-md-4 grid_3">
+				<div class="about text-center">
+					<img src="images/abt.jpg" alt="" />
+					<h3>AL BORLAND</h3>
+					<h4>handcrafter</h4>
+					<p>38 years old handcrafter who has a wide array of professional knowledge concerning tools  and <a href="#">available </a>for work.</p>
+				</div>
+				<div class="about-slider">
+					<div class="span_of_3">
+				<!----start-text-slider---->
+					<ul class="bxslider">
+					  <li><img src="images/slider-pic1.jpg" />
+					  	<div class="bx_top">
+							<h3 class="style">house of family johnson</h3>
+							<p class="para">complete construction</p>
+						</div>
+					  </li>
+					  <li><img src="images/slider-pic1.jpg" />
+					  	<div class="bx_top">
+							<h3 class="style">house of family johnson</h3>
+							<p class="para">complete construction</p>
+						</div>
+					  </li>
+					   <li><img src="images/slider-pic1.jpg" />
+					  	<div class="bx_top">
+							<h3 class="style">house of family johnson</h3>
+							<p class="para">complete construction.</p>
+						</div>
+					  </li>
+					   <li><img src="images/slider-pic1.jpg" />
+					  	<div class="bx_top">
+							<h3 class="style">house of family johnson</h3>
+							<p class="para">complete construction</p>
+						</div>
+					  </li>
+					</ul>
+				<!----//End-text-slider---->
+				</div>
+					<p class="text">This is the brand new house for family johnson.</p>
+				<div class="social-icons">
+					<a href="#"><i class="tw"></i></a>
+					<a href="#"><i class="fb"></i></a>
+					<a href="#"><i class="heart"></i></a>
+				</div>
+				</div>
+				<div class="clearfix"></div>
+				<div class="to-do">
+						<h3>To-Do</h3>
+						<div class="checkbox-form">
+							<div class="check">
+								<label class="checkbox"><input type="checkbox" name="checkbox" checked=""><i> </i>Do the dishes.</label>
+							</div>
+							<div class="check">
+								<label class="checkbox"><input type="checkbox" name="checkbox" checked=""><i> </i>Hit the gym.</label>
+							</div>
+							<div class="check">
+								<label class="checkbox"><input type="checkbox" name="checkbox" checked=""><i> </i>Walk the dog.</label>
+							</div>
+							<div class="check">
+								<label class="checkbox"><input type="checkbox" name="checkbox" checked=""><i> </i>Get wireframing!</label>
+							</div>
+							<div class="check">
+								<label class="checkbox"><input type="checkbox" name="checkbox" checked=""><i> </i>Talk to the cat.</label>
+							</div>
+						</div>
+					</div>
+				<div class="clients">
+					<h3>CLIENTS</h3>
+					<div class="clients-grids">
+						<div class="client-grid text-center">
+							<img src="images/c1.jpg" alt="" />
+							<h5>JOHNSON</h5>
+						</div>
+						<div class="client-grid text-center">
+							<img src="images/c2.jpg" alt="" />
+							<h5>BENTZ</h5>
+						</div>
+						<div class="client-grid text-center">
+							<img src="images/c3.jpg" alt="" />
+							<h5>Carrier</h5>
+						</div>
+						<div class="client-grid text-center">
+							<img src="images/c4.jpg" alt="" />
+							<h5>Meyerfeld</h5>
+						</div>
+						<div class="clearfix"></div>
+					</div>
+				</div>
+				<div class="result">
+					<h3>RESULTS</h3>
+					<div class="skills-top">
+						<h5>Rock</h5>
+						<div class="skills">
+							<div class="skill1" style="width:52%"></div>
+							<div class="skills-right">
+								<p>52%</p>
+							</div>
+							<div class="clearfix"> </div>
+						</div>
+					</div>
+					<div class="skills-top">
+						<h5>Punk</h5>
+						<div class="skills">
+							<div class="skill1" style="width:35%"></div>
+							<div class="skills-right">
+								<p>35%</p>
+							</div>
+							<div class="clearfix"> </div>
+						</div>
+					</div>
+					<div class="skills-top">
+						<h5>Pop</h5>
+						<div class="skills">
+							<div class="skill1" style="width:11%"></div>
+							<div class="skills-right">
+								<p>11%</p>
+							</div>
+							<div class="clearfix"> </div>
+						</div>
+					</div>
+					<div class="skills-top">
+						<h5>Japan glam</h5>
+						<div class="skills">
+							<div class="skill1" style="width:5%"></div>
+							<div class="skills-right">
+								<p>5%</p>
+							</div>
+							<div class="clearfix"> </div>
+						</div>
+					</div>
+					<div class="skills-top">
+						<h5>Don’t know</h5>
+						<div class="skills">
+							<div class="skill1" style="width:1%"></div>
+							<div class="skills-right">
+								<p>1%</p>
+							</div>
+							<div class="clearfix"> </div>
+						</div>
+					</div>
+				</div>
+			</div>
+			<div class="clearfix"></div>
+		</div>
+		<div class="footer">
+			<div class="copy-rights text-center">
+				<p> Copyright &copy;2015  All rights  Reserved | Design by <a href="https://w3layouts.com" target="target_blank">W3Layouts</a></p>
+			</div>
+		</div>
+	</div>
+</body>
+</html>

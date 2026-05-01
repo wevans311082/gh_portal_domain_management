@@ -1,4 +1,4 @@
-{% extends "base_auth.html" %}
+﻿{% extends "base_auth.html" %}
 
 {% block title %}Register - {{ SITE_NAME }}{% endblock %}
 
@@ -13,7 +13,7 @@
         {% if field.errors %}<p class="text-red-500 text-sm mt-1">{{ field.errors.0 }}</p>{% endif %}
     </div>
     {% endfor %}
-    <button type="submit" class="w-full bg-orange-500 text-white py-3 rounded hover:bg-orange-600">Create Account</button>
+    <button type="submit" class="w-full bg-sky-600 text-white py-3 rounded hover:bg-sky-700">Create Account</button>
 </form>
-<p class="text-center mt-4 text-sm">Already have an account? <a href="{% url 'account_login' %}" class="text-orange-500">Sign In</a></p>
+<p class="text-center mt-4 text-sm">Already have an account? <a href="{% url 'account_login' %}" class="text-sky-600">Sign In</a></p>
 {% endblock %}

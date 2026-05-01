@@ -1,0 +1,141 @@
+/* reset */
+html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,img,ins,kbd,q,s,samp,small,strike,strong,sub,sup,tt,var,b,u,i,dl,dt,dd,ol,nav ul,nav li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td,article,aside,canvas,details,embed,figure,figcaption,footer,header,hgroup,menu,nav,output,ruby,section,summary,time,mark,audio,video{margin:0;padding:0;border:0;font-size:100%;font:inherit;vertical-align:baseline;}
+article, aside, details, figcaption, figure,footer, header, hgroup, menu, nav, section {display: block;}
+ol,ul{list-style:none;margin:0px;padding:0px;}
+blockquote,q{quotes:none;}
+blockquote:before,blockquote:after,q:before,q:after{content:'';content:none;}
+table{border-collapse:collapse;border-spacing:0;}
+/* start editing from here */
+a{text-decoration:none;}
+.txt-rt{text-align:right;}/* text align right */
+.txt-lt{text-align:left;}/* text align left */
+.txt-center{text-align:center;}/* text align center */
+.float-rt{float:right;}/* float right */
+.float-lt{float:left;}/* float left */
+.clear{clear:both;}/* clear float */
+.pos-relative{position:relative;}/* Position Relative */
+.pos-absolute{position:absolute;}/* Position Absolute */
+.vertical-base{	vertical-align:baseline;}/* vertical align baseline */
+.vertical-top{	vertical-align:top;}/* vertical align top */
+nav.vertical ul li{	display:block;}/* vertical menu */
+nav.horizontal ul li{	display: inline-block;}/* horizontal menu */
+img{max-width:100%;}
+/*end reset*/
+body{
+	 font-family: Arial, Helvetica, sans-serif;
+	 background:#00B3E7;
+}
+/*---start-header----*/
+.logo{
+	float:left;
+}
+.top-social-icons{
+	float:right;
+	margin-top: 0.5em;
+}
+.top-social-icons ul li{
+	display:inline-block;
+	float:left;
+}
+/* ---------- TIMER ---------- */
+ul#countdown{text-align:center;padding-top: 15px;}
+ul#countdown span {
+	color: #FFF;
+	font-size: 2em;
+	font-weight: bold;
+	text-align: center;
+	display: inline-block;
+}
+ul#countdown h3{
+	color: #fff;
+	background: #000;
+	padding: 10px;
+	margin-top: 0.3em;
+	font-size: 0.8em;
+}
+ul#countdown li{
+	display:inline-block;
+	width: 23%;
+}
+ul#countdown li p.timeRefDays,
+ul#countdown li p.timeRefHours,
+ul#countdown li p.timeRefMinutes,
+ul#countdown li p.timeRefSeconds {
+	color: rgb(255, 255, 255);
+	text-transform: uppercase;
+	font-size: 1.2em;
+	191919
+}
+.frist{
+	background:#A7D802;
+}
+.second{
+	background:#E9A300;
+}
+.three{
+	background:#F4C400;
+}
+.four{
+	background:#A12BB8;
+}
+/*---end-timer-----*/
+/*---start-notified----*/
+
+.notified{
+	width: 90%;
+	margin: 0 auto;
+	margin-top: 1em;
+	background:#FFF;
+}
+.notified input[type="text"]{
+	width: 60.5%;
+	padding: 10px;
+	color:#888;
+	font-size:0.875em;
+	 font-family: Arial, Helvetica, sans-serif;
+	 border:none;
+	 outline:none;
+}
+.notified input[type="submit"]{
+	background:#000;
+	padding: 10px;
+	border:none;
+	color:#FFF;
+	 font-family: Arial, Helvetica, sans-serif;
+	 cursor:pointer;
+}
+.notified input[type="submit"]:hover{
+	background:#555;
+}
+.notified form{
+	text-align:center;
+}
+/*---start-content-----*/
+.content{
+	text-align:center;
+	margin-top: 1em;
+}
+.content h1{
+	font-size:1.5em;
+	color:#FFF;
+}
+.content p{
+	font-size: 1em;
+	color:#FFF;
+	margin-top: 0.3em;
+}
+/*---start-copy-right-----*/
+.copy-right{
+	text-align:center;
+	margin-top:1em;
+}
+.copy-right p{
+	color:#FFF;
+	font-size:0.875em;
+}
+.copy-right p a{
+	color:#FFF;
+}
+.copy-right p a:hover{
+	color:#000;	
+}

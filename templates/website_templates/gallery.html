@@ -1,0 +1,116 @@
+{% extends "base_portal.html" %}
+
+{% block title %}Website Templates — {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Website Templates{% endblock %}
+
+{% block header_actions %}
+<a href="{% url 'website_templates:my_templates' %}" class="text-sm text-sky-600 hover:underline font-medium">My Installations</a>
+{% endblock %}
+
+{% block content %}
+<!-- Filter bar -->
+<div class="bg-white rounded-xl shadow-sm border border-sky-100 p-4 mb-6 flex flex-col sm:flex-row gap-3">
+    <form method="get" class="flex flex-1 gap-3 flex-wrap">
+        <input type="text" name="q" value="{{ search_q }}" placeholder="Search templates…"
+               class="border border-sky-200 rounded-lg px-3 py-2 text-sm flex-1 min-w-0 focus:outline-none focus:ring-2 focus:ring-sky-400">
+        <select name="category"
+                class="border border-sky-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400">
+            <option value="">All Categories</option>
+            {% for value, label in categories %}
+            <option value="{{ value }}" {% if category_filter == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit"
+                class="bg-sky-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-sky-700 transition-colors">
+            Filter
+        </button>
+        {% if search_q or category_filter %}
+        <a href="{% url 'website_templates:gallery' %}"
+           class="border border-sky-200 text-sky-600 px-4 py-2 rounded-lg text-sm hover:bg-sky-50 transition-colors">
+            Clear
+        </a>
+        {% endif %}
+    </form>
+</div>
+
+<!-- Results count -->
+<p class="text-sm text-sky-600 mb-4 font-medium">
+    {{ templates|length }} template{{ templates|length|pluralize }} found
+</p>
+
+{% if templates %}
+<!-- Template grid -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+    {% for tpl in templates %}
+    <div class="bg-white rounded-xl shadow-sm border border-sky-100 overflow-hidden hover:shadow-md hover:border-sky-300 transition-all group flex flex-col">
+        <!-- Thumbnail -->
+        <a href="{% url 'website_templates:preview' slug=tpl.slug %}" class="block relative overflow-hidden bg-sky-50" style="height:180px">
+            <img src="{% url 'website_templates:thumbnail' slug=tpl.slug %}"
+                 alt="{{ tpl.name }}" loading="lazy"
+                 class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
+            <!-- Preview overlay -->
+            <div class="absolute inset-0 bg-sky-900/0 group-hover:bg-sky-900/40 flex items-center justify-center transition-all duration-200">
+                <span class="opacity-0 group-hover:opacity-100 bg-white text-sky-800 text-xs font-semibold px-3 py-1.5 rounded-full shadow transition-opacity duration-200">
+                    Preview
+                </span>
+            </div>
+        </a>
+        <!-- Card body -->
+        <div class="p-4 flex flex-col flex-1">
+            <div class="flex items-start justify-between gap-2 mb-1">
+                <h3 class="font-semibold text-sky-900 text-sm leading-snug">{{ tpl.name }}</h3>
+                {% if tpl.id in my_installs %}
+                <span class="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 text-xs px-2 py-0.5 rounded-full flex-shrink-0 font-medium">
+                    ✓ Installed
+                </span>
+                {% endif %}
+            </div>
+            <span class="text-xs text-sky-500 capitalize mb-2">{{ tpl.get_category_display }}</span>
+
+            <!-- Tags row -->
+            <div class="flex flex-wrap gap-1 mb-3">
+                {% if tpl.jquery_version %}
+                <span class="text-xs bg-sky-50 text-sky-600 border border-sky-200 px-1.5 py-0.5 rounded">jQuery {{ tpl.jquery_version }}</span>
+                {% endif %}
+                {% if tpl.bootstrap_version %}
+                <span class="text-xs bg-indigo-50 text-indigo-600 border border-indigo-200 px-1.5 py-0.5 rounded">Bootstrap {{ tpl.bootstrap_version }}</span>
+                {% endif %}
+                {% if tpl.is_sanitised %}
+                <span class="text-xs bg-emerald-50 text-emerald-600 border border-emerald-200 px-1.5 py-0.5 rounded">✓ Audited</span>
+                {% endif %}
+            </div>
+
+            <div class="mt-auto flex gap-2">
+                <a href="{% url 'website_templates:preview' slug=tpl.slug %}"
+                   class="flex-1 text-center border border-sky-300 text-sky-700 text-xs px-3 py-1.5 rounded-lg hover:bg-sky-50 font-medium transition-colors">
+                    Preview
+                </a>
+                {% if request.user.is_authenticated %}
+                <a href="{% url 'website_templates:install_confirm' slug=tpl.slug %}"
+                   class="flex-1 text-center bg-sky-600 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-sky-700 font-medium transition-colors">
+                    {% if tpl.id in my_installs %}Reinstall{% else %}Install{% endif %}
+                </a>
+                {% else %}
+                <a href="{% url 'account_login' %}"
+                   class="flex-1 text-center bg-sky-600 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-sky-700 font-medium transition-colors">
+                    Login to Install
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% else %}
+<!-- Empty state -->
+<div class="text-center py-20">
+    <svg class="w-16 h-16 mx-auto text-sky-200 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+    </svg>
+    <h3 class="text-lg font-semibold text-sky-900 mb-1">No templates found</h3>
+    <p class="text-sky-500 text-sm mb-4">Try adjusting your search or category filter.</p>
+    <a href="{% url 'website_templates:gallery' %}" class="text-sky-600 hover:underline text-sm">Clear filters</a>
+</div>
+{% endif %}
+{% endblock %}

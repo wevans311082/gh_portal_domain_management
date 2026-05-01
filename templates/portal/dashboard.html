@@ -1,4 +1,4 @@
-{% extends "base_portal.html" %}
+﻿{% extends "base_portal.html" %}
 
 {% block title %}Dashboard - {{ SITE_NAME }}{% endblock %}
 {% block page_title %}Dashboard{% endblock %}
@@ -41,7 +41,7 @@
     <div class="bg-white rounded-lg shadow p-6">
         <div class="flex justify-between items-center mb-4">
             <h3 class="font-semibold">Active Services</h3>
-            <a href="{% url 'portal:my_services' %}" class="text-sm text-orange-500 hover:underline">View all</a>
+            <a href="{% url 'portal:my_services' %}" class="text-sm text-sky-600 hover:underline">View all</a>
         </div>
         {% if active_services %}
         <ul class="divide-y">
@@ -60,7 +60,7 @@
     <div class="bg-white rounded-lg shadow p-6">
         <div class="flex justify-between items-center mb-4">
             <h3 class="font-semibold">Unpaid Invoices</h3>
-            <a href="{% url 'invoices:list' %}" class="text-sm text-orange-500 hover:underline">View all</a>
+            <a href="{% url 'invoices:list' %}" class="text-sm text-sky-600 hover:underline">View all</a>
         </div>
         {% if unpaid_invoices %}
         <ul class="divide-y">
@@ -75,7 +75,7 @@
                 <div class="text-right">
                     <p class="font-medium text-red-500">£{{ invoice.total }}</p>
                     <a href="{% url 'payments:stripe_checkout' invoice_id=invoice.pk %}"
-                       class="text-xs bg-orange-500 text-white px-2 py-1 rounded hover:bg-orange-600">
+                       class="text-xs bg-sky-600 text-white px-2 py-1 rounded hover:bg-sky-700">
                         Pay Now
                     </a>
                 </div>
@@ -92,7 +92,7 @@
     <div class="bg-white rounded-lg shadow p-6">
         <div class="flex justify-between items-center mb-4">
             <h3 class="font-semibold">Open Tickets</h3>
-            <a href="{% url 'support:list' %}" class="text-sm text-orange-500 hover:underline">View all</a>
+            <a href="{% url 'support:list' %}" class="text-sm text-sky-600 hover:underline">View all</a>
         </div>
         {% if open_tickets %}
         <ul class="divide-y">
@@ -116,7 +116,7 @@
     <div class="bg-white rounded-lg shadow p-6">
         <h3 class="font-semibold mb-4">Quick Actions</h3>
         <div class="space-y-2">
-            <a href="{% url 'domains:search' %}" class="block w-full text-center bg-orange-500 text-white py-2 px-4 rounded hover:bg-orange-600">
+            <a href="{% url 'domains:search' %}" class="block w-full text-center bg-sky-600 text-white py-2 px-4 rounded hover:bg-sky-700">
                 Search &amp; Register Domain
             </a>
             <a href="{% url 'support:create' %}" class="block w-full text-center bg-gray-700 text-white py-2 px-4 rounded hover:bg-gray-800">

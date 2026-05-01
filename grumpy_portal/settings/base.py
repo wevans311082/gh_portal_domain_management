@@ -50,6 +50,7 @@ LOCAL_APPS = [
     "apps.notifications",
     "apps.audit",
     "apps.admin_tools",
+    "apps.website_templates",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -167,6 +168,20 @@ CELERY_TIMEZONE = "Europe/London"
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = 30 * 60
 CELERY_RESULT_EXPIRES = 60 * 60 * 24 * 7  # 7 days — prevents unbounded Redis growth
+
+# ---------------------------------------------------------------------------
+# Website Templates
+# ---------------------------------------------------------------------------
+import os as _os
+
+WEBSITE_TEMPLATES_ZIP_ROOT = env(
+    "WEBSITE_TEMPLATES_ZIP_ROOT",
+    default=str(BASE_DIR / "website_templates" / "Website Templates"),
+)
+WEBSITE_TEMPLATES_EXTRACTED_ROOT = env(
+    "WEBSITE_TEMPLATES_EXTRACTED_ROOT",
+    default=str(BASE_DIR / "website_templates" / "extracted"),
+)
 
 EMAIL_BACKEND = env("EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")
 EMAIL_HOST = env("EMAIL_HOST", default="")

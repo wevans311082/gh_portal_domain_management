@@ -1,0 +1,79 @@
+{% extends "base_portal.html" %}
+
+{% block title %}Install {{ template.name }} — {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Install Template{% endblock %}
+
+{% block content %}
+<div class="max-w-xl mx-auto">
+    <div class="bg-white rounded-xl shadow-sm border border-sky-100 overflow-hidden">
+        <!-- Thumbnail header -->
+        <div class="h-48 bg-sky-50 overflow-hidden">
+            <img src="{% url 'website_templates:thumbnail' slug=template.slug %}"
+                 alt="{{ template.name }}"
+                 class="w-full h-full object-cover">
+        </div>
+
+        <div class="p-6">
+            <h2 class="text-xl font-bold text-sky-900 mb-1">{{ template.name }}</h2>
+            <p class="text-sm text-sky-500 capitalize mb-4">{{ template.get_category_display }}</p>
+
+            {% if template.description %}
+            <p class="text-sm text-sky-700 mb-4">{{ template.description }}</p>
+            {% endif %}
+
+            <!-- Tech tags -->
+            <div class="flex flex-wrap gap-2 mb-6">
+                {% if template.jquery_version %}
+                <span class="text-xs bg-sky-50 text-sky-600 border border-sky-200 px-2 py-1 rounded-full">jQuery {{ template.jquery_version }}</span>
+                {% endif %}
+                {% if template.bootstrap_version %}
+                <span class="text-xs bg-indigo-50 text-indigo-600 border border-indigo-200 px-2 py-1 rounded-full">Bootstrap {{ template.bootstrap_version }}</span>
+                {% endif %}
+                {% if template.is_sanitised %}
+                <span class="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-1 rounded-full">✓ Security Audited</span>
+                {% endif %}
+            </div>
+
+            <form method="post" action="{% url 'website_templates:install' slug=template.slug %}">
+                {% csrf_token %}
+
+                {% if user_services %}
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-sky-800 mb-1">
+                        Associate with a hosting service <span class="text-sky-400 font-normal">(optional)</span>
+                    </label>
+                    <select name="service_domain"
+                            class="w-full border border-sky-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400">
+                        <option value="">— No specific domain —</option>
+                        {% for svc in user_services %}
+                        <option value="{{ svc.domain_name }}">{{ svc.domain_name }} ({{ svc.package.name }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+
+                <div class="bg-sky-50 border border-sky-200 rounded-lg p-3 mb-5 text-sm text-sky-700">
+                    <strong>What happens when you install?</strong>
+                    <ul class="mt-1 space-y-1 list-disc list-inside text-xs text-sky-600">
+                        <li>The template is saved to your account</li>
+                        <li>You can preview it at any time from My Installations</li>
+                        <li>Download the source files from the preview page</li>
+                        <li>Upload to your hosting via cPanel File Manager or FTP</li>
+                    </ul>
+                </div>
+
+                <div class="flex gap-3">
+                    <a href="{% url 'website_templates:gallery' %}"
+                       class="flex-1 text-center border border-sky-300 text-sky-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-sky-50 transition-colors">
+                        Cancel
+                    </a>
+                    <button type="submit"
+                            class="flex-1 bg-sky-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-sky-700 transition-colors">
+                        Confirm Install
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,351 @@
+/* reset */
+html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,img,ins,kbd,q,s,samp,small,strike,strong,sub,sup,tt,var,b,u,i,dl,dt,dd,ol,nav ul,nav li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td,article,aside,canvas,details,embed,figure,figcaption,footer,header,hgroup,menu,nav,output,ruby,section,summary,time,mark,audio,video{margin:0;padding:0;border:0;font-size:100%;font:inherit;vertical-align:baseline;}
+article, aside, details, figcaption, figure,footer, header, hgroup, menu, nav, section {display: block;}
+ol,ul{list-style:none;margin:0;padding:0;}
+blockquote,q{quotes:none;}
+blockquote:before,blockquote:after,q:before,q:after{content:'';content:none;}
+table{border-collapse:collapse;border-spacing:0;}
+/* start editing from here */
+a{text-decoration:none;}
+.txt-rt{text-align:right;}/* text align right */
+.txt-lt{text-align:left;}/* text align left */
+.txt-center{text-align:center;}/* text align center */
+.float-rt{float:right;}/* float right */
+.float-lt{float:left;}/* float left */
+.clear{clear:both;}/* clear float */:
+.pos-relative{position:relative;}/* Position Relative */
+.pos-absolute{position:absolute;}/* Position Absolute */
+.vertical-base{	vertical-align:baseline;}/* vertical align baseline */
+.vertical-top{	vertical-align:top;}/* vertical align top */
+.underline{	padding-bottom:5px;	border-bottom: 1px solid #eee; margin:0 0 20px 0;}/* Add 5px bottom padding and a underline */
+nav.vertical ul li{	display:block;}/* vertical menu */
+nav.horizontal ul li{	display: inline-block;}/* horizontal menu */
+img{max-width:100%;display: block;}
+/*end reset*/
+body{
+	background: #333;
+	font-family: Trebuchet MS, sans-serif;
+	color:white;
+	}
+/*navigation*/
+.top-header{
+	padding:18px 0;
+	border-bottom: 1px solid #aaa;
+}
+.nav{
+	text-align:center;
+}
+.nav li{
+	display:inline-block;
+}
+.nav li a{
+	display:block;
+	padding:4px 6px;
+	color:#fff;
+	font-size:10px;
+}
+.nav li a:hover,
+.nav ul li.active a{
+	background: #444;
+}
+
+/*header*/
+.header{
+	padding:5px 0;
+}
+
+.head-lt a{
+	color:white;
+	font-size:30px;
+	text-align:center;
+}
+.head-rt{
+	float:right;
+	width:300px;
+	font-size: 14px;
+	line-height:1.5em;
+	color:#777;
+}
+.head-rt a{
+	color:#d0cecd;
+}
+.head-rt a:hover{
+	color:#f87705
+}
+/*end header*/
+
+/*content*/
+.content{
+	margin-top:10px;
+}
+.content-box{
+	
+	width:220px;
+	margin: 0 auto;
+}
+.content-msg1{
+	background-color:#0587bd;
+	color:white;
+}
+.content-msg2{
+	background-color:#e6c908;
+	color:#fff;
+}
+.content-msg3{
+	background-color:#2E8B57;
+	color:white;
+}
+.content-msg1,
+.content-msg2,
+.content-msg3{
+	padding:15px;
+	margin-bottom:10px;
+}
+.content-msg1 h2,
+.content-msg2 h2,
+.content-msg3 h2{
+	padding-bottom:5px;
+	font-size:18px;
+	
+}
+.content-msg1 p,
+.content-msg2 p,
+.content-msg3 p{
+	font-size: 12px;
+	line-height: 1.5em;	
+}
+.button1,.button2,.button3{
+	margin-top:10px;
+		
+}
+.button1 a,
+.button2 a,
+.button3 a{
+	color:#fff;
+	font-size: 13px;
+	padding:2px 8px;
+}
+.button1 a{
+	background:#066c96;
+}
+.button2 a{
+	background:#cbb20a;
+}
+.button3 a{
+	background:#18352a;
+}
+.button1 a:hover,.button2 a:hover,.button3 a:hover{
+	background:#222;
+}
+/*end content*/
+/*main*/
+.main{
+	margin-bottom:20px;
+}
+
+.main-content h3{
+	text-align:center;
+	font-size:16px;
+}
+.main-content{
+	padding:5px;
+}
+.main-content p{
+	margin:10px 0;
+	font-size:12px;
+	line-height:1.5em;
+	color:#aaa;
+}
+.sub-main{
+	margin-top:10px;
+}
+.wel-lt{
+	margin-top:20px;	
+}
+.wel-lt span{
+	color: #ddd;
+	font-size:14px;
+	text-transform: uppercase;
+}
+.wel-lt p{
+	font-size:12px;
+}
+
+.button4{
+	margin-top:10px;
+		
+}
+.button4 a{
+	color:#ccc;
+	 font-size: 13px;
+	padding:2px 8px;
+	background:#222;
+}
+.button4 a:hover{
+	color:#fff;
+	background:#444;
+}
+
+/*end main*/
+/*footer*/
+.footer{
+	text-align:center;
+	padding:20px;
+	background: #2d2c2c;
+	font-size:12px;
+}
+.footer p a,
+.footer span,.copy{
+	color:#666;
+	
+}
+.footer p a{
+	padding-left:3px;
+}
+.footer p a:hover,
+.copy a:hover{
+	color:#fff;
+}
+/*end footer*/
+
+/*about*/
+.about{
+	
+}
+.abt-sidebar{
+	
+}
+.abt-sidebar h3{
+	font-size: 18px;
+	padding: 10px 0 0 10px;
+}
+.abt-sidebar li {
+	text-align:center;
+}
+.abt-sidebar li .date{
+	padding-bottom: 10px;
+	
+}
+.abt-sidebar li .data{
+	font-size: 12px;
+	color: #aaa;
+	line-height: 1.5em;
+}
+
+.abt-sidebar li{
+	padding: 10px 5px;;
+}
+.abt-main{
+	
+}
+.abt-wrap h2{
+	font-size:18px;
+	margin-top:10px;
+	padding:10px;
+	
+}
+.abt-wrap h4{
+	font-size:12px;
+	padding:0 10px;
+}
+.abt-wrap h5{
+	font-size:13px;
+	padding: 16px 0 20px 0;
+	color:#777;
+	padding:20px 10px;
+}
+.abt-wrap a{
+	margin:20px 0 0 10px;
+		
+}
+.abt-wrap a{
+	color:#fff;
+	padding:2px 8px;
+	
+	background:#272625;
+}
+.abt-wrap a:hover{
+	background:#090909;
+}
+.team-imgs h4{
+	font-size:20px;
+	padding:20px 0 20px 10px;
+}
+.box{
+	float:left;
+	width:90px;
+	margin: 0 10px 10px 0;
+}
+.box img{
+	padding:0 8px;
+}
+.box span{
+	font-size:13px;
+	padding:0 8px;
+}
+
+
+/*end about*/
+/*contact*/
+.contact{
+	margin:0 auto;
+	
+}
+
+.contact-map h2{
+	font-size:20px;
+}
+
+.contact-form{
+	margin:0 0 0 20px;
+}
+.contact-form h2{
+	font-size:18px;
+	margin-bottom:20px;
+}
+
+.contact-form input[type="text"]{
+	width:95%;
+	border: none;
+	padding:5px;
+	background-color:#272625;
+	margin-bottom:20px;
+	color:#878181;
+	outline: none;
+}
+.contact-form textarea{
+	
+	width:95%;
+	height:100px;
+	background-color:#272625;
+	color:#878181;
+	border: none;
+	padding:5px;
+	margin-bottom:20px;
+	outline: none;
+	font-family: Arial, Helvetica, sans-serif;
+}
+.contact-form label{
+	display:block;
+	color:#ccc;
+	font-size:14px;
+	padding-bottom:5px;
+}
+.submit-button input[type="submit"],
+.submit-button input[type="reset"]{
+	cursor: pointer;
+	color: white;
+	background: #272625;
+	padding:5px 12px;
+	font-size:12px;
+	border:none;
+}
+.submit-button input[type="submit"]:hover,
+.submit-button input[type="reset"]:hover{
+	color:#fff;
+	background:#444;
+}
+.submit-button{
+	margin-bottom:10px;
+}
+/*end contact*/

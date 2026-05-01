@@ -1,0 +1,71 @@
+{% extends "base_portal.html" %}
+
+{% block title %}Preview: {{ template.name }} — {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Preview: {{ template.name }}{% endblock %}
+
+{% block header_actions %}
+<a href="{% url 'website_templates:gallery' %}"
+   class="text-sm text-sky-600 hover:underline">← Back to Gallery</a>
+{% if request.user.is_authenticated %}
+<a href="{% url 'website_templates:install_confirm' slug=template.slug %}"
+   class="bg-sky-600 text-white text-sm px-4 py-1.5 rounded-lg hover:bg-sky-700 font-medium transition-colors ml-2">
+    Install This Template
+</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="flex flex-col h-full" style="height: calc(100vh - 120px)">
+    <!-- Info bar -->
+    <div class="bg-white border border-sky-100 rounded-xl shadow-sm p-4 mb-4 flex items-center gap-4 flex-wrap">
+        <div class="flex-1 min-w-0">
+            <h2 class="font-semibold text-sky-900">{{ template.name }}</h2>
+            <p class="text-sm text-sky-500 capitalize">{{ template.get_category_display }}
+                {% if template.jquery_version %} · jQuery {{ template.jquery_version }}{% endif %}
+                {% if template.bootstrap_version %} · Bootstrap {{ template.bootstrap_version }}{% endif %}
+            </p>
+        </div>
+        <div class="flex gap-2">
+            {% if template.is_sanitised %}
+            <span class="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs px-2.5 py-1 rounded-full font-medium">
+                ✓ Security Audited
+            </span>
+            {% endif %}
+        </div>
+        <!-- Device switcher -->
+        <div class="flex border border-sky-200 rounded-lg overflow-hidden text-xs font-medium" x-data="{ device: 'desktop' }">
+            <button @click="device='desktop'; $refs.iframe.style.width='100%'"
+                    :class="device==='desktop' ? 'bg-sky-600 text-white' : 'bg-white text-sky-600 hover:bg-sky-50'"
+                    class="px-3 py-1.5 transition-colors">🖥 Desktop</button>
+            <button @click="device='tablet'; $refs.iframe.style.width='768px'"
+                    :class="device==='tablet' ? 'bg-sky-600 text-white' : 'bg-white text-sky-600 hover:bg-sky-50'"
+                    class="px-3 py-1.5 transition-colors border-l border-sky-200">📱 Tablet</button>
+            <button @click="device='mobile'; $refs.iframe.style.width='375px'"
+                    :class="device==='mobile' ? 'bg-sky-600 text-white' : 'bg-white text-sky-600 hover:bg-sky-50'"
+                    class="px-3 py-1.5 transition-colors border-l border-sky-200">📱 Mobile</button>
+        </div>
+    </div>
+
+    <!-- Preview iframe -->
+    <div class="flex-1 bg-sky-100 rounded-xl overflow-auto flex justify-center" x-data="{}">
+        <div class="h-full overflow-auto flex" style="width:100%">
+            <iframe
+                x-ref="iframe"
+                src="{% url 'website_templates:preview_file' slug=template.slug file_path='index.html' %}"
+                class="border-0 bg-white shadow-lg mx-auto transition-all duration-300"
+                style="width:100%; height:100%; min-height:600px"
+                title="Preview of {{ template.name }}"
+                sandbox="allow-scripts allow-same-origin"
+            ></iframe>
+        </div>
+    </div>
+
+    <!-- Security notes (collapsible) -->
+    {% if template.security_notes and template.security_notes != "No issues found." %}
+    <details class="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm">
+        <summary class="cursor-pointer font-medium text-amber-800">⚠ Security Audit Notes</summary>
+        <pre class="mt-2 text-xs text-amber-700 whitespace-pre-wrap font-mono">{{ template.security_notes }}</pre>
+    </details>
+    {% endif %}
+</div>
+{% endblock %}

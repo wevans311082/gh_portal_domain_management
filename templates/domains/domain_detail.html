@@ -1,4 +1,4 @@
-{% extends "base_portal.html" %}
+﻿{% extends "base_portal.html" %}
 
 {% block title %}{{ domain.name }} - {{ SITE_NAME }}{% endblock %}
 {% block page_title %}{{ domain.name }}{% endblock %}
@@ -56,7 +56,7 @@
                 {% if domain.nameserver2 %}<li class="text-gray-700">{{ domain.nameserver2 }}</li>{% endif %}
                 {% if domain.nameserver3 %}<li class="text-gray-700">{{ domain.nameserver3 }}</li>{% endif %}
                 {% if domain.nameserver4 %}<li class="text-gray-700">{{ domain.nameserver4 }}</li>{% endif %}
-                {% if not domain.nameserver1 %}<li class="text-gray-400">No nameservers configured</li>{% endif %}
+                {% if not domain.nameserver1 %}<li class="text-sky-300">No nameservers configured</li>{% endif %}
             </ul>
         </div>
     </div>
@@ -72,7 +72,7 @@
                         {% csrf_token %}
                         <button type="submit"
                                 class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors
-                                    {% if domain.auto_renew %}bg-orange-500{% else %}bg-gray-300{% endif %}">
+                                    {% if domain.auto_renew %}bg-sky-600{% else %}bg-gray-300{% endif %}">
                             <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform
                                 {% if domain.auto_renew %}translate-x-6{% else %}translate-x-1{% endif %}">
                             </span>
@@ -81,7 +81,7 @@
                 </div>
                 <div class="flex items-center justify-between">
                     <span class="text-sm text-gray-700">Registrar Lock</span>
-                    <span class="text-sm {% if domain.is_locked %}text-green-600{% else %}text-gray-400{% endif %}">
+                    <span class="text-sm {% if domain.is_locked %}text-green-600{% else %}text-sky-300{% endif %}">
                         {% if domain.is_locked %}Locked{% else %}Unlocked{% endif %}
                     </span>
                 </div>

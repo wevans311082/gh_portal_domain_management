@@ -1,0 +1,540 @@
+<!--Author: W3layouts
+Author URL: http://w3layouts.com
+License: Creative Commons Attribution 3.0 Unported
+License URL: http://creativecommons.org/licenses/by/3.0/
+-->
+<!DOCTYPE HTML>
+<html>
+<head>
+<title> Groom ui kit Flat bootstrap Responsive  Website Template | Home :: w3layouts</title>
+<link href="css/bootstrap.css" rel="stylesheet" type="text/css" media="all">
+<!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
+<script src="js/jquery-1.11.0.min.js"></script>
+<!-- Custom Theme files -->
+<link href="css/style.css" rel="stylesheet" type="text/css" media="all"/>
+<!-- Custom Theme files -->
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<script type="application/x-javascript"> addEventListener("load", function() { setTimeout(hideURLbar, 0); }, false); function hideURLbar(){ window.scrollTo(0,1); }>
+</script>
+<meta name="keywords" content="Groom ui kit Responsive web template, Bootstrap Web Templates, Flat Web Templates, AndriodCompatible web template, Smartphone Compatible web template, free webdesigns for Nokia, Samsung, LG, SonyErricsson, Motorola web design" />
+<!--Google Fonts-->
+<link href="https://fonts.googleapis.com/css?family=Roboto:400,100,300,500,700,900' rel='stylesheet' type='text/css'>
+<!-- start-smoth-scrolling -->
+<script type="text/javascript" src="js/move-top.js"></script>
+<script type="text/javascript" src="js/easing.js"></script>
+	<script type="text/javascript">
+			jQuery(document).ready(function($) {
+				$(".scroll").click(function(event){		
+					event.preventDefault();
+					$('html,body').animate({scrollTop:$(this.hash).offset().top},1000);
+				});
+			});
+	</script>
+<!-- //end-smoth-scrolling -->
+
+<script src="js/snap.svg-min.js"></script>
+<script src="js/modernizr.custom.js"></script>
+<script type="text/javascript" src="js/jquery.jscrollpane.min.js"></script>
+		<script type="text/javascript" id="sourcecode">
+			$(function()
+			{
+				$('.scroll-pane').jScrollPane();
+			});
+		</script>
+
+<link href="css/form.css" rel="stylesheet" type="text/css" media="all" />
+
+
+<script>$(document).ready(function(c) {
+	$('.box-close').on('click', function(c){
+		$('.head-close').fadeOut('slow', function(c){
+	  		$('.head-close').remove();
+		});
+	});	  
+});
+</script>
+
+<script>$(document).ready(function(c) {
+	$('.news-close').on('click', function(c){
+		$('.newsletter').fadeOut('slow', function(c){
+	  		$('.newsletter').remove();
+		});
+	});	  
+});
+</script>
+
+<script>$(document).ready(function(c) {
+	$('.log-close').on('click', function(c){
+		$('.login').fadeOut('slow', function(c){
+	  		$('.login').remove();
+		});
+	});	  
+});
+</script>
+<script>$(document).ready(function(c) {
+	$('.temper-cross').on('click', function(c){
+		$('.temper').fadeOut('slow', function(c){
+	  		$('.temper').remove();
+		});
+	});	  
+});
+</script>
+</head>
+<body>
+<!--header start here-->
+<!--logo start-->
+   <div class="header">
+		<div class="logo">
+			<a href="#"><img src="images/logo.png" alt=""></a>
+		</div>
+<!--navgation start here-->
+		<div class="top-nav">
+			    <span class="menu"> <img src="images/icon.png" alt=""/></span>
+			<ul class="res">
+				<li><a class="active" href="#home"><i class="home"> </i>Home</a></li>
+				<li><a href="#features"><i class="flag"> </i>Services</a></li>
+				<li><a href="#gallery"><i class="royal"> </i>About me</a></li>
+				<li><a href="#events"><i class="team"> </i>Team</a></li>
+				<li class="serc"><input type="text" value="Search...." onfocus="this.value = '';" onblur="if (this.value == '') {this.value = 'Search....';}">
+					<input type="submit" value="">
+				</li>
+			</ul>
+			<!-- script-for-menu -->
+						 <script>
+						   $( "span.menu" ).click(function() {
+							 $( "ul.res" ).slideToggle( 300, function() {
+							 // Animation complete.
+							  });
+							 });
+						</script>
+		<!-- /script-for-menu -->
+		</div>
+<!--header main start here-->
+<div class="header-main">
+   <div class="col-md-4 header-left">
+		<div class="buttons">
+<!--search1 start here-->
+			<div class="serch1">
+				<input type="text" value="Search group" onfocus="this.value = '';" onblur="if (this.value == '') {this.value = 'Search group';}">
+				<input type="submit" value="">
+			</div>
+<!--search2 start here-->
+			<div class="serch2">
+				<input type="text" value="Search input" onfocus="this.value = '';" onblur="if (this.value == '') {this.value = 'Search input';}">
+				<input type="submit" value="">
+			</div>
+<!-- simple btns here-->
+			<div class="simple-btns">
+				<div class="simp-bt1"><a href="#">Simple Button</a></div>
+				<div class="simp-bt2"><a href="#" class="hvr-shutter-out-vertical">Button</a></div>
+				<div class="clearfix"> </div>
+			</div>
+<!--dropdown start here-->
+			<div class="drop-down">
+				 <ul class="menu">
+					<li class="item1"><a href="#">Dropdown Menu<i class="glyphicon glyphicon-menu-down"> </i> </a>
+						<ul class="cute">
+							<li class="subitem1"><a href="#">Inbox </a></li>
+							<li class="subitem2"><a href="#">Sent </a></li>
+							<li class="subitem3"><a href="#">Draft </a></li>
+							<li class="subitem3"><a href="#">Trash</a></li>
+						</ul>
+					</li>		
+				</ul>
+				<!--initiate accordion-->
+		<script type="text/javascript">
+			$(function() {
+			    var menu_ul = $('.menu > li > ul'),
+			           menu_a  = $('.menu > li > a');
+			    menu_ul.hide();
+			    menu_a.click(function(e) {
+			        e.preventDefault();
+			        if(!$(this).hasClass('active')) {
+			            menu_a.removeClass('active');
+			            menu_ul.filter(':visible').slideUp('normal');
+			            $(this).addClass('active').next().stop(true,true).slideDown('normal');
+			        } else {
+			            $(this).removeClass('active');
+			            $(this).next().stop(true,true).slideUp('normal');
+			        }
+			    });
+			
+			});
+		</script>
+			</div>
+<!--input btn star here-->
+			<div class="input-btns">
+				<div class="normal-input"><a href="#">Normal  input</a></div>
+				<div class=" normal-input active-input"><a href="#">Activeinput</a></div>
+			</div>
+			<!---->
+<!--icon left top start here-->
+			<div class="icon-left-top">
+					<section class="si-icons si-icons-default">
+						<span class="si-icon si-icon-nav-left-arrow" data-icon-name="navLeftArrow"> </span>
+						<span class="si-icon si-icon-nav-up-arrow" data-icon-name="navUpArrow"> </span>
+						<span class="si-icon si-icon-hamburger-cross" data-icon-name="hamburgerCross"> </span>
+						<span class="si-icon si-icon-maximize-rotate" data-icon-name="maximizeRotate"> </span>
+					</section>
+				</div>
+				
+					<script src="js/svgicons-config.js"></script>
+					<script src="js/svgicons.js"></script>
+					<script>
+						(function() {
+							// initialize all
+							
+							[].slice.call( document.querySelectorAll( '.si-icons-default > .si-icon' ) ).forEach( function( el ) {
+								var svgicon = new svgIcon( el, svgIconConfig );
+							} );
+
+							new svgIcon( document.querySelector( '.si-icons-easing .si-icon-nav-left-arrow' ), svgIconConfig, { easing : mina.backin } );
+							
+							new svgIcon( document.querySelector( '.si-icons-easing .si-icon-hamburger-cross' ), svgIconConfig, { easing : mina.elastic, speed: 600 } );
+							
+							new svgIcon( document.querySelector( '.si-icons-easing .si-icon-maximize' ), svgIconConfig, { easing : mina.elastic, speed: 600 } );
+							
+							new svgIcon( document.querySelector( '.si-icons-hover .si-icon-nav-left-arrow' ), svgIconConfig, { easing : mina.backin, evtoggle : 'mouseover', size : { w : 128, h : 128 } } );
+							new svgIcon( document.querySelector( '.si-icons-hover .si-icon-hamburger' ), svgIconConfig, { easing : mina.backin, evtoggle : 'mouseover', size : { w : 128, h : 128 } } );
+							
+							new svgIcon( document.querySelector( '.si-icons-hover .si-icon-maximize' ), svgIconConfig, { easing : mina.backin, evtoggle : 'mouseover', size : { w : 128, h : 128 } } );
+						})();
+					</script>
+			<!---->
+<!--chatting start here-->
+			<div class="chatting">
+				<div class="messages">
+					<div class="tool-tip-1"> </div>
+					<div class="mess-small">
+					    <a href="#"> <span class="mess-num"> 30 </span>Messages </a>
+					</div>
+				</div>
+				<div class="fire"> 
+					<div class="tool-tip-2"> </div>
+					<a href="#">45</a>
+				</div>
+			  <div class="clearfix"> </div>
+			</div>
+<!--pagenation start here-->
+			<div class="page-nation">
+				<ul id="flexiselDemo1">		
+							<li>
+								<span class="page-nation-num">1</span>
+								
+							</li>
+							<li>
+								<span class="page-nation-num">2</span>
+								
+							</li>
+							<li>
+								<span class="page-nation-num">3</span>
+								
+							</li>
+							<li>
+								<span class="page-nation-num">4</span>
+								
+							</li>
+							<li>
+								<span class="page-nation-num">5</span>
+								
+							</li>
+							<li>
+								<span class="page-nation-num">6</span>
+								
+							</li>
+							<li>
+								<span class="page-nation-num">7</span>
+								
+							</li>
+							<li>
+								<span class="page-nation-num">8</span>
+								
+							</li>
+							<li>
+								<span class="page-nation-num">9</span>
+							
+							</li>
+						</ul>
+					
+<script type="text/javascript">
+		$(window).load(function() {
+			$("#flexiselDemo1").flexisel({
+				visibleItems: 5,
+				animationSpeed: 1000,
+				autoPlay: true,
+				autoPlaySpeed: 3000,    		
+				pauseOnHover: true,
+				enableResponsiveBreakpoints: true,
+		    	responsiveBreakpoints: { 
+		    		portrait: { 
+		    			changePoint:480,
+		    			visibleItems: 5
+		    		}, 
+		    		landscape: { 
+		    			changePoint:640,
+		    			visibleItems: 5
+		    		},
+		    		tablet: { 
+		    			changePoint:768,
+		    			visibleItems: 5
+		    		}
+		    	}
+		    });
+		    
+		});
+	</script>
+	<script type="text/javascript" src="js/jquery.flexisel.js"></script>
+	</div>
+<!--catagery-slider start here-->
+			<div class="catagery-slider">
+				   <div class="online-head">
+						<h3>SELECT A CATEGORY</h3>
+				   </div>
+				<div class="online-slider">
+						<section class="sky-form">
+							<div class="row row1 scroll-pane">
+							<div class="sel-catg">
+								<h4><a href="#">City </a><span class="selcat-num"> (34) </span></h4>
+							</div>
+							<div class="sel-catg">
+								<h4><a href="#">Posters</a><span class="selcat-num"> (125) </span></h4>
+							</div>
+							<div class="sel-catg">
+								<h4><a href="#">Willd life</a><span class="selcat-num"> (16) </span></h4>
+							</div>
+							<div class="sel-catg">
+								<h4><a href="#">Culture</a><span class="selcat-num"> (92) </span></h4>
+							</div>
+							<div class="sel-catg">
+								<h4><a href="#">World Wide</a><span class="selcat-num"> (27) </span></h4>
+							</div>
+							<div class="sel-catg">
+								<h4><a href="#">Art's</a><span class="selcat-num"> (48) </span></h4>
+							</div>
+							<div class="sel-catg">
+								<h4><a href="#">Finance</a><span class="selcat-num"> (19) </span></h4>
+							</div>
+							<div class="sel-catg">
+								<h4><a href="#">Economy</a><span class="selcat-num"> (37) </span></h4>
+							</div>
+							<div class="sel-catg">
+								<h4><a href="#">Villages</a><span class="selcat-num"> (42) </span></h4>
+							</div>
+							<div class="sel-catg">
+								<h4><a href="#">Life Style</a><span class="selcat-num">(85)</span></h4>
+							</div>
+							<div class="sel-catg">
+								<h4><a href="#">City</a><span class="selcat-num"> (34) </span></h4>
+							</div>
+							<div class="sel-catg">
+								<h4><a href="#">Posters</a><span class="selcat-num"> (125) </span></h4>
+							</div>
+							<div class="sel-catg">
+								<h4><a href="#">Willd life</a><span class="selcat-num"> (16) </span></h4>
+							</div>
+							<div class="sel-catg">
+								<h4><a href="#">Culture</a><span class="selcat-num"> (92) </span></h4>
+							</div>
+							<div class="sel-catg">
+								<h4><a href="#">World Wide</a><span class="selcat-num"> (27) </span></h4>
+							</div>
+							<div class="sel-catg">
+								<h4><a href="#">Art's</a><span class="selcat-num"> (48) </span></h4>
+							</div>
+							<div class="sel-catg">
+								<h4><a href="#">Finance</a><span class="selcat-num"> (19) </span></h4>
+							</div>
+							<div class="sel-catg">
+								<h4><a href="#">Economy</a><span class="selcat-num"> (37) </span></h4>
+							</div>
+							<div class="sel-catg">
+								<h4><a href="#">Villages</a><span class="selcat-num"> (42) </span></h4>
+							</div>
+							<div class="sel-catg">
+								<h4><a href="#">Life Style</a><span class="selcat-num">(85)</span></h4>
+							</div>
+					   </div>
+					 </section>
+				</div>
+			</div>
+<!--teamper start here-->
+			<div class="temper">
+				<span class="temper-cross"> </span>
+				<div class="col-md-4 morocco">
+					<h4>Agsdir,morocco</h4>
+					<div class="thermo"> <span class="thermometer"> </span> </div>
+					<h3>32</h3>
+					<div class="clearfix"> </div>
+					<h5><a href="#">Saturday</a></h5>
+				</div>
+				<div class="col-md-4 morocco">
+					<h4>Agsdir,morocco</h4>
+					<div class="thermo"> <span class="rain-cld"> </span> </div>
+					<h3>25</h3>
+					<div class="clearfix"> </div>
+					<h5><a href="#">Sunday</a></h5>
+				</div>
+				<div class="col-md-4 morocco">
+					<h4>Agsdir,morocco</h4>
+					<div class="thermo"> <span class="dot-cld"> </span> </div>
+					<h3>30</h3>
+					<div class="clearfix"> </div>
+					<h5><a href="#">Monday</a></h5>
+				</div>
+			  <div class="clearfix"> </div>
+			</div>
+		</div>
+   </div>
+<!--header right start here-->
+	<div class="col-md-8 header-right">
+	<!--header-right-blc-1 start here-->
+	    <div class="header-right-blc-1">
+		 	<div class="col-md-7 head-grd-1">
+				<div class="main-emma">
+					<div class="montain">
+						<span class="emma-img"> </span>
+					</div>
+					<div class="emma-heading">
+						<h1>Emma Watson</h1>
+						<div class="emma-btn">
+							<a href="#">Follow</a>
+						</div>
+					</div>
+				</div>
+		    </div>
+  <!--header grd-2 start here-->
+			<div class="col-md-5 head-grd-2">
+			   <div class="sub-emma">
+			   	  <div class="head-close">
+					<div class="box-close"><img src="images/close.png" alt=""> </div>
+					<div class="emma-followers">
+						<div class="col-md-5 follow-left">
+							<img src="images/b2.jpg" alt="" class="img-responsive">
+						</div>
+						<div class="col-md-7 follow-right">
+							<h3>Malorum</h3>
+							<p><span class="follo-num"> 24,526 </span>Followers</p>
+							<p><span class="follo-num"> 15,856 </span>Comments</p>
+						</div>
+					  <div class="clearfix"> </div>
+					</div>
+					<div class="london">
+						<ul>
+							<li><a href="#"><i class="local"> </i>London</a></li>
+							<li><a href="#"><i class="star"> </i>Premimum</a></li>
+						</ul>
+					</div>
+					 <div class="clearfix"> </div>
+				  </div>
+				  <div class="newsletter">
+				  	<span class="news-close"> </span>
+				  	<div class="news-input">
+			         <input type="text" value="Your Email" onfocus="this.value = '';" onblur="if (this.value == '') {this.value = 'Your Email';}">
+			         <i class="news-mail"> </i>
+			         </div>
+				  </div>
+			  </div>
+		    </div>
+		  <div class="clearfix"> </div>
+	   </div>
+<!--header right blc-2 start here-->
+	   <div class="col-md-12 header-right-blc-2">
+	   	  <div class="bann-slider">
+	   	  	<ul class="rslides" id="slider">
+				<li>
+					<div class="slide-text">
+			 			<h3>MARINA BAY</h3>
+			 			<p>Explore the magnificient</p>
+		            </div>
+		 		</li>
+		 		<li>
+		  			<div class="slide-text">
+			 			<h3>FINIBUS BAY</h3>
+			 			<p>But must explain mistaken</p>
+		            </div>
+			     </li>
+		         <li>
+		  			<div class="slide-text">
+			 			<h3>BONORUM BAY</h3>
+			 			<p>denouncing pleasure system</p>
+		            </div>
+			     </li>
+			 </ul>
+	   	  </div>
+				<script src="js/responsiveslides.min.js"></script>
+				<script>
+				    $(function () {
+				      $("#slider").responsiveSlides({
+				      	auto: true,
+				      	speed: 500,
+				        namespace: "callbacks",
+				        pager: false,
+				        nav:true,
+				      });
+				    });
+				  </script>
+	   </div>
+<!--header right blc-3 start here-->
+	   <div class="header-right-blc-3">
+		   	<div class="col-md-8 video">
+		   		<div class="u-tube">
+		   			<iframe src="https://player.vimeo.com/video/104842888"  webkitallowfullscreen mozallowfullscreen allowfullscreen > </iframe> 
+		   		</div>
+		   		<div class="login">
+		   		   <div class="login-top">
+		   			 <span class="log-close"> </span>
+		   			 <div class="log-input">
+		   			   <input type="text" value="Login" onfocus="this.value = '';" onblur="if (this.value == '') {this.value = 'Login';}">
+		   			   <i class="log-mail"> </i>
+		   			 </div>
+		   			  <div class="log-input">
+		   			   <input type="password" value="Password" onfocus="this.value = '';" onblur="if (this.value == '') {this.value = 'password';}">
+		   			   <i class="log-pass"> </i>
+		   			 </div>
+		   		   </div>
+		   		   <div class="login-btn">
+		   		   	  <input type="submit" value="Login"> 
+		   		   </div>
+		   		</div>
+		   	</div>
+		   	<div class="col-md-4 city">
+		   		<div class="city-img">
+		   			
+		   		</div>
+		   		<div class="marrakech">
+		   			<h4>Marrakech</h4>
+		   			<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.</p>
+		   		   <div class="marr-btn">
+		   		   	   <a href="#">Full article<span class="city-arr"> </span></a>
+		   		   </div>
+		   		</div>
+		   	</div>
+	   	  <div class="clearfix"> </div>
+	   </div>	
+	</div>
+  <div class="clearfix"> </div>
+</div>
+</div>
+<div class="copyright">
+	 <p>© 2015 Groom ui kit All rights reserved | Template by  <a href="https://w3layouts.com/" target="_blank">  W3layouts </a></p>
+<script type="text/javascript">
+										$(document).ready(function() {
+											/*
+											var defaults = {
+									  			containerID: 'toTop', // fading element id
+												containerHoverID: 'toTopHover', // fading element hover id
+												scrollSpeed: 1200,
+												easingType: 'linear' 
+									 		};
+											*/
+											
+											$().UItoTop({ easingType: 'easeOutQuart' });
+											
+										});
+									</script>
+						<a href="#" id="toTop" style="display: block;"> <span id="toTopHover" style="opacity: 1;"> </span></a>
+</div>
+<!--header end here-->
+</body>
+</html>

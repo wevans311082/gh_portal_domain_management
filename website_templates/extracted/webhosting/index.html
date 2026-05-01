@@ -1,0 +1,386 @@
+<!--
+Author: W3layouts
+Author URL: http://w3layouts.com
+License: Creative Commons Attribution 3.0 Unported
+License URL: http://creativecommons.org/licenses/by/3.0/
+-->
+<!DOCTYPE HTML>
+<html>
+<head>
+<title>Free Web-Hosting Website Template | Home :: w3layouts</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<link rel="stylesheet" href="web/css/style.css" type="text/css" media="all" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<script src="web/js/jquery.js"></script>
+</head>
+<body>
+<div class="header">
+<div class="wrap">
+	<div class="logo">
+		<a href="index.html"><img src="web/images/logo.png" alt=""/></a>
+	</div>
+	<div id="shopping-cart">
+		<strong class="u-name">Hello <span id="dashboard-username"></span>!</strong>
+		  	<span class="dash-login">
+		  		<a href="login.html">Login </a>
+		  		<span class="bar">|</span>
+		  		<a href="create-account.html">Sign Up</a>
+		  	</span>
+		<div class="cart">
+	    	<span class="cart-items"><strong><span id="dashboard-cartItemCount">0</span></strong> Item(s) in <a id="headerCartLink" title="Your Shopping cart is empty." class="cart-empty">Cart</a></span>
+			<a class="checkout-btn" id="headerCheckoutBtn" title="Your shopping cart is empty.">Check Out</a>
+		</div>
+	</div>
+    <div class="clear"></div>
+     </div>
+</div>
+<div id="primary-navindex">
+	<div class="wrap">
+	<div class="nav">
+			<ul class="navigation">
+				<li class="" id="domain-list">
+					<a href="index.html" id="menu-domainsection">
+						<span class="menu-mid">Domains</span>
+					</a>
+					<div class="sub domains-block" id="subn-1">
+                    	<div class="nav-heading">
+                        	<div class="title d-ic-1"><span class="menu-ic dreg"></span>Registration</div>
+                            <div class="title d-ic-2"><span class="menu-ic tran"></span>Transfer</div>
+                            <div class="title d-ic-3"><span class="menu-ic addo"></span>Addons</div>
+							<div class="clear"></div>
+                        </div>
+						<ul>
+						     <li><a href="domain-registration.html">Register a Domain<span class="nav-note">Book your domain here</span></a></li>
+                            <li><a href="bulk-domain-registration.html">Bulk Domain Registration<span class="nav-note">Bulk Registrations at Lower Rates</span></a></li>
+                            <li><a href="idn-domain-registration.html">IDN Domain Registration<span class="nav-note">Book your internationalized domains here</span></a></li>
+                            <li><a href="view-domain-pricing.html">View Domain Pricing<span class="nav-note">Compare pricing across 50+ extensions</span></a></li>
+                          </ul>
+                          <ul>  
+                            <li><a href="transfer-your-domain.html">Transfer your Domain<span class="nav-note">Move in your existing Domains</span></a></li>
+							<li><a href="bulk-domain-transfer.html">Bulk Domain Transfer<span class="nav-note">Save by moving domains in bulk</span></a></li>                           
+                            </ul>
+                            <ul>
+                            <li><a href="free-with-every-domain.html">Free with Every Domain<span class="nav-note">Free Email, Privacy Protection and more</span></a></li>
+                            <li><a href="name-suggestion-tool.html">Name Suggestion Tool <span class="nav-note">Get help in picking a domain</span></a></li>  
+							<li><a href="whois-lookup.html">Whois Lookup<span class="nav-note">Perform a Whois Lookup</span></a></li>
+						</ul>
+						<div class="btm-bg"></div>
+					</div>
+				</li>
+                <li class=" box-2" id="hosting-list">
+					<a href="linux-reseller-hosting.html" id="menu-hostingsection">
+						<span class="menu-mid">Web Hosting</span>
+					</a>
+					<div class="sub" id="subn-2">
+						<ul>
+                      			<li class="nav-ic-5"><a href="linux-reseller-hosting.html"><span class="menu-ic rh"></span>Linux Reseller Hosting<span class="nav-note">Start your Hosting Business here</span></a></li>
+                      			<li class="nav-ic-2"><a href="linux-reseller-hosting.html"><span class="menu-ic rhw"></span>Windows Reseller Hosting<span class="nav-note">Start your Windows Hosting Business here</span></a></li>
+                        </ul>
+						<div class="btm-bg"></div>
+					</div>
+				</li>
+                <li class="">
+					<a href="email.html" id="menu-emailsection">
+						<span class="menu-mid">Email</span>
+					</a>
+				</li>
+				<li class="">
+					<a href="ssl.html" id="menu-emailsection">
+						<span class="menu-mid">SSL</span>
+					</a>
+				</li>
+				<li class="">
+					<a href="website-builder.html" id="menu-emailsection">
+						<span class="menu-mid">Website Builder</span>
+					</a>
+				</li>
+				<li class="">
+					<a href="support.html" id="menu-emailsection">
+						<span class="menu-mid">Support</span>
+					</a>
+				</li>
+            <div class="clear"></div>                
+			</ul>
+		</div>	
+	</div>
+	</div>
+<script type="text/javascript">
+$(".navigation li").hover(
+  function () {
+    $(this).addClass("nav-hover");	
+  },
+  function () {
+    $(this).removeClass("nav-hover");
+  }
+);
+</script>
+<!-- Domain Blurb -->
+	<div class="blue-bar">
+			<div class="wrap">
+				<div class="domain-name">
+					<h2>Get a Domain Name Now!</h2>
+				</div>
+				<div class="search-box">
+					<div class="domianbox-wrp">
+    				<!-- domian search -->
+                <form action="domain-registration.html" method="post" name="form_domain_avail" id="homepageDomainSearch">
+                    <input type="hidden" value="check_availability" name="action">
+                    <input type="hidden" value="true" name="showrelated">
+                    <div class="domain-search-box">
+                      <div class="domain-select-wrapper">
+                        <input type="hidden" name="showrelated" value="true">
+                        <input type="text" maxlength="65" id="field_domains-input" class="domains-input optionalField" name="txtDomainName" value="Buy a Domain name..."  onkeydown="remove_error_msg();" />
+                        <div class="domains-select"> <span id="tldDisplay" class="tlds">.com</span> <span class="tlds-dd"></span>
+                          <div class="ie-fix">
+                            <select name="tld[]" class="brd-fix" id="tldlist">
+                             <option value="com">.com</option>
+                              <option value="net">.net</option>
+                              <option value="in">.in</option>
+                              <option value="org">.org</option>
+                              <option value="info">.info</option>
+                              <option value="biz">.biz</option>
+                              <option value="us">.us</option>
+                              <option value="eu">.eu</option>
+                              <option value="co.uk">.co.uk</option>
+                              <option value="mobi">.mobi</option>
+                              <option value="asia">.asia</option>
+                              <option value="name">.name</option>
+                              <option value="tel">.tel</option>
+                              <option value="co.in">.co.in</option>
+                              <option value="tv">.tv</option>
+                              <option value="me">.me</option>
+                              <option value="ws">.ws</option>
+                              <option value="bz">.bz</option>
+                              <option value="cc">.cc</option>
+                              <option value="org.uk">.org.uk</option>
+                              <option value="me.uk">.me.uk</option>
+                              <option value="net.in">.net.in</option>
+                              <option value="org.in">.org.in</option>
+                              <option value="ind.in">.ind.in</option>
+                              <option value="firm.in">.firm.in</option>
+                              <option value="gen.in">.gen.in</option>
+                              <option value="mn">.mn</option>
+                              <option value="us.com">.us.com</option>
+                              <option value="eu.com">.eu.com</option>
+                              <option value="uk.com">.uk.com</option>
+                              <option value="uk.net">.uk.net</option>
+                              <option value="gb.com">.gb.com</option>
+                              <option value="gb.net">.gb.net</option>
+                              <option value="de.com">.de.com</option>
+                              <option value="cn.com">.cn.com</option>
+                              <option value="qc.com">.qc.com</option>
+                              <option value="kr.com">.kr.com</option>
+                              <option value="ae.org">.ae.org</option>
+                              <option value="br.com">.br.com</option>
+                              <option value="hu.com">.hu.com</option>
+                              <option value="jpn.com">.jpn.com</option>
+                              <option value="no.com">.no.com</option>
+                              <option value="ru.com">.ru.com</option>
+                              <option value="sa.com">.sa.com</option>
+                              <option value="se.com">.se.com</option>
+                              <option value="se.net">.se.net</option>
+                              <option value="uy.com">.uy.com</option>
+                              <option value="za.com">.za.com</option>
+                              <option value="cn">.cn</option>
+                              <option value="com.cn">.com.cn</option>
+                              <option value="net.cn">.net.cn</option>
+                              <option value="org.cn">.org.cn</option>
+                              <option value="co">.co</option>
+                              <option value="gr.com">.gr.com</option>
+                              <option value="co.nz">.co.nz</option>
+                              <option value="net.nz">.net.nz</option>
+                              <option value="org.nz">.org.nz</option>
+                              <option value="com.co">.com.co</option>
+                              <option value="net.co">.net.co</option>
+                              <option value="nom.co">.nom.co</option>
+                              <option value="ca">.ca</option>
+                              <option value="de">.de</option>
+                              <option value="es">.es</option>
+                              <option value="com.au">.com.au</option>
+                              <option value="net.au">.net.au</option>
+                              <option value="xxx">.xxx</option>
+                              <option value="ru">.ru</option>
+                              <option value="com.ru">.com.ru</option>
+                              <option value="net.ru">.net.ru</option>
+                              <option value="org.ru">.org.ru</option>
+                              <option value="pro">.pro</option>
+                              <option value="sx">.sx</option>
+                              <option value="nl">.nl</option>
+                              <option value="pw">.pw</option>
+                            </select>
+                          </div>
+                        </div>
+                        <a href="domain-registration.html"><input name="image" id="search_for_domains_id" type="submit" value="Go" class="domain-submit" onclick="return check_domain_name();" /></a>
+                      </div>      
+                      </div>
+                </form>
+                       <script type="text/javascript">
+                       $('#tldlist').change(function(event) {
+                            $('#tldDisplay').html( '.' +$('#tldlist').val());
+                        }); 
+                    </script>
+              <!-- /domian search -->            
+        </div>
+        </div>
+         <div class="banner-bottom">
+      		 <div class="img-holder"><img src="web/images/thumb-hosting.png" alt="Buy Shared Web Hosting"></div>
+        		<div class="text-hosting">
+            		<h2 class="ui-buy">Start<span class="bl-txt">  Your Website Today</span></h2>
+            			<p class="ui-subtitle">Web Hosting made <em class="greytext">EASY and AFFORDABLE!</em></p>
+   					<div class="feature-list">
+		                <ul>
+		                   <li>Unlimited Bandwith, Space</li>
+              			   <li>Reliable &amp; Secure</li>
+      					</ul>
+		              </div>
+		               <div class="feature-list">
+		                <ul>
+		                     <li>Powered by cPanel / Plesk</li>
+         					 <li>Free Email included</li>
+         				</ul>
+		              </div>
+		               <div class="feature-list1">
+		                <ul>
+		                   <li>99.9% Uptime Guarantee</li>
+               			   <li>30 Day Money Back Guarantee</li>
+               			</ul>
+		              </div>
+		              <div class="clear"></div>
+       	<div class="pricing-wrp">
+            <p>Plans starting<br> as low as <strong><span class="WebRupee">Rs.</span>250.00 <small>/mo</small></strong></p>
+        </div>
+        <div class="view-plans">
+            <a class="button" href="windows-reseller-hosting.html"> <img src="web/images/windows.png" style="margin-right:10px;margin-bottom:-10px;margin-top: -5px;">View Plans</a> 
+        </div>
+        <div class="view-plans">
+            <a class="button" href="linux-reseller-hosting.html"> <img src="web/images/linux.png" style="margin-right:10px;margin-bottom:-10px; margin-top: -5px;">View Plans</a> 
+        </div>
+    	<div class="clear"></div>   
+         </div>
+         <div class="clear"></div>  
+    </div>
+   </div>
+   <div class="clear"></div>
+</div>
+<script type="text/javascript">
+$(document).ready(function(){
+		$('#field_domains-input').textboxValueToggle('Buy a Domain name...');
+    });
+	$.fn.textboxValueToggle = function(defaultText) {
+		$(this).focus(function() {
+				if($(this).val()=== defaultText){
+					$(this).val('').removeClass('optionalField');
+				}
+			}).blur(function() {
+				if($(this).val()==='' ){
+					$(this).addClass('optionalField').val(defaultText);
+				}
+			});
+	}
+</script> 
+<div class="content">
+	<div class="wrap">
+		<div class="grids">
+			<div class="grid-a">
+				<div class="grid-left">
+				<h3>Buy &nbsp;<span class="blue">Reseller Hosting</span></h3>
+				<h4><span class="blue">FREE WHMCS</span>Included</h4>
+				<div class="host-list">
+		                <ul>
+		                   <li>99.9% Uptime Guarantee</li>
+              			   <li>Use WHM/cPanel for Management</li>
+              			   <li>Softaculous Included</li>
+            			</ul>
+		              </div>
+		              <div class="con-price">
+		              <p>Plans starting as low as <span class="price">Rs.1,120.00 /mo</span></p>
+		              </div>
+		              <div class="viewcon-plans">
+            <a class="con-button" href="windows-reseller-hosting.html"> <img src="web/images/view-plan1.png" style="margin-right:8px;margin-bottom:-9px;">View Plans</a> 
+         </div>
+         <div class="viewcon-plans">
+            <a class="con-button" href="linux-reseller-hosting.html"> <img src="web/images/view-plan.png" style="margin-right:8px;margin-bottom:-9px;">View Plans</a> 
+         </div>
+			</div>
+			<div class="rchosting">
+				<img src="web/images/rchosting.png" alt=""/>
+			</div>
+			<div class="clear"></div>
+			</div>
+			<div class="grid-b">
+				<h3>Buy &nbsp;<span class="blue">SSL Certificate</span></h3>
+				<h4>Secure your Website</h4>
+				<div class="host-list">
+		                <ul>
+		                   <li>Upto 256-bit Encryption</li>
+              			   <li>Free Reissues Included</li>
+            			</ul>
+		              </div>
+		              <div class="from">
+		              <p>From:</p>
+		              <div class="viewcon-price">
+		              	  <h5>Rs.1,950.60<span class="mo">/mo</span></h5>
+		              	   <div class="viewcon-plans">
+           				 <a class="con-button" href="ssl.html"> View Plans</a> 
+         			</div>
+		              </div>
+		             
+          			   <div class="clear"></div>
+		              </div>
+		            </div>
+		              <div class="clear"></div>
+		</div>
+	</div>
+</div>
+<div class="footer">
+ <div class="wrap">	
+<div class="footer_grides">
+	<div class="footer_grid">
+    	<h4>Let's Connect With Us</h4>
+		<div class="footer-pic">
+					<p><a href="#" class="link-1">Facebook</a></p>
+					<p><a href="#" class="link-2">Twitter</a></p>
+					<p><a href="#" class="link-3">Google+</a></p>
+ 			</div>
+	</div>   
+	<div class="footer_grid">
+    	<h4>Quick Navigation</h4>
+		<ul class="footer-links">                  
+			    <li><a href="index.html">Home</a></li>                       
+			    <li><a href="web-hosting.html">Web Hosting</a></li>                       
+			    <li><a href="email.html">Email</a></li>           
+			    <li><a href="ssl.html">SSL</a></li> 
+			    <li><a href="website-builder.html">Website Builder</a></li> 
+			     <li><a href="support.html">Support</a></li>              
+        </ul>
+    </div>   
+	<div class="footer_grid1">
+    	<h4>Quick Contact</h4>
+		<form>
+                <div>
+                    <span><label for="name">Name</label></span>
+                    <span><input type="text" id="name" name="name"></span>
+					<span><label for="email">Email</label></span>
+                    <span><input type="text" id="email" name="email"></span>
+				</div>
+               	<div>
+                    <span><label for="subject">Comment</label></span>
+                    <span><textarea id="subject" name="Subject"></textarea></span>
+                </div>
+                <div>
+			  		<span class="contact-but">Contact Us</span>
+				</div>
+         </form>
+	</div>
+  </div>
+  </div>
+<div class="footer-bottom">
+<div class="wrap">
+   <div class="copy-right">
+	<p>© All rights Reseverd | Design by <a href="https://w3layouts.com/">W3Layouts</a></p>
+</div>
+	</div>	
+</div>
+</div>
+</body>
+</html>

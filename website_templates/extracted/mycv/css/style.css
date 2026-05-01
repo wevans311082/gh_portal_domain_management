@@ -1,0 +1,426 @@
+/*
+Author: W3layout
+Author URL: http://w3layouts.com
+License: Creative Commons Attribution 3.0 Unported
+License URL: http://creativecommons.org/licenses/by/3.0/
+*/
+/* reset */
+html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,img,ins,kbd,q,s,samp,small,strike,strong,sub,sup,tt,var,b,u,i,dl,dt,dd,ol,nav ul,nav li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td,article,aside,canvas,details,embed,figure,figcaption,footer,header,hgroup,menu,nav,output,ruby,section,summary,time,mark,audio,video{margin:0;padding:0;border:0;font-size:100%;font:inherit;vertical-align:baseline;}
+article, aside, details, figcaption, figure,footer, header, hgroup, menu, nav, section {display: block;}
+ol,ul{list-style:none;margin:0;padding:0;}
+blockquote,q{quotes:none;}
+blockquote:before,blockquote:after,q:before,q:after{content:'';content:none;}
+table{border-collapse:collapse;border-spacing:0;}
+/* start editing from here */
+a{text-decoration:none;}
+.txt-rt{text-align:right;}/* text align right */
+.txt-lt{text-align:left;}/* text align left */
+.txt-center{text-align:center;}/* text align center */
+.float-rt{float:right;}/* float right */
+.float-lt{float:left;}/* float left */
+.clear{clear:both;}/* clear float */
+.pos-relative{position:relative;}/* Position Relative */
+.pos-absolute{position:absolute;}/* Position Absolute */
+.vertical-base{	vertical-align:baseline;}/* vertical align baseline */
+.vertical-top{	vertical-align:top;}/* vertical align top */
+.underline{	padding-bottom:5px;	border-bottom: 1px solid #eee; margin:0 0 20px 0;}/* Add 5px bottom padding and a underline */
+nav.vertical ul li{	display:block;}/* vertical menu */
+nav.horizontal ul li{	display: inline-block;}/* horizontal menu */
+img{max-width:100%;}
+/*end reset*/
+.clearfix{
+	clear:both;
+}
+html,body{
+	font-family:Arial, Helvetica, sans-serif;
+	background:#fff;
+}
+
+/*--- Header Part Starts Her ---*/
+.header{
+	background:url(../images/banner.jpg)no-repeat;
+	background-size:cover;
+	min-height:113px;
+}
+.header-profile{
+	text-align:center;
+}
+.header-profile img{
+	margin-top:-15%;
+}
+.header-top{
+	text-align:center;
+	margin-top:5px;
+}
+.header-top h2{
+	font-size:16px;
+	font-weight:800;
+	color:#2b3b4b;
+	margin:0px 0 5px 0;	
+}
+.header-top small {
+	font-size: 14px;
+	font-weight:300;
+	color:#7f8a90;
+}
+/*--- Header Part Ends Here ---*/
+/*--- About Part Starts Here ---*/
+.about{
+	margin:20px 10px 40px;
+}
+.about-top{
+}
+h3.top-title{
+	font-weight:800;
+	font-size:16px;
+	text-transform: uppercase;
+	text-align:center;
+}
+span.line{
+	width:10%;
+	height:1px;
+	background:#2b3b4b;
+	display: block;
+	margin:0 auto;
+}
+.about-top p.about-p{
+	font-weight:700;
+	font-size:15px;
+	color:#7f8a90;
+	margin:5px 0 5px 0;
+}
+.about-top p{
+	font-weight:400;
+	font-size:14px;
+	color:#7f8a90
+}
+.about-row{
+	margin-top:5px;
+}
+ul.about-details{
+	padding: 0;
+}
+ul.about-details li{
+	display: block;
+	margin:5px 0;
+}
+ul.about-details li p{
+	font-weight:800;
+	font-size:14px;
+	color:#7f8a90;
+}
+ul.about-details li p span{
+	font-weight:400;
+	color:#7f8a90;
+}
+ul.about-details li p span a{
+	font-weight:400;
+	color:#7f8a90;
+	text-decoration:none;
+}
+.about-row-column h3{
+	font-size:14px;
+	color:#7f8a90;
+	font-weight:800;
+	margin-top:1em;
+}
+ul.hoby{
+	padding:0;
+	margin-bottom:1em;
+}
+ul.hoby li{
+	display: inline-block;
+	margin:10px 3px;
+}
+ul.hoby li i{
+	width:35px;
+	height:35px;
+	background:url(../images/img-sprite.png)no-repeat;
+	cursor:pointer;
+	display: block;
+}
+ul.hoby li i.tv{
+	background-position:0px 0px;
+}
+ul.hoby li i.car{
+	background-position:-41px 0px;
+}
+ul.hoby li i.music{
+	background-position:-82px 0px;
+}
+ul.hoby li i.reading{
+	background-position:-161px 0px;
+}
+a.download{
+	color:#fff;
+	font-size:14px;
+	text-transform:uppercase;
+	text-decoration:none;
+	background:#2980b9;
+	padding:10px 15px;
+	border-bottom:4px solid #6ab8ea;
+	margin-left:3px;
+}
+a.download span{
+	background:url(../images/dold.png)no-repeat;
+	width:16px;
+	height:16px;
+	display:inline-block;
+	vertical-align:middle;
+	margin-right:5px;
+	
+}
+/*--- About Part Ends Here ---*/
+/*--- Experience Starts Here ----*/
+.experience{
+	background:#f1f2f7;
+	min-height:150px;
+	padding:20px 10px;
+}
+.exp-top{
+	padding:0 0 15px;
+}
+.exp-devide{
+	text-align:center;
+}
+.exp-devide h4{
+	color:#2b3b4b;
+	background:#d4d4d4;
+	padding:5px;
+	text-transform:uppercase;
+	font-size:14px;
+	display: block;
+	text-align:center;
+	width:40%;
+	font-weight:800;
+	margin:0 auto;
+}
+label.bag{
+	width:24px;
+	height:24px;
+	background:url(../images/bag.png)no-repeat;
+	display: initial;
+	top:2.5em;
+	left:8.25em;
+}
+label.book{
+	width:24px;
+	height:24px;
+	background:url(../images/book.png)no-repeat;
+	display: initial;
+	top:2.5em;
+	left:8.25em;
+}
+.exp-devide-grid-right{
+	text-align:center;
+	margin-top:10px;
+}
+.exp-devide-grid-right h5{
+	color:#2b3b4b;
+	text-transform:uppercase;
+	font-size:14px;
+	font-weight:800;
+	margin:0;
+	
+}
+.exp-devide-grid-right small,.exp-devide-grid-right p,{
+	font-size:13px;
+	font-weight:400;
+	color:#7f8a90;
+}
+.education{
+	margin-top:10px;
+}
+/*--- Experience Ends Here ----*/
+/*--- Skills Starts Here ----*/
+.skills{
+	margin: 20px 10px 0;
+	text-align: center;
+}
+.skills-top{
+	padding:0em 0 0;
+}
+.skill-grids{
+	padding:10px 0;
+}
+.skill-grid {
+	margin-bottom: 2em;
+}
+.skill-grid h3{
+	color: #2b3b4b;
+	font-weight:800;
+	font-size:15px;
+	margin-top: 0.8em;
+}
+.skill-grid p{
+	font-weight:400;
+	font-size:14px;
+	line-height:1.2em;
+	color:#7f8a90;
+}
+/*--- Skills Starts Here ----*/
+/*--- social Media Starts Here ---*/
+.social-media{
+	background:#f1f2f7;
+	padding:20px 10px;
+}
+.social-media-top{
+	text-align:center;
+}
+ul.social{
+	padding:0;
+	margin:5px 0 0;
+}
+ul.social li img{
+	cursor: pointer;
+}
+ul.social li{
+	display: inline-block;
+}
+ul.social li i{
+	cursor: pointer;
+}
+/*--- Awards Parts Starts Here ----*/
+.awards{
+	margin:20px 10px;
+}
+.awards-top{
+	padding:0 0;
+}
+.award-row{
+	margin-top:10px;
+}
+.award-column{
+	text-align: center;
+	margin-bottom:1em;
+}
+.award-column h5{
+	font-size:15px;
+	color:#2b3b4b;
+	font-weight:800;
+}
+.award-column small{
+	font-size:14px;
+	font-weight:400;
+	text-transform:uppercase;
+	color:#7f8a90;
+}
+/*--- Award Part Ends Here ----*/
+/*---- Twitter Feed Part Starts Here ----*/
+.twitter{
+	background:#f1f2f7;
+	padding:20px 10px 30px;
+}
+.twitter-top{
+	text-align:center;
+}
+#top{
+	margin:10px 0;
+}
+i.twit{
+	width:24px;
+	height:24px;
+	background:url(../images/twitter.png)no-repeat;
+	display: inline-block;
+	
+}
+.slider-top p{
+	font-size:14px;
+	font-weight:700;
+	color:#7f8a90;
+	margin: 0 10px; 
+}
+/*---- Twitter Feed Part Ends Here ----*/
+/*--- contact Part Starts Here ----*/
+.contact{
+	margin:0em 0 0;
+}
+.contact-top{
+	padding:20px 10px;
+	text-align:center;
+}
+.contact-top p{
+	font-size:15px;
+	font-weight:400;
+	color:#7f8a90;
+	margin:10px 0;
+}
+.contact-column{
+	padding:0;
+	margin:5px 0 10px;
+}
+.contact-column p,.contact-column a{
+	font-size:14px;
+	margin:0;
+	padding-top:0px;
+	font-weight:400;
+	color:#7f8a90;
+	text-decoration:none;
+}
+.contact-row{
+	margin:10px 10px 20px;
+}
+.contact-form{
+	text-align:center;
+}
+.text{
+	margin-bottom:10px;
+}
+.text input[type="text"]{
+	width:70%;
+	padding:10px 10px;
+	border:1px solid #2980b9;
+	background:#f1f2f7;
+	color:#7f8a90;
+	outline:none;
+	font-weight:300;
+	font-style:italic;
+	font-size:14px;
+	-webkit-appearance: none;
+}
+.text p{
+	font-size:0.85em;
+	margin:0.5em 0;
+}
+.text textarea{
+	width:70%;
+	padding:10px;
+	border:1px solid #2980b9;
+	background:#f1f2f7;
+	color:#7f8a90;
+	outline:none;
+	font-weight:300;
+	font-style:italic;
+	font-size:14px;
+	height:110px;
+	resize:none;
+	-webkit-appearance: none;
+}
+.text input[type="submit"]{
+	background:#2980b9;
+	color:#fff;
+	padding:10px 15px;
+	font-size:14px;
+	outline:none;
+	cursor:pointer;
+	-webkit-appearance: none;
+	border:0px;
+	text-transform:uppercase;
+}
+/*--- contact Part Ends Here ----*/
+/*--- Footer Starts Here ---*/
+.footer{
+	padding:20px 10px;
+	text-align:center;
+	background:#2b3b4b;
+}
+p.copyright{
+	font-size:15px;
+	color:#fff;
+	font-weight:400;
+}
+p.copyright a{
+	color:#2980b9;
+	text-decoration:none;
+}
+/*--- Footer Ends Here ---*/

@@ -1,0 +1,65 @@
+{% extends "base_portal.html" %}
+
+{% block title %}My Templates — {{ SITE_NAME }}{% endblock %}
+{% block page_title %}My Installed Templates{% endblock %}
+
+{% block header_actions %}
+<a href="{% url 'website_templates:gallery' %}"
+   class="bg-sky-600 text-white text-sm px-4 py-1.5 rounded-lg hover:bg-sky-700 font-medium transition-colors">
+    ← Browse Gallery
+</a>
+{% endblock %}
+
+{% block content %}
+{% if installs %}
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+    {% for install in installs %}
+    <div class="bg-white rounded-xl shadow-sm border border-sky-100 overflow-hidden flex flex-col">
+        <!-- Thumbnail -->
+        <div class="h-40 bg-sky-50 overflow-hidden">
+            <img src="{% url 'website_templates:thumbnail' slug=install.template.slug %}"
+                 alt="{{ install.template.name }}"
+                 class="w-full h-full object-cover">
+        </div>
+        <div class="p-4 flex flex-col flex-1">
+            <h3 class="font-semibold text-sky-900 mb-0.5">{{ install.template.name }}</h3>
+            <p class="text-xs text-sky-500 capitalize mb-1">{{ install.template.get_category_display }}</p>
+            {% if install.service_domain %}
+            <p class="text-xs text-sky-600 bg-sky-50 border border-sky-100 rounded px-2 py-0.5 mb-2 inline-block self-start">
+                🌐 {{ install.service_domain }}
+            </p>
+            {% endif %}
+            <p class="text-xs text-sky-400 mb-3">Installed {{ install.installed_at|date:"d M Y" }}</p>
+            <div class="mt-auto flex gap-2">
+                <a href="{% url 'website_templates:preview' slug=install.template.slug %}"
+                   class="flex-1 text-center border border-sky-300 text-sky-700 text-xs px-3 py-1.5 rounded-lg hover:bg-sky-50 font-medium transition-colors">
+                    Preview
+                </a>
+                <form method="post" action="{% url 'website_templates:uninstall' installation_id=install.pk %}"
+                      onsubmit="return confirm('Remove this template from your installations?')">
+                    {% csrf_token %}
+                    <button type="submit"
+                            class="border border-red-200 text-red-500 text-xs px-3 py-1.5 rounded-lg hover:bg-red-50 font-medium transition-colors">
+                        Remove
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% else %}
+<div class="text-center py-20">
+    <svg class="w-16 h-16 mx-auto text-sky-200 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+    </svg>
+    <h3 class="text-lg font-semibold text-sky-900 mb-1">No templates installed yet</h3>
+    <p class="text-sky-500 text-sm mb-4">Browse our gallery and click Install on any template you like.</p>
+    <a href="{% url 'website_templates:gallery' %}"
+       class="bg-sky-600 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-sky-700 transition-colors">
+        Browse Gallery
+    </a>
+</div>
+{% endif %}
+{% endblock %}

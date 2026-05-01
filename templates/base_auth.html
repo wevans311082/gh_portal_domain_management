@@ -1,12 +1,21 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
+{% load static %}
 
 {% block body %}
-<div class="min-h-full flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-    <div class="max-w-md w-full space-y-8">
-        <div class="text-center">
-            <h1 class="text-3xl font-extrabold text-gray-900">{{ SITE_NAME }}</h1>
+<div class="min-h-full flex flex-col">
+    <!-- Top bar -->
+    <div class="bg-sky-800 text-white text-center py-4 shadow">
+        <h1 class="text-xl font-bold tracking-tight">{{ SITE_NAME }}</h1>
+    </div>
+    <!-- Card area -->
+    <div class="flex-1 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-sky-50">
+        <div class="max-w-md w-full bg-white rounded-2xl shadow-lg border border-sky-100 px-8 py-10">
+            {% block content %}{% endblock %}
         </div>
-        {% block content %}{% endblock %}
+    </div>
+    <!-- Footer -->
+    <div class="bg-white border-t border-sky-100 text-center py-3 text-xs text-sky-400">
+        &copy; {% now "Y" %} {{ SITE_NAME }}. All rights reserved.
     </div>
 </div>
 {% endblock %}

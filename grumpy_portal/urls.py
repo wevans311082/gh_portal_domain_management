@@ -21,6 +21,7 @@ urlpatterns = [
     path("dns/", include("apps.dns.urls")),
     path("support/", include("apps.support.urls")),
     path("admin-tools/", include("apps.admin_tools.urls")),
+    path("website-templates/", include("apps.website_templates.urls")),
 ]
 
 if settings.DEBUG:

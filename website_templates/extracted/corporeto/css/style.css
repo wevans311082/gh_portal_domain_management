@@ -1,0 +1,202 @@
+/*
+Author: W3Layouts
+Author URL: http://w3layouts.com
+License: Creative Commons Attribution 3.0 Unported
+License URL: http://creativecommons.org/licenses/by/3.0/
+*/
+/* reset */
+html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,img,ins,kbd,q,s,samp,small,strike,strong,sub,sup,tt,var,b,u,i,dl,dt,dd,ol,nav ul,nav li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td,article,aside,canvas,details,embed,figure,figcaption,footer,header,hgroup,menu,nav,output,ruby,section,summary,time,mark,audio,video{margin:0;padding:0;border:0;font-size:100%;font:inherit;vertical-align:baseline;}
+article, aside, details, figcaption, figure,footer, header, hgroup, menu, nav, section {display: block;}
+ol,ul{list-style:none;margin:0;padding:0;}
+blockquote,q{quotes:none;}
+blockquote:before,blockquote:after,q:before,q:after{content:'';content:none;}
+table{border-collapse:collapse;border-spacing:0;}
+/* start editing from here */
+a{text-decoration:none;}
+.txt-rt{text-align:right;}/* text align right */
+.txt-lt{text-align:left;}/* text align left */
+.txt-center{text-align:center;}/* text align center */
+.float-rt{float:right;}/* float right */
+.float-lt{float:left;}/* float left */
+.clear{clear:both;}/* clear float */
+.pos-relative{position:relative;}/* Position Relative */
+.pos-absolute{position:absolute;}/* Position Absolute */
+.vertical-base{	vertical-align:baseline;}/* vertical align baseline */
+.vertical-top{	vertical-align:top;}/* vertical align top */
+.underline{	padding-bottom:5px;	border-bottom: 1px solid #eee; margin:0 0 20px 0;}/* Add 5px bottom padding and a underline */
+nav.vertical ul li{	display:block;}/* vertical menu */
+nav.horizontal ul li{	display: inline-block;}/* horizontal menu */
+img{max-width:100%;}
+/*end reset*/
+body {
+	font-family:Trebuchet MS, Helvetica, sans-serif;
+	font-size:12px;
+}
+.wrap {
+	margin:0 auto;
+	background:#fff;
+}
+.logo{
+	margin:5px 0 0 10px;
+}
+.nav{
+	width:97%;
+	height:45px;
+	margin:0 auto;
+	background:#5E5F63;
+	text-align:center;
+}
+.nav ul{
+	padding:0;
+}
+.nav li {
+	display:inline-block;
+	line-height:4em;
+}
+.nav li:first-child {
+	margin:0 0 0 5px;
+}
+.nav li:last-child{
+	margin:0 5px 0 0 ;
+}
+.nav li a {
+	color:#eee;
+	padding:5px;
+	font-size:14px;
+}
+.nav li a:hover{
+	background:#333;
+	color:#88ba02;
+}
+.header{
+	margin-bottom:20px;
+}
+.banner{
+	text-align:center;
+	margin:8px;
+}
+/*--boxes--*/
+.box{
+	margin:10px;
+	padding-bottom:10px;
+	border-bottom:1px solid #ddd;
+}
+.box img{
+	float:left;
+	margin:0 10px 5px 0;
+	max-width:100%;
+}
+.box h2{
+	color:#88ba02;
+	font-size:22px;
+	padding:5px;
+	background:#f2f2f2;
+	margin-bottom:10px;
+}
+.box p{
+	color:#888;
+	font-size:14px;
+}
+.small-box{
+	margin:0 10px 10px 10px;
+}
+.small-box h2{
+	color:#88ba02;
+	font-size:18px;
+	padding-bottom:5px;
+}
+.small-box p{
+	color:#888;
+	font-size:14px;
+}
+.small-box img{
+	border:1px solid #eee;
+	padding:7px;
+}
+/*--about--*/
+.about{
+	margin:10px;
+}
+.about h1,
+.feedback h1,
+.map h3{
+	font-size:24px;
+	padding-bottom:10px;
+	color:#88BA02;
+}
+.about p{
+	font-size:14px;
+	color:#888;
+	line-height:1.5em;
+}
+.map{
+	margin:10px;
+}
+/*--feedback--*/
+.feedback{
+	font-size:14px;
+	padding-bottom:10px;
+	color:#aaa;
+	margin:0 0 0 10px;
+}
+.feedback div{
+	padding:10px;
+}
+.feedback span{	
+	display:block;
+}
+.feedback input[type="text"]{
+	width:90%;
+	padding:5px 0;
+	font-size:16px;
+	border:1px solid #aaa;
+	color:#aaa;
+}
+.feedback textarea{
+	width:90%;
+	height:100px;
+	padding:5px 0;
+	font-size:16px;
+}
+.feedback input[type="submit"]{
+	width:100px;
+	padding:7px 0;
+	font-size:16px;
+	background:#aaa;
+	border:none;
+	font-size:14px;
+	color:#eee;
+	cursor:pointer;
+	-webkit-appearance:none;
+}
+
+/*--footer--*/
+.footer{
+	background:#5e5f63;
+	text-align:center;
+	padding:15px 0;
+	color:#ddd;
+}
+.footer ul{
+	padding:0;
+}
+.footer li{
+	margin:5px;
+	display:inline-block;
+}
+.footer li a{
+	color:#ddd;
+}
+.footer li a:hover{
+	color:#eee;
+}
+.copy{
+	text-align:center;
+	color:#aaa;
+}
+.copy a{
+	color:#eee;
+}
+.copy a:hover{
+	text-decoration:underline;
+}

@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% load core_tags %}
 
 {% block title %}Pricing - {{ SITE_NAME }}{% endblock %}
@@ -11,11 +11,11 @@
         <div class="border rounded-lg p-6 {% if package.is_featured %}border-orange-500 shadow-lg{% else %}border-gray-200{% endif %}">
             {% if package.is_featured %}
             <div class="text-center mb-2">
-                <span class="bg-orange-500 text-white text-sm px-3 py-1 rounded-full">Most Popular</span>
+                <span class="bg-sky-600 text-white text-sm px-3 py-1 rounded-full">Most Popular</span>
             </div>
             {% endif %}
             <h2 class="text-2xl font-bold text-center mb-2">{{ package.name }}</h2>
-            <p class="text-4xl font-bold text-center text-orange-500 mb-1">{{ package.price_monthly|currency }}<span class="text-lg text-gray-500">/mo</span></p>
+            <p class="text-4xl font-bold text-center text-sky-600 mb-1">{{ package.price_monthly|currency }}<span class="text-lg text-gray-500">/mo</span></p>
             <p class="text-center text-gray-500 mb-6">{{ package.price_annually|currency }}/year</p>
             <ul class="space-y-2 mb-6">
                 {% for feature in package.get_features %}
@@ -25,7 +25,7 @@
                 </li>
                 {% endfor %}
             </ul>
-            <a href="{% url 'accounts_custom:register' %}" class="block text-center bg-orange-500 text-white py-3 rounded hover:bg-orange-600">Get Started</a>
+            <a href="{% url 'accounts_custom:register' %}" class="block text-center bg-sky-600 text-white py-3 rounded hover:bg-sky-700">Get Started</a>
         </div>
         {% empty %}
         <p class="col-span-3 text-center text-gray-500">No plans available yet.</p>

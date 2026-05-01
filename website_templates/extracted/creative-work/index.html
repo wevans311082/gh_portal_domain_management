@@ -1,0 +1,641 @@
+<!--
+Author: W3layouts
+Author URL: http://w3layouts.com
+License: Creative Commons Attribution 3.0 Unported
+License URL: http://creativecommons.org/licenses/by/3.0/
+-->
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Creative Digital Agency a Corporate Category Flat Bootstrap Responsive Website Template | Home :: w3layouts</title>
+	<!--fonts-->
+		<link href="https://fonts.googleapis.com/css?family=Dosis:200,300,400,500,600,700,800' rel='stylesheet' type='text/css'>
+		<link href="https://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800' rel='stylesheet' type='text/css'>
+	<!--//fonts-->
+		<link href="css/bootstrap.css" rel="stylesheet" type="text/css" media="all" />
+			<link href="css/style.css" rel="stylesheet" type="text/css" media="all" />
+	<!-- for-mobile-apps -->
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+		<meta name="keywords" content="Creative Digital Agency Responsive web template, Bootstrap Web Templates, Flat Web Templates, Andriod Compatible web template, 
+		Smartphone Compatible web template, free webdesigns for Nokia, Samsung, LG, SonyErricsson, Motorola web design" />
+		<script type="application/x-javascript"> addEventListener("load", function() { setTimeout(hideURLbar, 0); }, false); function hideURLbar(){ window.scrollTo(0,1); } </script>
+	<!-- //for-mobile-apps -->
+	<!-- js -->
+		<script type="text/javascript" src="js/jquery.min.js"></script>
+	<!-- js -->
+	<!-- start-smooth-scrolling -->
+		<script type="text/javascript" src="js/move-top.js"></script>
+		<script type="text/javascript" src="js/easing.js"></script>
+		<script type="text/javascript">
+			jQuery(document).ready(function($) {
+				$(".scroll").click(function(event){		
+					event.preventDefault();
+					$('html,body').animate({scrollTop:$(this.hash).offset().top},1000);
+				});
+			});
+		</script>
+	<!-- start-smooth-scrolling -->
+
+</head>
+<body>
+<!-- banner -->
+<div class="banner">
+	<div class="container">
+		<div class="header-grids">
+			<div class="container">
+				<div class="fixed-header">
+					<div class="header-left">
+						<a href="index.html"><img src="images/logo.png" alt=""/></a>
+					</div>
+					<div class="header-right">
+						<span class="menu"><img src="images/menu.png" alt=""/></span>
+								<ul class="nav1">
+									<li><a class="active" href="index.html">HOME</a></li>
+									<li><a href="works.html">WORKS</a></li>
+									<li><a href="industries.html">INDUSTRIES</a></li>
+									<li><a href="services.html">SERVICES</a></li>	
+									<li><a href="404.html">NEWS</a></li>
+									<li><a href="about.html">WHO WE ARE</a></li>
+									<li><a href="contact.html">CONTACT</a></li>
+								</ul>
+								<!-- script for menu -->
+									<script> 
+										$( "span.menu" ).click(function() {
+										$( "ul.nav1" ).slideToggle( 300, function() {
+										 // Animation complete.
+										});
+										});
+									</script>
+								<!-- //script for menu -->
+								<!-- script-for sticky-nav -->
+								<script>
+								$(document).ready(function() {
+									 var navoffeset=$(".header-grids").offset().top;
+									 $(window).scroll(function(){
+										var scrollpos=$(window).scrollTop(); 
+										if(scrollpos >=navoffeset){
+											$(".header-grids").addClass("fixed");
+										}else{
+											$(".header-grids").removeClass("fixed");
+										}
+									 });
+									 
+								});
+								</script>
+							<!-- /script-for sticky-nav -->
+
+					</div>
+					<div class="clearfix"></div>
+				</div>
+			</div>
+		</div>
+		<div class="slider">
+			<!-- responsiveslides -->
+						<script src="js/responsiveslides.min.js"></script>
+							<script>
+								// You can also use "$(window).load(function() {"
+								$(function () {
+								 // Slideshow 4
+								$("#slider3").responsiveSlides({
+									auto: true,
+									pager: true,
+									nav: true,
+									speed: 500,
+									namespace: "callbacks",
+									before: function () {
+								$('.events').append("<li>before event fired.</li>");
+								},
+								after: function () {
+									$('.events').append("<li>after event fired.</li>");
+									}
+									});
+									});
+						</script>
+					<!-- responsiveslides -->
+			<div  id="top" class="callbacks_container">
+				<ul class="rslides" id="slider3">
+					<li>
+						<div class="banner-info">
+							<h1>AGENCY</h1>
+							<h2>FREEBIE PSD DOWNLOAD</h2>
+							<div class="border"></div>
+							<p>Maecenas suscipit imperdiet nisi ac hendrerit. Nam congue felis ac massa rutrum pulvinar. 
+							Donec sodales eros sed efficitur mattis. Integer tincidunt, felis a placerat maximus, eros 
+							nulla dapibus dui, at facilisis enim odio at velit. Aenean dictum eleifend mi sit amet luctus. </p>
+							
+							
+						</div>
+					</li>
+					<li>
+						<div class="banner-info">
+							<h1>AGENCY</h1>
+							<h2>FREEBIE PSD DOWNLOAD</h2>
+							<div class="border"></div>
+							<p>Donec sodales eros sed efficitur mattis. Integer tincidunt, felis a placerat maximus, eros 
+							nulla dapibus dui, at facilisis enim odio at velit. Aenean dictum eleifend mi sit amet luctus. 
+							Maecenas suscipit imperdiet nisi ac hendrerit. congue felis ac massa rutrum pulvinar.  </p>							
+						</div>
+					</li>
+					<li>
+						<div class="banner-info">
+							<h1>AGENCY</h1>
+							<h2>FREEBIE PSD DOWNLOAD</h2>
+							<div class="border"></div>
+							<p>Donec sodales eros sed efficitur mattis. Integer tincidunt, felis a placerat maximus, eros 
+							nulla dapibus dui, at facilisis enim odio at velit. Aenean dictum eleifend mi sit amet luctus.
+							Maecenas suscipit imperdiet nisi ac hendrerit. congue felis ac massa rutrum pulvinar.</p>							
+						</div>
+					</li>
+					<li>
+						<div class="banner-info">
+							<h1>AGENCY</h1>
+							<h2>FREEBIE PSD DOWNLOAD</h2>
+							<div class="border"></div>
+							<p>Integer suscipit imperdiet nisi ac hendrerit. Nam congue felis ac massa rutrum pulvinar. 
+							Donec sodales eros sed efficitur mattis. Maecenas  tincidunt, felis a placerat maximus, eros 
+							nulla dapibus dui, at facilisis enim odio at velit. Aenean dictum eleifend mi sit amet luctus. </p>
+							
+						</div>
+					</li>
+					<li>
+						<div class="banner-info">
+							<h1>AGENCY</h1>
+							<h2>FREEBIE PSD DOWNLOAD</h2>
+							<div class="border"></div>
+							<p>Maecenas suscipit imperdiet nisi ac hendrerit. Nam congue felis ac massa rutrum pulvinar.
+							Donec sodales eros sed efficitur mattis. Integer tincidunt, felis a placerat maximus, eros							 
+							nulla dapibus dui, at facilisis enim odio at velit. Aenean dictum eleifend mi sit amet luctus. </p>
+							
+						</div>
+					</li>
+				</ul>
+			</div>
+		</div>
+		<div class="down-arrow text-center">
+			<a class="scroll" href="#hello"><img src="images/scroll.png" alt=""/></a>
+		</div>
+		
+	</div>		
+</div>
+<!-- //banner -->
+<!-- clients -->
+<div class="clients">
+	
+		<div class="client-grids">
+			<div class="client-left">
+				<h3>OUR CLIENTS</h3>
+			</div>
+			<div class="client-right">
+				<ul>
+					<li><img src="images/21.png" alt=""/></li>
+					<li><img src="images/22.png" alt=""/></li>
+					<li><img src="images/23.png" alt=""/></li>
+					<li><img src="images/24.png" alt=""/></li>
+					<li><img src="images/25.png" alt=""/></li>
+					<li><img src="images/26.png" alt=""/></li>
+				</ul>
+			</div>
+			<div class="clearfix"></div>
+		</div>
+	
+</div>
+<!-- //clients -->
+<!-- hello -->
+<div id="hello" class="hello">
+	<div class="container">
+		<div class="col-md-6 hello-info a"></div>
+		<div class="col-md-6 hello-info">
+			<h3>HELLO <span>LOREM IPSUM DOLOR SIT AMET</span></h3>
+			<div class="strip"></div>
+			<p>Curabitur et dapibus leo. Donec eleifend pharetra sem, 
+			et interdum nunc semper vel. Sed interdum magna eu faucibus faucibus. </p>
+			<p>Nulla varius faucibus arcu, eget aliquet tortor sollicitudin ut. 
+			Interdum et malesuada fames ac ante ipsum primis in faucibus. Aliquam 
+			sollicitudin felis quis varius porta. Donec sit amet diam a elit pulvinar pretium. </p>
+			<a href="about.html" class="hvr-rectangle-out button">SEE MORE ABOUT US</a>
+		</div>
+		<div class="clearfix"></div>
+	</div>
+</div>
+<!-- //hello -->
+<!-- experience -->
+<div class="experience">
+	<div class="container">
+		<div class="col-md-6 exp-left">
+			<h3>EXPERIENCE <span>ALL EXPERT DIGITAL SERVICES</span></h3>
+			<div class="strip"></div>
+			<p>Maecenas suscipit imperdiet nisi ac hendrerit. Nam congue felis ac massa rutrum pulvinar. 
+			Donec sodales eros sed efficitur mattis. Integer tincidunt, felis a placerat maximus, 
+			eros nulla dapibus dui.</p>
+			<a href="services.html" class="hvr-rectangle-out button">SEE OUR SERVICES</a>
+		</div>
+		<div class="col-md-6 exp-right">
+			<div class="col-md-6 exp-grid text-center">
+				<div class="exp-image a"></div>
+				<p>WEBSITE DESIGN & DEVELOPMENT</p>
+			</div>
+			<div class="col-md-6 exp-grid text-center">
+				<div class="exp-image b"></div>
+				<p>WEB SECURITY & OPTIMIZATION</p>
+			</div>
+			<div class="col-md-6 exp-grid text-center">
+				<div class="exp-image c"></div>
+				<p>DIGITAL MARKETING</p>
+			</div>
+			<div class="col-md-6 exp-grid text-center">
+				<div class="exp-image d"></div>
+				<p>CONVERSION OPTIMIZATION</p>
+			</div>
+			<div class="clearfix"></div>
+		</div>
+		<div class="clearfix"></div>
+	</div>
+</div>
+<!-- //experience -->
+<!-- work -->
+<div class="recent-work">
+	<div class="container">
+		<div class="recent-info text-center">
+			<h3>RECENT WORK</h3>
+			<div class="strip a"></div>
+			<p>Donec sodales eros sed efficitur mattis. Integer tincidunt, 
+			felis a placerat maximus, eros nulla dapibus dui, at facilisis enim odio at velit. </p>
+		</div>
+	</div>
+	<div class="recent-btm">
+			<div class="col-md-6 recent-left">
+				<img src="images/banner3.jpg" alt=""/>
+			</div>
+			<div class="col-md-6 recent-grid">
+				<h3>CustomerDomain.com</h3>
+				<p>Donec lacus leo, vestibulum et erat eget, viverra posuere est. Maecenas 
+				dapibus mi erat. Duis egestas tempus leo, non euismod velit dictum eu. </p>
+				<ul class="list ins1">
+					<li>Client</li>
+					<li>Location</li>
+					<li>Services</li>
+					<li>Website link</li>
+				</ul>
+				<ul class="list ins1 ins2">
+					<li>: Customer</li>
+					<li>: U.K</li>
+					<li>: Search Engine Optimization</li>
+					<li>: <a href="mailto:info@example.com">www.CustomerDomain.com </a></li>
+				</ul>
+			</div>
+			<div class="clearfix"></div>
+	</div>
+</div>
+<!-- work -->
+<div class="flex-slider">
+	<div class="container">
+			<ul id="flexiselDemo1">			
+					<li>
+						<div class="opportunity">
+							<img src="images/19.png" alt=""/>
+							<div class="opportunity-info">
+								<h3>future<span>think</span></h3>
+								<p> Futurethink.com is the professional website which researches and 
+								develops innovation for organizations using a refreshing and simple approach.</p>
+							</div>
+						</div>
+					</li>
+					<li>
+						<div class="opportunity">
+							<img src="images/20.png" alt=""/>
+							<div class="opportunity-info">
+								<h3>future<span>think</span></h3>
+								<p> Futurethink.com is the professional website which researches and 
+								develops innovation for organizations using a refreshing and simple approach.</p>
+							</div>
+						</div>
+					</li>
+					<li>
+						<div class="opportunity">
+							<img src="images/19.png" alt=""/>
+							<div class="opportunity-info">
+								<h3>future<span>think</span></h3>
+								<p> Futurethink.com is the professional website which researches and 
+								develops innovation for organizations using a refreshing and simple approach.</p>
+							</div>
+						</div>
+					</li>
+					<li>
+						<div class="opportunity">
+							<img src="images/20.png" alt=""/>
+							<div class="opportunity-info">
+								<h3>future<span>think</span></h3>
+								<p> Futurethink.com is the professional website which researches and 
+								develops innovation for organizations using a refreshing and simple approach.</p>
+							</div>
+						</div>
+					</li>
+					
+			</ul>
+            		<script type="text/javascript">
+							$(window).load(function() {
+								$("#flexiselDemo1").flexisel({
+									visibleItems: 3,
+									animationSpeed: 1000,
+									autoPlay: true,
+									autoPlaySpeed: 3000,    		
+									pauseOnHover: true,
+									enableResponsiveBreakpoints: true,
+									responsiveBreakpoints: { 
+										portrait: { 
+											changePoint:480,
+											visibleItems: 1
+										}, 
+										landscape: { 
+											changePoint:640,
+											visibleItems: 2
+										},
+										tablet: { 
+											changePoint:768,
+											visibleItems: 2
+										}
+									}
+								});
+								
+							});
+					</script>
+					<script type="text/javascript" src="js/jquery.flexisel.js"></script>
+	</div>
+</div>
+<!-- we focus -->
+<div class="we-focus">
+	<div class="container">
+		<div class="focus-grids">
+			<div class="col-md-6 focus-grid">
+				<h3>WE FOCUS <span>ON KEY INDUSTRIES</span></h3>
+				<div class="strip"></div>
+				<p>Donec nulla justo, pharetra nulla, lacinia pulvinar nunc rutrum nisi vel nib.</p>
+			</div>
+			<div class="col-md-3 focus-grid">
+				<div class="focus-border">
+					<div class="focus-layout">
+						<div class="focus-image a"></div>
+						<h4>Digital Marketing</h4>
+					</div>
+				</div>
+			</div>
+			<div class="col-md-3 focus-grid">
+				<div class="focus-border">
+					<div class="focus-layout">
+						<div class="focus-image b"></div>
+						<h4>Sport & Entertainment</h4>
+					</div>
+				</div>
+			</div>
+			<div class="col-md-3 focus-grid">
+				<div class="focus-border">
+					<div class="focus-layout">
+						<div class="focus-image c"></div>
+						<h4>Health & Fitness</h4>
+					</div>
+				</div>
+			</div>
+			<div class="col-md-3 focus-grid">
+				<div class="focus-border">
+					<div class="focus-layout">
+						<div class="focus-image d"></div>
+						<h4>Law firms and Real Estates</h4>
+					</div>
+				</div>
+			</div>
+			<div class="col-md-3 focus-grid">
+				<div class="focus-border">
+					<div class="focus-layout">
+						<div class="focus-image e"></div>
+						<h4>Professional Services</h4>
+					</div>
+				</div>
+			</div>
+			<div class="col-md-3 focus-grid">
+				<div class="focus-border">
+					<div class="focus-layout">
+						<div class="focus-image f"></div>
+						<h4>Fashion & Beauty</h4>
+					</div>
+				</div>
+			</div>
+			<div class="col-md-3 focus-grid">
+				<div class="focus-border">
+					<div class="focus-layout">
+						<div class="focus-image g"></div>
+						<h4>Food & Beverage</h4>
+					</div>
+				</div>
+			</div>
+			<div class="col-md-3 focus-grid">
+				<div class="focus-border">
+					<div class="focus-layout">
+						<div class="focus-image h"></div>
+						<h4>Games & Comics</h4>
+					</div>
+				</div>
+			</div>
+			<div class="col-md-3 focus-grid">
+				<div class="focus-border">
+					<div class="focus-layout">
+						<div class="focus-image i"></div>
+						<h4>Travel & Hotels</h4>
+					</div>
+				</div>
+			</div>
+			<div class="col-md-3 focus-grid">
+				<div class="focus-border">
+					<div class="focus-layout">
+						<div class="focus-image a"></div>
+						<h4>Digital Marketing</h4>
+					</div>
+				</div>
+			</div>
+			<div class="clearfix"></div>
+		</div>
+	</div>
+</div>
+<!-- //we focus -->
+<!-- feature -->
+<div class="feature">
+	<div class="container">
+		<div class="col-md-6 feature-grid">
+			<img src="images/15.png" alt=""/>
+		</div>
+		<div class="col-md-6 feature-grid">
+			<h3>FEATURE <span>MARKETING GUIDE</span></h3>
+			<div class="strip"></div>
+			<p>Etiam vitae dui quis mi pharetra facilisis. Aenean volutpat nisi dui, 
+			vel tempus metus euismod in. Quisque vitae volutpat nulla. Curabitur cursus leo lacus, 
+			a ullamcorper augue iaculis vel.  </p>
+			<p>Cras in risus vitae leo feugiat lobortis euismod quis dui. Integer tempor 
+			urna quis quam volutpat, non consequat augue iaculis. Proin malesuada sem 
+			sagittis imperdiet rutrum.  </p>
+			<a href="#" class="hvr-rectangle-out button">SEE MORE</a>
+			<a href="#" class="hvr-rectangle-in button red">DOWNLOAD</a>
+		</div>
+		<div class="clearfix"></div>
+	</div>
+</div>
+<!-- //feature -->
+<!-- recent blog -->
+<div class="blog">
+	<div class="container">
+		<div class="blog-info text-center">
+			<h3> Recent blog</h3>
+			<div class="strip a"></div>
+			<p>Donec nulla justo, pharetra in nulla in, lacinia pulvinar nunc. 
+			Nunc rutrum nisi vel nibh cursus, nec vestibulum orci feugiat.</p>
+		</div>
+		<script src="jquery.min.js"></script>
+			<script>
+				$(document).ready(function () {
+					size_li = $("#myList li").size();
+					x=1;
+					$('#myList li:lt('+x+')').show();
+					$('#loadMore').click(function () {
+						x= (x+1 <= size_li) ? x+1 : size_li;
+						$('#myList li:lt('+x+')').show();
+					});
+					$('#showLess').click(function () {
+						x=(x-1<0) ? 1 : x-1;
+						$('#myList li').not(':lt('+x+')').hide();
+					});
+				});
+			</script>
+		<div class="load_more">	
+			<ul id="myList">
+				<li>
+					<div class="blog-text">
+						<div class="col-md-4 blog-grid">
+							<a href="single.html"><img src="images/16.jpg" alt=""/></a>
+							<h3><a href="single.html">Is there hope for the SEO profession?</a></h3>
+							<p>Post by <a href="#">Lawrence R. Smith</a></p>
+							<div class="strip b"></div>
+							<p>Donec nulla justo, pharetra in nulla in, lacinia pulvinar nunc. 
+							Nunc rutrum nisi vel nibh cursus, nec vestibulum orci feugiat. 
+							Nunc in luctus lacus. Integer eget dui nisi. Integer mauris lacus.</p>
+							<a href="single.html">Read more</a>
+						</div>
+						<div class="col-md-4 blog-grid">
+							<a href="single.html"><img src="images/17.jpg" alt=""/></a>
+							<h3><a href="single.html">Is there hope for the SEO profession?</a></h3>
+							<p>Post by <a href="#">Esperanza A. Johnson</a></p>
+							<div class="strip b"></div>
+							<p>Donec nulla justo, pharetra in nulla in, lacinia pulvinar nunc. 
+							Nunc rutrum nisi vel nibh cursus, nec vestibulum orci feugiat. 
+							Nunc in luctus lacus. Integer eget dui nisi. Integer mauris lacus.</p>
+							<a href="single.html">Read more</a>
+						</div>
+						<div class="col-md-4 blog-grid">
+							<a href="single.html"><img src="images/18.jpg" alt=""/></a>
+							<h3><a href="single.html">Is there hope for the SEO profession?</a></h3>
+							<p>Post by <a href="#">Heather R. Williams</a></p>
+							<div class="strip b"></div>
+							<p>Donec nulla justo, pharetra in nulla in, lacinia pulvinar nunc. 
+							Nunc rutrum nisi vel nibh cursus, nec vestibulum orci feugiat. 
+							Nunc in luctus lacus. Integer eget dui nisi. Integer mauris lacus.</p>
+							<a href="single.html">Read more</a>
+						</div>
+						<div class="clearfix"></div>
+					</div>
+				</li>
+				<li>
+					<div class="blog-text">
+						<div class="col-md-4 blog-grid g_r">
+							<a href="single.html"><img src="images/17.jpg" alt=""/></a>
+							<h3><a href="single.html">Is there hope for the SEO profession?</a></h3>
+							<p>Post by <a href="#">Lawrence R. Smith</a></p>
+							<div class="strip b"></div>
+							<p>Donec nulla justo, pharetra in nulla in, lacinia pulvinar nunc. 
+							Nunc rutrum nisi vel nibh cursus, nec vestibulum orci feugiat. 
+							Nunc in luctus lacus. Integer eget dui nisi. Integer mauris lacus.</p>
+							<a href="single.html">Read more</a>
+						</div>
+						<div class="col-md-4 blog-grid g_r">
+							<a href="single.html"><img src="images/18.jpg" alt=""/></a>
+							<h3><a href="single.html">Is there hope for the SEO profession?</a></h3>
+							<p>Post by <a href="#">Esperanza A. Johnson</a></p>
+							<div class="strip b"></div>
+							<p>Donec nulla justo, pharetra in nulla in, lacinia pulvinar nunc. 
+							Nunc rutrum nisi vel nibh cursus, nec vestibulum orci feugiat. 
+							Nunc in luctus lacus. Integer eget dui nisi. Integer mauris lacus.</p>
+							<a href="single.html">Read more</a>
+						</div>
+						<div class="col-md-4 blog-grid g_r">
+							<a href="single.html"><img src="images/16.jpg" alt=""/></a>
+							<h3><a href="single.html">Is there hope for the SEO profession?</a></h3>
+							<p>Post by <a href="#">Heather R. Williams</a></p>
+							<div class="strip b"></div>
+							<p>Donec nulla justo, pharetra in nulla in, lacinia pulvinar nunc. 
+							Nunc rutrum nisi vel nibh cursus, nec vestibulum orci feugiat. 
+							Nunc in luctus lacus. Integer eget dui nisi. Integer mauris lacus.</p>
+							<a href="single.html">Read more</a>
+						</div>
+						<div class="clearfix"></div>
+					</div>
+				</li>
+			</ul>
+		</div>
+		<div id="loadMore">Load more</div>
+	</div>
+</div>
+<!-- //recent blog -->
+<!-- footer -->
+<div class="footer">
+	<div class="container">
+		<div class="footer-grids">
+			
+			<div class="col-md-3 footer-grid">
+				<h4>ADDRESS</h4>
+				<ul>
+					<li>ABC Agency Creative</li>
+					<li>4111 Deer Haven Drive Greenville, SC 29601 </li>
+					<li>Hours: Mon-Fri 9am - 6:00pm</li>
+				</ul>
+			</div>
+			<div class="col-md-3 footer-grid">
+				<h4>GET IN TOUCH</h4>
+				<ul>
+					<li>Tel: +1 234-567-890</li>
+					<li>Fax: +1 646-216-9789</li>
+					<li>Email: <a href="mailto:info@example.com">info@yourdomain.com </a></li>
+				</ul>
+			</div>
+			<div class="col-md-3 footer-grid">
+				<h4>SUBSCRIBE TO OUR MAILING LIST</h4>
+				<form>
+					<input type="email" value="Enter your email" onfocus="this.value = '';" onblur="if (this.value == '') {this.value = 'Enter your email';}" required="">
+					<input type="submit" value=" ">
+				</form>
+			</div>
+			<div class="col-md-3 footer-grid">
+				<h3>AGENCY CREATIVE</h3>
+				<p>Copyright &copy; 2015 Creative Digital Agency. Template by <a href="https://w3layouts.com/"> W3layouts</a></p>
+			</div>
+			<div class="clearfix"></div>
+		</div>
+	</div>
+</div>
+<!-- //footer -->
+<!-- here stars scrolling icon -->
+	<script type="text/javascript">
+		$(document).ready(function() {
+			/*
+				var defaults = {
+				containerID: 'toTop', // fading element id
+				containerHoverID: 'toTopHover', // fading element hover id
+				scrollSpeed: 1200,
+				easingType: 'linear' 
+				};
+			*/
+								
+			$().UItoTop({ easingType: 'easeOutQuart' });
+								
+			});
+	</script>
+<!-- //here ends scrolling icon -->
+
+</body>
+</html>

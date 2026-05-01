@@ -1,4 +1,4 @@
-{% extends "base_auth.html" %}
+﻿{% extends "base_auth.html" %}
 
 {% block title %}Two-Factor Authentication - {{ SITE_NAME }}{% endblock %}
 
@@ -26,13 +26,13 @@
     </div>
 
     <button type="submit"
-            class="w-full bg-orange-500 text-white py-3 rounded hover:bg-orange-600 font-semibold">
+            class="w-full bg-sky-600 text-white py-3 rounded hover:bg-sky-700 font-semibold">
         Verify
     </button>
 </form>
 
 <p class="text-center mt-4 text-sm text-gray-500">
     Lost access to your authenticator?
-    <a href="mailto:support@{{ SITE_DOMAIN }}" class="text-orange-500 hover:underline">Contact support</a>
+    <a href="mailto:support@{{ SITE_DOMAIN }}" class="text-sky-600 hover:underline">Contact support</a>
 </p>
 {% endblock %}
