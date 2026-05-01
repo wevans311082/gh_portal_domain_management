@@ -1,0 +1,117 @@
+{% extends "base_portal.html" %}
+{% load static %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 py-8">
+  <!-- Header -->
+  <div class="mb-6">
+    <h1 class="text-2xl font-bold text-gray-900">{{ action }} DNS Record</h1>
+    <p class="text-sm text-gray-500 mt-1">{{ domain.name }}</p>
+  </div>
+
+  <div class="bg-white rounded-lg border border-gray-200 shadow-sm">
+    <form method="post" class="divide-y divide-gray-100">
+      {% csrf_token %}
+
+      <div class="px-6 py-5 space-y-5">
+
+        <!-- Record Type -->
+        <div>
+          <label for="{{ form.record_type.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+            {{ form.record_type.label }}
+          </label>
+          {{ form.record_type }}
+          {% if form.record_type.errors %}
+          <p class="mt-1 text-xs text-red-600">{{ form.record_type.errors|join:", " }}</p>
+          {% endif %}
+        </div>
+
+        <!-- Name / Host -->
+        <div>
+          <label for="{{ form.name.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+            {{ form.name.label }}
+          </label>
+          <div class="flex rounded-md shadow-sm">
+            {{ form.name }}
+          </div>
+          <p class="mt-1 text-xs text-gray-400">Use <code>@</code> for the root domain or enter a subdomain (e.g. <code>mail</code>, <code>www</code>).</p>
+          {% if form.name.errors %}
+          <p class="mt-1 text-xs text-red-600">{{ form.name.errors|join:", " }}</p>
+          {% endif %}
+        </div>
+
+        <!-- Content / Value -->
+        <div>
+          <label for="{{ form.content.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+            {{ form.content.label }}
+          </label>
+          {{ form.content }}
+          {% if form.content.errors %}
+          <p class="mt-1 text-xs text-red-600">{{ form.content.errors|join:", " }}</p>
+          {% endif %}
+        </div>
+
+        <!-- TTL + Priority row -->
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label for="{{ form.ttl.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+              {{ form.ttl.label }}
+            </label>
+            {{ form.ttl }}
+            {% if form.ttl.errors %}
+            <p class="mt-1 text-xs text-red-600">{{ form.ttl.errors|join:", " }}</p>
+            {% endif %}
+          </div>
+          <div>
+            <label for="{{ form.priority.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+              {{ form.priority.label }}
+            </label>
+            {{ form.priority }}
+            {% if form.priority.errors %}
+            <p class="mt-1 text-xs text-red-600">{{ form.priority.errors|join:", " }}</p>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Proxied (Cloudflare) -->
+        {% if zone.provider == "cloudflare" %}
+        <div class="flex items-start gap-3">
+          {{ form.proxied }}
+          <div>
+            <label for="{{ form.proxied.id_for_label }}" class="text-sm font-medium text-gray-700">
+              {{ form.proxied.label }}
+            </label>
+            <p class="text-xs text-gray-400">Route traffic through Cloudflare's proxy for DDoS protection and caching.</p>
+          </div>
+        </div>
+        {% endif %}
+
+        <!-- Non-field errors -->
+        {% if form.non_field_errors %}
+        <div class="rounded-md bg-red-50 border border-red-200 px-4 py-3">
+          {% for error in form.non_field_errors %}
+          <p class="text-sm text-red-700">{{ error }}</p>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Actions -->
+      <div class="px-6 py-4 bg-gray-50 flex items-center justify-between rounded-b-lg">
+        <a href="{% url 'dns:zone_detail' domain.pk %}"
+           class="text-sm text-gray-600 hover:text-gray-900">Cancel</a>
+        <button type="submit"
+                class="inline-flex items-center gap-2 rounded-md bg-sky-600 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-sky-500 transition-colors">
+          {% if action == "Add" %}
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+          Add Record
+          {% else %}
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+          Save Changes
+          {% endif %}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

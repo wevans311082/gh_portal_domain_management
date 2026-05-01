@@ -1,0 +1,100 @@
+{% extends "base_portal.html" %}
+{% load static %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 py-8">
+
+  <div class="mb-6">
+    <h1 class="text-2xl font-bold text-gray-900">Renew Domain</h1>
+    <p class="text-sm text-gray-500 mt-1">{{ domain.name }}</p>
+  </div>
+
+  <!-- Domain status banner -->
+  {% if domain.status == "expired" %}
+  <div class="mb-5 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-800">
+    <strong>This domain has expired.</strong> Renewing it now will attempt to restore it — this may incur a redemption fee if the grace period has ended.
+  </div>
+  {% endif %}
+
+  <div class="bg-white rounded-lg border border-gray-200 shadow-sm">
+
+    <!-- Domain summary -->
+    <div class="px-6 py-5 border-b border-gray-100">
+      <dl class="grid grid-cols-2 gap-4 text-sm">
+        <div>
+          <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Domain</dt>
+          <dd class="mt-1 font-semibold text-gray-900">{{ domain.name }}</dd>
+        </div>
+        <div>
+          <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Current Expiry</dt>
+          <dd class="mt-1 text-gray-700">
+            {% if domain.expires_at %}{{ domain.expires_at|date:"d M Y" }}{% else %}&mdash;{% endif %}
+          </dd>
+        </div>
+        <div>
+          <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">TLD</dt>
+          <dd class="mt-1 text-gray-700">.{{ domain.tld }}</dd>
+        </div>
+        <div>
+          <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Renewal Price / year</dt>
+          <dd class="mt-1 font-semibold text-sky-700">&pound;{{ pricing.renewal_price }}</dd>
+        </div>
+      </dl>
+    </div>
+
+    <!-- Renewal form -->
+    <form method="post">
+      {% csrf_token %}
+      <div class="px-6 py-5 space-y-5">
+
+        <!-- Years selector -->
+        <div>
+          <label for="years" class="block text-sm font-medium text-gray-700 mb-1">Renewal period</label>
+          <select id="years" name="years"
+                  class="block w-full rounded-md border-gray-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm">
+            {% for y in "1234567890" %}
+            {% with y_int=forloop.counter %}
+            <option value="{{ y_int }}" {% if y_int == years %}selected{% endif %}>
+              {{ y_int }} year{{ y_int|pluralize }}
+              — &pound;{% widthratio pricing.renewal_price 1 y_int %}
+            </option>
+            {% endwith %}
+            {% endfor %}
+          </select>
+          <p class="mt-1 text-xs text-gray-400">You can renew for 1–10 years.</p>
+        </div>
+
+        <!-- Price breakdown -->
+        <div class="rounded-lg bg-sky-50 border border-sky-100 px-4 py-4">
+          <div class="flex items-center justify-between text-sm">
+            <span class="text-gray-600">{{ domain.name }} &times; {{ years }} year{{ years|pluralize }}</span>
+            <span class="font-semibold text-gray-900">&pound;{{ renewal_price }}</span>
+          </div>
+          <div class="flex items-center justify-between text-sm mt-2 pt-2 border-t border-sky-100">
+            <span class="font-semibold text-gray-800">Total due</span>
+            <span class="text-lg font-bold text-sky-700">&pound;{{ renewal_price }}</span>
+          </div>
+          <p class="mt-2 text-xs text-gray-400">Prices are exclusive of VAT where applicable.</p>
+        </div>
+
+      </div>
+
+      <div class="px-6 py-4 bg-gray-50 flex items-center justify-between rounded-b-lg">
+        <a href="{% url 'domains:detail' domain.pk %}" class="text-sm text-gray-600 hover:text-gray-900">Cancel</a>
+        <button type="submit"
+                class="inline-flex items-center gap-2 rounded-md bg-sky-600 px-6 py-2.5 text-sm font-semibold text-white shadow hover:bg-sky-500 transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          </svg>
+          Proceed to Payment
+        </button>
+      </div>
+    </form>
+
+  </div>
+
+  <div class="mt-6">
+    <a href="{% url 'domains:my_domains' %}" class="text-sm text-gray-500 hover:text-gray-700">&larr; Back to domains</a>
+  </div>
+</div>
+{% endblock %}

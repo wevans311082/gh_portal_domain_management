@@ -9,7 +9,7 @@ from django_celery_beat.models import IntervalSchedule, PeriodicTask
 from apps.cloudflare_integration.models import CloudflareZone
 from apps.cloudflare_integration.services import CloudflareService
 from apps.dns.models import DNSRecord, DNSZone
-from apps.domains.models import Domain, DomainOrder, DomainPricingSettings
+from apps.domains.models import Domain, DomainOrder, DomainPricingSettings, DomainRenewal
 from apps.domains.pricing import TLDPricingService
 from apps.domains.resellerclub_client import ResellerClubClient
 from apps.domains.services import DomainContactService
@@ -241,3 +241,78 @@ def sync_domain_expiry_statuses():
     updated = expired.update(status=Domain.STATUS_EXPIRED)
     logger.info("Marked %s domains as expired based on local expiry dates", updated)
     return updated
+
+
+@shared_task
+def execute_domain_renewal(renewal_id: int):
+    """
+    Execute a paid domain renewal via the registrar.
+
+    Idempotent: if the renewal is already completed it exits early.
+    On failure the renewal is marked FAILED — an admin can re-queue via
+    the admin action or the auto-renew beat task.
+    """
+    try:
+        renewal = DomainRenewal.objects.select_related("domain", "invoice").get(pk=renewal_id)
+    except DomainRenewal.DoesNotExist:
+        logger.error("execute_domain_renewal: DomainRenewal %s not found", renewal_id)
+        return
+
+    if renewal.status == DomainRenewal.STATUS_COMPLETED:
+        logger.info("execute_domain_renewal: renewal %s already completed, skipping", renewal_id)
+        return
+
+    domain = renewal.domain
+
+    if not domain.registrar_id:
+        logger.error("execute_domain_renewal: domain %s has no registrar_id", domain.name)
+        renewal.status = DomainRenewal.STATUS_FAILED
+        renewal.last_error = "Domain has no registrar order ID — cannot renew."
+        renewal.save(update_fields=["status", "last_error"])
+        return
+
+    renewal.status = DomainRenewal.STATUS_PROCESSING
+    renewal.save(update_fields=["status"])
+
+    try:
+        client = ResellerClubClient()
+
+        # ResellerClub expects the expiry timestamp as a Unix epoch integer
+        import calendar
+        current_expiry_epoch = (
+            calendar.timegm(domain.expires_at.timetuple()) if domain.expires_at else 0
+        )
+
+        result = client.renew_domain(
+            order_id=domain.registrar_id,
+            years=renewal.renewal_years,
+            current_expiry_date=current_expiry_epoch,
+            auto_renew=domain.auto_renew,
+        )
+
+        # Update the domain's expiry date (+years)
+        from dateutil.relativedelta import relativedelta
+        new_expiry = (domain.expires_at or timezone.now().date()) + relativedelta(years=renewal.renewal_years)
+        domain.expires_at = new_expiry
+        domain.status = Domain.STATUS_ACTIVE
+        domain.save(update_fields=["expires_at", "status"])
+
+        renewal.status = DomainRenewal.STATUS_COMPLETED
+        renewal.new_expiry_date = new_expiry
+        renewal.completed_at = timezone.now()
+        renewal.last_error = ""
+        renewal.save(update_fields=["status", "new_expiry_date", "completed_at", "last_error"])
+
+        logger.info(
+            "execute_domain_renewal: domain %s renewed for %s year(s), new expiry %s (registrar result: %s)",
+            domain.name,
+            renewal.renewal_years,
+            new_expiry,
+            result,
+        )
+
+    except Exception as exc:
+        logger.error("execute_domain_renewal: renewal %s failed: %s", renewal_id, exc)
+        renewal.status = DomainRenewal.STATUS_FAILED
+        renewal.last_error = str(exc)
+        renewal.save(update_fields=["status", "last_error"])

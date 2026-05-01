@@ -217,3 +217,48 @@ class DomainOrder(TimeStampedModel):
 
     def __str__(self):
         return f"{self.domain_name} ({self.status})"
+
+
+class DomainRenewal(TimeStampedModel):
+    """Tracks a single renewal event for a domain."""
+
+    STATUS_PENDING_PAYMENT = "pending_payment"
+    STATUS_PAID = "paid"
+    STATUS_PROCESSING = "processing"
+    STATUS_COMPLETED = "completed"
+    STATUS_FAILED = "failed"
+    STATUS_CANCELLED = "cancelled"
+
+    STATUS_CHOICES = [
+        (STATUS_PENDING_PAYMENT, "Pending payment"),
+        (STATUS_PAID, "Paid"),
+        (STATUS_PROCESSING, "Processing"),
+        (STATUS_COMPLETED, "Completed"),
+        (STATUS_FAILED, "Failed"),
+        (STATUS_CANCELLED, "Cancelled"),
+    ]
+
+    domain = models.ForeignKey(Domain, on_delete=models.PROTECT, related_name="renewals")
+    user = models.ForeignKey(User, on_delete=models.PROTECT, related_name="domain_renewals")
+    invoice = models.ForeignKey(
+        "billing.Invoice",
+        on_delete=models.PROTECT,
+        related_name="domain_renewals",
+        null=True,
+        blank=True,
+    )
+    renewal_years = models.PositiveSmallIntegerField(default=1)
+    total_price = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING_PAYMENT)
+    # New expiry date after successful renewal
+    new_expiry_date = models.DateField(null=True, blank=True)
+    last_error = models.TextField(blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Domain renewal"
+        verbose_name_plural = "Domain renewals"
+
+    def __str__(self):
+        return f"Renewal: {self.domain.name} ({self.status})"

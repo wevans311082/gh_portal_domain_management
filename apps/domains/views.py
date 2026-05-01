@@ -13,7 +13,7 @@ from django.views.decorators.http import require_GET, require_POST
 
 from apps.billing.models import Invoice, InvoiceLineItem
 from apps.domains.forms import DomainRegistrationForm
-from apps.domains.models import Domain, DomainOrder, TLDPricing
+from apps.domains.models import Domain, DomainOrder, DomainRenewal, TLDPricing
 from apps.domains.resellerclub_client import ResellerClubClient, ResellerClubError
 from apps.domains.services import DomainContactService
 
@@ -251,3 +251,72 @@ def domain_toggle_autorenew(request, pk):
     domain.save(update_fields=["auto_renew"])
     messages.success(request, f"Auto-renew {'enabled' if domain.auto_renew else 'disabled'} for {domain.name}.")
     return redirect("domains:detail", pk=pk)
+
+
+@login_required
+def domain_renew(request, pk):
+    """
+    Customer-facing renewal checkout.
+
+    GET  — show a confirmation page with the renewal price.
+    POST — create a DomainRenewal + Invoice, redirect to Stripe checkout.
+    """
+    domain = get_object_or_404(Domain, pk=pk, user=request.user)
+
+    if domain.status not in (Domain.STATUS_ACTIVE, Domain.STATUS_EXPIRED):
+        messages.error(request, "This domain cannot be renewed at this time.")
+        return redirect("domains:detail", pk=pk)
+
+    pricing = TLDPricing.objects.filter(tld=domain.tld, is_active=True).first()
+    if not pricing:
+        messages.error(request, f"Renewal pricing is not available for .{domain.tld}.")
+        return redirect("domains:detail", pk=pk)
+
+    years = max(1, min(int(request.POST.get("years", 1)), 10))
+    renewal_price = (pricing.renewal_price * Decimal(str(years))).quantize(Decimal("0.01"))
+
+    if request.method == "POST":
+        billing_name = request.user.full_name
+        billing_address = ""
+        if hasattr(request.user, "client_profile"):
+            profile = request.user.client_profile
+            billing_address = "\n".join(filter(None, [
+                profile.address_line1, profile.address_line2,
+                profile.city, profile.county, profile.postcode, profile.country,
+            ]))
+
+        invoice = Invoice.objects.create(
+            user=request.user,
+            number=_build_invoice_number(request.user.id),
+            status=Invoice.STATUS_UNPAID,
+            vat_rate=Decimal("0.00"),
+            due_date=timezone.now().date(),
+            billing_name=billing_name,
+            billing_address=billing_address,
+        )
+        InvoiceLineItem.objects.create(
+            invoice=invoice,
+            description=f"Domain renewal: {domain.name} ({years} year(s))",
+            quantity=1,
+            unit_price=renewal_price,
+        )
+        invoice.calculate_totals()
+
+        renewal = DomainRenewal.objects.create(
+            domain=domain,
+            user=request.user,
+            invoice=invoice,
+            renewal_years=years,
+            total_price=renewal_price,
+            status=DomainRenewal.STATUS_PENDING_PAYMENT,
+        )
+
+        messages.success(request, f"Renewal order created for {domain.name}. Continue to payment.")
+        return redirect("payments:stripe_checkout", invoice_id=invoice.id)
+
+    return render(request, "domains/renew.html", {
+        "domain": domain,
+        "pricing": pricing,
+        "years": years,
+        "renewal_price": renewal_price,
+    })

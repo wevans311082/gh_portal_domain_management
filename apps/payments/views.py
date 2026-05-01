@@ -14,8 +14,8 @@ from django.utils import timezone
 from django.db import transaction
 
 from apps.billing.models import Invoice
-from apps.domains.models import DomainOrder
-from apps.domains.tasks import register_domain_order
+from apps.domains.models import DomainOrder, DomainRenewal
+from apps.domains.tasks import register_domain_order, execute_domain_renewal
 from apps.payments.models import Payment, WebhookEvent
 from apps.payments.stripe_service import StripeService
 
@@ -155,6 +155,15 @@ def _queue_paid_domain_orders(invoice: Invoice):
         order.status = DomainOrder.STATUS_PAID
         order.save(update_fields=["status", "updated_at"])
         register_domain_order.delay(order.id)
+
+    pending_renewals = DomainRenewal.objects.filter(
+        invoice=invoice,
+        status=DomainRenewal.STATUS_PENDING_PAYMENT,
+    )
+    for renewal in pending_renewals:
+        renewal.status = DomainRenewal.STATUS_PAID
+        renewal.save(update_fields=["status"])
+        execute_domain_renewal.delay(renewal.id)
 
 
 def _handle_invoice_paid(stripe_invoice: dict, webhook_event: WebhookEvent):

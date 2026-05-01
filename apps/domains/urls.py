@@ -10,4 +10,5 @@ urlpatterns = [
     path("my-domains/", views.my_domains, name="my_domains"),
     path("<int:pk>/", views.domain_detail, name="detail"),
     path("<int:pk>/toggle-autorenew/", views.domain_toggle_autorenew, name="toggle_autorenew"),
+    path("<int:pk>/renew/", views.domain_renew, name="renew"),
 ]
