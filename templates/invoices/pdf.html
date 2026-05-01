@@ -38,7 +38,7 @@
         <tr>
             <td style="border: none; padding: 0; width: 50%; vertical-align: top;">
                 <p style="margin: 0 0 4px; font-weight: bold; color: #6b7280;">BILLED TO</p>
-                <p style="margin: 0;">{{ invoice.billing_name|default:invoice.user.get_full_name }}</p>
+                <p style="margin: 0;">{{ invoice.billing_name|default:invoice.user.full_name }}</p>
                 {% if invoice.billing_address %}
                 <p style="margin: 4px 0; white-space: pre-line;">{{ invoice.billing_address }}</p>
                 {% endif %}

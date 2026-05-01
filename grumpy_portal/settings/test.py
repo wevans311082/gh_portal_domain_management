@@ -23,3 +23,8 @@ CELERY_TASK_EAGER_PROPAGATES = True
 
 RATELIMIT_ENABLE = False
 STATICFILES_STORAGE = "django.contrib.staticfiles.storage.StaticFilesStorage"
+
+# Use only our custom backend in tests — allauth's backend bypasses MFA
+AUTHENTICATION_BACKENDS = [
+    "apps.accounts.backends.EmailBackend",
+]
