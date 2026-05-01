@@ -7,6 +7,9 @@ python manage.py wait_for_db
 echo "Running migrations..."
 python manage.py migrate
 
+echo "Collecting static files..."
+python manage.py collectstatic --noinput
+
 echo "Starting gunicorn..."
 exec gunicorn grumpy_portal.wsgi:application \
     --bind 0.0.0.0:8000 \
