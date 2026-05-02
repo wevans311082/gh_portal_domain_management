@@ -443,7 +443,7 @@ def resellerclub_debug(request):
             from apps.admin_tools.models import IntegrationSetting
 
             enabled = request.POST.get("enable_debug_mode") == "on"
-            IntegrationSetting.set(
+            IntegrationSetting.set_value(
                 "RESELLERCLUB_DEBUG_MODE",
                 "true" if enabled else "false",
                 is_secret=False,
