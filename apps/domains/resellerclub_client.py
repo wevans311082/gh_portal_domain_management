@@ -93,9 +93,18 @@ class ResellerClubClient:
             raise ResellerClubError(f"ResellerClub error: {error}")
         return data
 
+    @staticmethod
+    def _normalize_endpoint(endpoint: str) -> str:
+        """LogicBoxes endpoints are expected to be called with .json suffix."""
+        cleaned = (endpoint or "").strip().lstrip("/")
+        if not cleaned.endswith(".json"):
+            cleaned = f"{cleaned}.json"
+        return cleaned
+
     def _get(self, endpoint: str, params: dict = None) -> dict:
         """Make an authenticated GET request to the ResellerClub API."""
-        url = f"{self.base_url}/{endpoint}"
+        normalized_endpoint = self._normalize_endpoint(endpoint)
+        url = f"{self.base_url}/{normalized_endpoint}"
         merged_params = {**self._auth_params, **(params or {})}
         try:
             response = self.session.get(
@@ -109,21 +118,22 @@ class ResellerClubClient:
             status_code = getattr(getattr(e, "response", None), "status_code", None)
             body = (getattr(getattr(e, "response", None), "text", "") or "")[:300]
             if status_code and status_code >= 500:
-                logger.error("ResellerClub GET %s server error %s: %s", endpoint, status_code, body)
+                logger.error("ResellerClub GET %s server error %s: %s", normalized_endpoint, status_code, body)
                 raise ResellerClubError(
                     "ResellerClub returned a server error. This commonly happens when request parameters "
                     "are malformed (for example domain-name should be label only)."
                 ) from e
-            logger.error(f"ResellerClub GET {endpoint} failed: {e}")
+            logger.error(f"ResellerClub GET {normalized_endpoint} failed: {e}")
             raise ResellerClubError(f"API request failed: {e}") from e
         except requests.RequestException as e:
-            logger.error(f"ResellerClub GET {endpoint} failed: {e}")
+            logger.error(f"ResellerClub GET {normalized_endpoint} failed: {e}")
             raise ResellerClubError(f"API request failed: {e}") from e
-        return self._check_response(data, endpoint)
+        return self._check_response(data, normalized_endpoint)
 
     def _post(self, endpoint: str, data: dict = None) -> dict:
         """Make an authenticated POST request to the ResellerClub API."""
-        url = f"{self.base_url}/{endpoint}"
+        normalized_endpoint = self._normalize_endpoint(endpoint)
+        url = f"{self.base_url}/{normalized_endpoint}"
         merged_data = {**self._auth_params, **(data or {})}
         try:
             response = self.session.post(
@@ -137,14 +147,14 @@ class ResellerClubClient:
             status_code = getattr(getattr(e, "response", None), "status_code", None)
             body = (getattr(getattr(e, "response", None), "text", "") or "")[:300]
             if status_code and status_code >= 500:
-                logger.error("ResellerClub POST %s server error %s: %s", endpoint, status_code, body)
+                logger.error("ResellerClub POST %s server error %s: %s", normalized_endpoint, status_code, body)
                 raise ResellerClubError("ResellerClub returned a server error while processing the request.") from e
-            logger.error(f"ResellerClub POST {endpoint} failed: {e}")
+            logger.error(f"ResellerClub POST {normalized_endpoint} failed: {e}")
             raise ResellerClubError(f"API POST failed: {e}") from e
         except requests.RequestException as e:
-            logger.error(f"ResellerClub POST {endpoint} failed: {e}")
+            logger.error(f"ResellerClub POST {normalized_endpoint} failed: {e}")
             raise ResellerClubError(f"API POST failed: {e}") from e
-        return self._check_response(result, endpoint)
+        return self._check_response(result, normalized_endpoint)
 
     def check_availability(self, domain_names: list, tlds: list) -> dict:
         """

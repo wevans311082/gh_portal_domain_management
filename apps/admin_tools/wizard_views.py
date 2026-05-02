@@ -416,7 +416,7 @@ def _test_connection(step_key: str, data: dict):
 
         # LogicBoxes HTTP API authenticates via query params, NOT Basic Auth
         resp = requests.get(
-            f"{base_url}/domains/available",
+            f"{base_url}/domains/available.json",
             params={
                 "auth-userid": reseller_id,
                 "api-key": api_key,

@@ -428,7 +428,7 @@ def resellerclub_debug(request):
 
     context = {
         "base_url": base_url,
-        "endpoint": "domains/available",
+        "endpoint": "domains/available.json",
         "domain_label": "example",
         "tlds": "com,net",
         "raw_params": "",
@@ -436,7 +436,7 @@ def resellerclub_debug(request):
     }
 
     if request.method == "POST":
-        endpoint = (request.POST.get("endpoint") or "domains/available").strip().lstrip("/")
+        endpoint = (request.POST.get("endpoint") or "domains/available.json").strip().lstrip("/")
         domain_label = (request.POST.get("domain_label") or "example").strip().lower()
         tlds_raw = (request.POST.get("tlds") or "com").strip().lower()
         raw_params = (request.POST.get("raw_params") or "").strip()
@@ -463,7 +463,7 @@ def resellerclub_debug(request):
                     }
                 )
                 return render(request, "admin_tools/resellerclub_debug.html", context)
-        elif endpoint == "domains/available":
+        elif endpoint in {"domains/available", "domains/available.json"}:
             tld_list = [x.strip().lstrip(".") for x in tlds_raw.split(",") if x.strip()]
             params.update(
                 {
