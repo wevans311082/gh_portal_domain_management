@@ -441,6 +441,68 @@ def users(request):
 
 
 # ---------------------------------------------------------------------------
+# Invoices overview
+# ---------------------------------------------------------------------------
+
+@staff_member_required
+def invoices(request):
+    """Paginated invoice review page with quick filters and totals."""
+    q = request.GET.get("q", "").strip()
+    status = request.GET.get("status", "").strip()
+    date_from = request.GET.get("from", "").strip()
+    date_to = request.GET.get("to", "").strip()
+
+    qs = Invoice.objects.select_related("user").order_by("-created_at")
+
+    if q:
+        qs = qs.filter(
+            Q(number__icontains=q)
+            | Q(user__email__icontains=q)
+            | Q(billing_name__icontains=q)
+        )
+
+    if status:
+        qs = qs.filter(status=status)
+
+    if date_from:
+        try:
+            from datetime import date
+            qs = qs.filter(created_at__date__gte=date.fromisoformat(date_from))
+        except ValueError:
+            pass
+
+    if date_to:
+        try:
+            from datetime import date
+            qs = qs.filter(created_at__date__lte=date.fromisoformat(date_to))
+        except ValueError:
+            pass
+
+    paginator = Paginator(qs, 30)
+    page = paginator.get_page(request.GET.get("page"))
+
+    last_30 = timezone.now() - timedelta(days=30)
+    stats = {
+        "total_invoices": Invoice.objects.count(),
+        "paid_invoices": Invoice.objects.filter(status=Invoice.STATUS_PAID).count(),
+        "unpaid_invoices": Invoice.objects.filter(status__in=[Invoice.STATUS_UNPAID, Invoice.STATUS_OVERDUE]).count(),
+        "revenue_30d": Invoice.objects.filter(status=Invoice.STATUS_PAID, paid_at__gte=last_30).aggregate(total=Sum("total"))["total"] or 0,
+        "outstanding_total": Invoice.objects.filter(status__in=[Invoice.STATUS_UNPAID, Invoice.STATUS_OVERDUE]).aggregate(total=Sum("total"))["total"] or 0,
+    }
+
+    return render(request, "admin_tools/invoices.html", {
+        "page_obj": page,
+        "invoices": page.object_list,
+        "search_q": q,
+        "status_filter": status,
+        "date_from": date_from,
+        "date_to": date_to,
+        "status_choices": Invoice.STATUS_CHOICES,
+        "stats": stats,
+    })
+
+
+# ---------------------------------------------------------------------------
 # Security & Audit log
 # ---------------------------------------------------------------------------
 

@@ -10,6 +10,8 @@ urlpatterns = [
     path("stats/", views.stats, name="stats"),
     # People
     path("users/", views.users, name="users"),
+    # Commerce
+    path("invoices/", views.invoices, name="invoices"),
     # System
     path("tasks/", views.task_management, name="task_management"),
     path("templates/scan/", views.template_scan, name="template_scan"),
