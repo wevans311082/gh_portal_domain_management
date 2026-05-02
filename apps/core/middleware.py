@@ -4,6 +4,8 @@ import uuid
 
 from django.conf import settings
 
+from apps.domains.debug_state import reset_entries
+
 logger = logging.getLogger(__name__)
 
 
@@ -67,3 +69,14 @@ class ContentSecurityPolicyMiddleware:
             response["Content-Security-Policy"] = "; ".join(directives)
 
         return response
+
+
+class ResellerClubDebugCaptureMiddleware:
+    """Reset in-memory ResellerClub debug capture at the start of each request."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        reset_entries()
+        return self.get_response(request)

@@ -13,6 +13,16 @@
 </p>
 
 <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-4 mb-5">
+    <form method="post" class="mb-4 pb-4 border-b border-slate-200 flex items-center gap-3">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="toggle_debug_mode">
+        <label class="inline-flex items-center gap-2 text-sm text-slate-700">
+            <input type="checkbox" name="enable_debug_mode" {% if debug_mode %}checked{% endif %}>
+            Enable global ResellerClub debug tray
+        </label>
+        <button type="submit" class="bg-amber-600 text-white px-3 py-1.5 rounded hover:bg-amber-700 text-xs font-semibold">Save</button>
+    </form>
+
     <form method="post" class="grid grid-cols-1 lg:grid-cols-4 gap-3 items-end">
         {% csrf_token %}
         <div class="lg:col-span-2">

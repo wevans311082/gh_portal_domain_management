@@ -5,6 +5,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 from apps.core.runtime_settings import get_runtime_setting
+from apps.domains.debug_state import add_entry
 
 logger = logging.getLogger(__name__)
 
@@ -101,6 +102,20 @@ class ResellerClubClient:
             cleaned = f"{cleaned}.json"
         return cleaned
 
+    def _capture_debug(self, request_data: dict, response_data: dict = None, error: str = ""):
+        debug_mode = str(get_runtime_setting("RESELLERCLUB_DEBUG_MODE", "false")).strip().lower() in (
+            "1", "true", "yes", "on"
+        )
+        if not debug_mode:
+            return
+        add_entry(
+            {
+                "request": request_data,
+                "response": response_data,
+                "error": error,
+            }
+        )
+
     def _get(self, endpoint: str, params: dict = None) -> dict:
         """Make an authenticated GET request to the ResellerClub API."""
         normalized_endpoint = self._normalize_endpoint(endpoint)
@@ -112,11 +127,52 @@ class ResellerClubClient:
                 params=merged_params,
                 timeout=(_CONNECT_TIMEOUT, _READ_TIMEOUT),
             )
+            self._capture_debug(
+                request_data={
+                    "method": "GET",
+                    "url": response.request.url,
+                    "headers": dict(response.request.headers),
+                    "body": response.request.body.decode("utf-8", errors="replace")
+                    if isinstance(response.request.body, bytes)
+                    else (response.request.body or ""),
+                    "params": merged_params,
+                    "endpoint": normalized_endpoint,
+                },
+                response_data={
+                    "status_code": response.status_code,
+                    "reason": response.reason,
+                    "headers": dict(response.headers),
+                    "text": response.text,
+                },
+            )
             response.raise_for_status()
             data = response.json()
         except requests.HTTPError as e:
             status_code = getattr(getattr(e, "response", None), "status_code", None)
             body = (getattr(getattr(e, "response", None), "text", "") or "")[:300]
+            resp = getattr(e, "response", None)
+            req = getattr(resp, "request", None)
+            self._capture_debug(
+                request_data={
+                    "method": getattr(req, "method", "GET"),
+                    "url": getattr(req, "url", url),
+                    "headers": dict(getattr(req, "headers", {}) or {}),
+                    "body": (
+                        getattr(req, "body", b"").decode("utf-8", errors="replace")
+                        if isinstance(getattr(req, "body", None), bytes)
+                        else (getattr(req, "body", "") or "")
+                    ),
+                    "params": merged_params,
+                    "endpoint": normalized_endpoint,
+                },
+                response_data={
+                    "status_code": getattr(resp, "status_code", None),
+                    "reason": getattr(resp, "reason", ""),
+                    "headers": dict(getattr(resp, "headers", {}) or {}),
+                    "text": getattr(resp, "text", ""),
+                },
+                error=str(e),
+            )
             if status_code and status_code >= 500:
                 logger.error("ResellerClub GET %s server error %s: %s", normalized_endpoint, status_code, body)
                 raise ResellerClubError(
@@ -126,6 +182,18 @@ class ResellerClubClient:
             logger.error(f"ResellerClub GET {normalized_endpoint} failed: {e}")
             raise ResellerClubError(f"API request failed: {e}") from e
         except requests.RequestException as e:
+            self._capture_debug(
+                request_data={
+                    "method": "GET",
+                    "url": url,
+                    "headers": {},
+                    "body": "",
+                    "params": merged_params,
+                    "endpoint": normalized_endpoint,
+                },
+                response_data=None,
+                error=str(e),
+            )
             logger.error(f"ResellerClub GET {normalized_endpoint} failed: {e}")
             raise ResellerClubError(f"API request failed: {e}") from e
         return self._check_response(data, normalized_endpoint)
@@ -141,17 +209,70 @@ class ResellerClubClient:
                 data=merged_data,
                 timeout=(_CONNECT_TIMEOUT, _READ_TIMEOUT),
             )
+            self._capture_debug(
+                request_data={
+                    "method": "POST",
+                    "url": response.request.url,
+                    "headers": dict(response.request.headers),
+                    "body": response.request.body.decode("utf-8", errors="replace")
+                    if isinstance(response.request.body, bytes)
+                    else (response.request.body or ""),
+                    "data": merged_data,
+                    "endpoint": normalized_endpoint,
+                },
+                response_data={
+                    "status_code": response.status_code,
+                    "reason": response.reason,
+                    "headers": dict(response.headers),
+                    "text": response.text,
+                },
+            )
             response.raise_for_status()
             result = response.json()
         except requests.HTTPError as e:
             status_code = getattr(getattr(e, "response", None), "status_code", None)
             body = (getattr(getattr(e, "response", None), "text", "") or "")[:300]
+            resp = getattr(e, "response", None)
+            req = getattr(resp, "request", None)
+            self._capture_debug(
+                request_data={
+                    "method": getattr(req, "method", "POST"),
+                    "url": getattr(req, "url", url),
+                    "headers": dict(getattr(req, "headers", {}) or {}),
+                    "body": (
+                        getattr(req, "body", b"").decode("utf-8", errors="replace")
+                        if isinstance(getattr(req, "body", None), bytes)
+                        else (getattr(req, "body", "") or "")
+                    ),
+                    "data": merged_data,
+                    "endpoint": normalized_endpoint,
+                },
+                response_data={
+                    "status_code": getattr(resp, "status_code", None),
+                    "reason": getattr(resp, "reason", ""),
+                    "headers": dict(getattr(resp, "headers", {}) or {}),
+                    "text": getattr(resp, "text", ""),
+                },
+                error=str(e),
+            )
             if status_code and status_code >= 500:
                 logger.error("ResellerClub POST %s server error %s: %s", normalized_endpoint, status_code, body)
                 raise ResellerClubError("ResellerClub returned a server error while processing the request.") from e
             logger.error(f"ResellerClub POST {normalized_endpoint} failed: {e}")
             raise ResellerClubError(f"API POST failed: {e}") from e
         except requests.RequestException as e:
+            self._capture_debug(
+                request_data={
+                    "method": "POST",
+                    "url": url,
+                    "headers": {},
+                    "body": "",
+                    "data": merged_data,
+                    "endpoint": normalized_endpoint,
+                },
+                response_data=None,
+                error=str(e),
+            )
             logger.error(f"ResellerClub POST {normalized_endpoint} failed: {e}")
             raise ResellerClubError(f"API POST failed: {e}") from e
         return self._check_response(result, normalized_endpoint)

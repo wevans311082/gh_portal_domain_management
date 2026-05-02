@@ -68,6 +68,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "allauth.account.middleware.AccountMiddleware",
     # Custom middleware
+    "apps.core.middleware.ResellerClubDebugCaptureMiddleware",
     "apps.core.middleware.RequestCorrelationIDMiddleware",
     "apps.core.middleware.ContentSecurityPolicyMiddleware",
     "apps.audit.middleware.AuditLogMiddleware",

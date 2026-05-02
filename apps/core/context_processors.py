@@ -1,5 +1,6 @@
 from django.conf import settings
 
+from apps.domains.debug_state import get_entries
 from apps.core.runtime_settings import get_runtime_setting
 
 
@@ -9,4 +10,6 @@ def site_settings(request):
         "SITE_DOMAIN": settings.SITE_DOMAIN,
         "STRIPE_PUBLISHABLE_KEY": get_runtime_setting("STRIPE_PUBLISHABLE_KEY", settings.STRIPE_PUBLISHABLE_KEY),
         "DJANGO_ADMIN_URL": getattr(settings, "DJANGO_ADMIN_URL", "admin/"),
+        "RESELLERCLUB_DEBUG_MODE": str(get_runtime_setting("RESELLERCLUB_DEBUG_MODE", "false")).strip().lower() in ("1", "true", "yes", "on"),
+        "RESELLERCLUB_DEBUG_ENTRIES": get_entries(),
     }

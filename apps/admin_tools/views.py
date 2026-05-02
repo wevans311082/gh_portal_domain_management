@@ -426,6 +426,8 @@ def resellerclub_debug(request):
     reseller_id = get_runtime_setting("RESELLERCLUB_RESELLER_ID", "")
     api_key = get_runtime_setting("RESELLERCLUB_API_KEY", "")
 
+    debug_mode = str(get_runtime_setting("RESELLERCLUB_DEBUG_MODE", "false")).strip().lower() in ("1", "true", "yes", "on")
+
     context = {
         "base_url": base_url,
         "endpoint": "domains/available.json",
@@ -433,9 +435,22 @@ def resellerclub_debug(request):
         "tlds": "com,net",
         "raw_params": "",
         "debug": None,
+        "debug_mode": debug_mode,
     }
 
     if request.method == "POST":
+        if (request.POST.get("action") or "").strip() == "toggle_debug_mode":
+            from apps.admin_tools.models import IntegrationSetting
+
+            enabled = request.POST.get("enable_debug_mode") == "on"
+            IntegrationSetting.set(
+                "RESELLERCLUB_DEBUG_MODE",
+                "true" if enabled else "false",
+                is_secret=False,
+            )
+            messages.success(request, f"ResellerClub debug mode {'enabled' if enabled else 'disabled'}.")
+            return redirect(reverse("admin_tools:resellerclub_debug"))
+
         endpoint = (request.POST.get("endpoint") or "domains/available.json").strip().lstrip("/")
         domain_label = (request.POST.get("domain_label") or "example").strip().lower()
         tlds_raw = (request.POST.get("tlds") or "com").strip().lower()
@@ -636,6 +651,7 @@ def _parse_tld_list(raw: str):
 @staff_member_required
 def tld_pricing(request):
     settings_obj = DomainPricingSettings.get_solo()
+    debug_mode = str(get_runtime_setting("RESELLERCLUB_DEBUG_MODE", "false")).strip().lower() in ("1", "true", "yes", "on")
 
     if request.method == "POST":
         action = (request.POST.get("action") or "").strip()
@@ -686,21 +702,34 @@ def tld_pricing(request):
             return redirect(redirect_url)
 
         if action == "sync_all":
-            from apps.domains.tasks import sync_tld_pricing
+            tlds = list(settings_obj.supported_tlds or [])
+            if debug_mode:
+                from apps.domains.pricing import TLDPricingService
 
-            sync_tld_pricing.delay(tlds=list(settings_obj.supported_tlds or []))
-            messages.success(request, "Queued pricing sync for supported TLDs.")
+                TLDPricingService().sync_pricing(tlds=tlds)
+                messages.success(request, "Ran pricing sync inline (debug mode). Check the debug tray for request details.")
+            else:
+                from apps.domains.tasks import sync_tld_pricing
+
+                sync_tld_pricing.delay(tlds=tlds)
+                messages.success(request, "Queued pricing sync for supported TLDs.")
             return redirect(redirect_url)
 
         if action == "sync_tld":
-            from apps.domains.tasks import sync_tld_pricing
-
             tld = (request.POST.get("tld") or "").strip().lower()
             if not tld:
                 messages.error(request, "No TLD selected for sync.")
                 return redirect(redirect_url)
-            sync_tld_pricing.delay(tlds=[tld])
-            messages.success(request, f"Queued pricing sync for .{tld}.")
+            if debug_mode:
+                from apps.domains.pricing import TLDPricingService
+
+                TLDPricingService().sync_pricing(tlds=[tld])
+                messages.success(request, f"Ran pricing sync inline for .{tld} (debug mode). Check the debug tray.")
+            else:
+                from apps.domains.tasks import sync_tld_pricing
+
+                sync_tld_pricing.delay(tlds=[tld])
+                messages.success(request, f"Queued pricing sync for .{tld}.")
             return redirect(redirect_url)
 
         if action == "save_tld":
