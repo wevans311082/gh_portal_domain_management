@@ -2,6 +2,7 @@ import json
 import time
 from decimal import Decimal, InvalidOperation
 from datetime import timedelta
+import requests
 
 from django.conf import settings
 from django.contrib import messages
@@ -416,6 +417,117 @@ def integration_detail(request, service):
         "service_label": SERVICE_LABELS[service],
         "tests": tests,
     })
+
+
+@staff_member_required
+def resellerclub_debug(request):
+    """Low-level debug page to inspect full ResellerClub HTTP request/response details."""
+    base_url = get_runtime_setting("RESELLERCLUB_API_URL", "https://test.httpapi.com/api").rstrip("/")
+    reseller_id = get_runtime_setting("RESELLERCLUB_RESELLER_ID", "")
+    api_key = get_runtime_setting("RESELLERCLUB_API_KEY", "")
+
+    context = {
+        "base_url": base_url,
+        "endpoint": "domains/available",
+        "domain_label": "example",
+        "tlds": "com,net",
+        "raw_params": "",
+        "debug": None,
+    }
+
+    if request.method == "POST":
+        endpoint = (request.POST.get("endpoint") or "domains/available").strip().lstrip("/")
+        domain_label = (request.POST.get("domain_label") or "example").strip().lower()
+        tlds_raw = (request.POST.get("tlds") or "com").strip().lower()
+        raw_params = (request.POST.get("raw_params") or "").strip()
+
+        params = {
+            "auth-userid": reseller_id,
+            "api-key": api_key,
+        }
+
+        if raw_params:
+            try:
+                parsed = json.loads(raw_params)
+                if not isinstance(parsed, dict):
+                    raise ValueError("Raw params JSON must be an object.")
+                params.update(parsed)
+            except Exception as exc:
+                messages.error(request, f"Invalid raw params JSON: {exc}")
+                context.update(
+                    {
+                        "endpoint": endpoint,
+                        "domain_label": domain_label,
+                        "tlds": tlds_raw,
+                        "raw_params": raw_params,
+                    }
+                )
+                return render(request, "admin_tools/resellerclub_debug.html", context)
+        elif endpoint == "domains/available":
+            tld_list = [x.strip().lstrip(".") for x in tlds_raw.split(",") if x.strip()]
+            params.update(
+                {
+                    "domain-name": domain_label.split(".", 1)[0],
+                    "tlds": ",".join(tld_list),
+                }
+            )
+
+        session = requests.Session()
+        req = requests.Request(
+            "GET",
+            f"{base_url}/{endpoint}",
+            params=params,
+            headers={"Accept": "application/json"},
+        )
+        prepared = session.prepare_request(req)
+
+        debug = {
+            "request": {
+                "method": prepared.method,
+                "url": prepared.url,
+                "headers": dict(prepared.headers),
+                "body": prepared.body.decode("utf-8", errors="replace")
+                if isinstance(prepared.body, bytes)
+                else (prepared.body or ""),
+                "params": params,
+            },
+            "response": None,
+            "error": None,
+        }
+
+        try:
+            started = time.monotonic()
+            response = session.send(prepared, timeout=(10, 30))
+            elapsed_ms = round((time.monotonic() - started) * 1000)
+            body_text = response.text
+            body_json = None
+            try:
+                body_json = response.json()
+            except Exception:
+                body_json = None
+
+            debug["response"] = {
+                "elapsed_ms": elapsed_ms,
+                "status_code": response.status_code,
+                "reason": response.reason,
+                "headers": dict(response.headers),
+                "text": body_text,
+                "json": body_json,
+            }
+        except Exception as exc:
+            debug["error"] = str(exc)
+
+        context.update(
+            {
+                "endpoint": endpoint,
+                "domain_label": domain_label,
+                "tlds": tlds_raw,
+                "raw_params": raw_params,
+                "debug": debug,
+            }
+        )
+
+    return render(request, "admin_tools/resellerclub_debug.html", context)
 
 
 # ---------------------------------------------------------------------------

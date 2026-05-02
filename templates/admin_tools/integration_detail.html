@@ -5,6 +5,9 @@
 
 {% block header_actions %}
 <a href="{% url 'admin_tools:integrations_overview' %}" class="text-sm text-sky-600 hover:underline font-medium">← All Integrations</a>
+{% if service == 'resellerclub' %}
+<a href="{% url 'admin_tools:resellerclub_debug' %}" class="text-sm text-amber-700 hover:underline font-medium">HTTP Debug</a>
+{% endif %}
 {% endblock %}
 
 {% block content %}

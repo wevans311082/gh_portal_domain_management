@@ -18,6 +18,7 @@ urlpatterns = [
     path("templates/scan/", views.template_scan, name="template_scan"),
     path("integrations/", views.integrations_overview, name="integrations_overview"),
     path("integrations/<str:service>/", views.integration_detail, name="integration_detail"),
+    path("integrations/resellerclub/debug/", views.resellerclub_debug, name="resellerclub_debug"),
     path("security/", views.security, name="security"),
     path("database/", views.database, name="database"),
     path("settings/", views.settings_overview, name="settings_overview"),

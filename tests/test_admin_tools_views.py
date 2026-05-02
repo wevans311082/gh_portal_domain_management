@@ -149,3 +149,26 @@ def test_staff_can_view_tld_pricing_and_loss_indicator(client, django_user_model
     assert "TLD Pricing Management" in content
     assert ".com" in content
     assert "Sold at loss" in content
+
+
+@pytest.mark.django_db
+def test_resellerclub_debug_page_requires_staff(client):
+    response = client.get(reverse("admin_tools:resellerclub_debug"))
+
+    assert response.status_code == 302
+    assert reverse("admin:login") in response.url
+
+
+@pytest.mark.django_db
+def test_staff_can_view_resellerclub_debug_page(client, django_user_model):
+    staff_user = django_user_model.objects.create_user(
+        email="reseller-debug-admin@example.com",
+        password="password123",
+        is_staff=True,
+    )
+
+    client.force_login(staff_user)
+    response = client.get(reverse("admin_tools:resellerclub_debug"))
+
+    assert response.status_code == 200
+    assert "ResellerClub HTTP Debug" in response.content.decode()

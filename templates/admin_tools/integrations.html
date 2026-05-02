@@ -37,7 +37,10 @@
         {% endif %}
         <!-- Detail link: map labels to URL slugs -->
         {% if probe.label == "ResellerClub" %}
-        <a href="{% url 'admin_tools:integration_detail' 'resellerclub' %}" class="mt-auto text-xs text-sky-600 hover:underline font-medium">View details →</a>
+        <div class="mt-auto flex items-center gap-3">
+            <a href="{% url 'admin_tools:integration_detail' 'resellerclub' %}" class="text-xs text-sky-600 hover:underline font-medium">View details →</a>
+            <a href="{% url 'admin_tools:resellerclub_debug' %}" class="text-xs text-amber-700 hover:underline font-medium">HTTP debug →</a>
+        </div>
         {% elif probe.label == "Cloudflare" %}
         <a href="{% url 'admin_tools:integration_detail' 'cloudflare' %}" class="mt-auto text-xs text-sky-600 hover:underline font-medium">View details →</a>
         {% elif probe.label == "Companies House" %}

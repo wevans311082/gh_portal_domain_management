@@ -1,0 +1,107 @@
+{% extends "base_admin.html" %}
+
+{% block title %}ResellerClub HTTP Debug — Admin Tools{% endblock %}
+{% block page_title %}ResellerClub HTTP Debug{% endblock %}
+
+{% block header_actions %}
+<a href="{% url 'admin_tools:integration_detail' 'resellerclub' %}" class="text-sm text-sky-600 hover:underline font-medium">← ResellerClub Diagnostics</a>
+{% endblock %}
+
+{% block content %}
+<p class="text-sm text-sky-500 mb-6">
+    This sends a live request directly to ResellerClub and prints the full prepared request and full response.
+</p>
+
+<div class="bg-white rounded-xl border border-slate-200 shadow-sm p-4 mb-5">
+    <form method="post" class="grid grid-cols-1 lg:grid-cols-4 gap-3 items-end">
+        {% csrf_token %}
+        <div class="lg:col-span-2">
+            <label class="block text-xs text-slate-500 font-semibold mb-1">Endpoint</label>
+            <input type="text" name="endpoint" value="{{ endpoint }}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" placeholder="domains/available">
+        </div>
+        <div>
+            <label class="block text-xs text-slate-500 font-semibold mb-1">Domain label</label>
+            <input type="text" name="domain_label" value="{{ domain_label }}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" placeholder="example">
+        </div>
+        <div>
+            <label class="block text-xs text-slate-500 font-semibold mb-1">TLDs (comma separated)</label>
+            <input type="text" name="tlds" value="{{ tlds }}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" placeholder="com,net,org">
+        </div>
+        <div class="lg:col-span-4">
+            <label class="block text-xs text-slate-500 font-semibold mb-1">Raw params JSON (optional, overrides default endpoint params)</label>
+            <textarea name="raw_params" rows="4" class="w-full border border-slate-300 rounded px-3 py-2 text-sm font-mono" placeholder='{"domain-name":"example","tlds":"com"}'>{{ raw_params }}</textarea>
+        </div>
+        <div class="lg:col-span-4 flex gap-2 items-center">
+            <button type="submit" class="bg-sky-600 text-white px-4 py-2 rounded hover:bg-sky-700 text-sm font-semibold">Run Request</button>
+            <span class="text-xs text-slate-500">Base URL: {{ base_url }}</span>
+        </div>
+    </form>
+</div>
+
+{% if debug %}
+<div class="space-y-4">
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="px-4 py-3 border-b border-slate-200 bg-slate-50 font-semibold text-sm text-slate-800">Prepared Request</div>
+        <div class="p-4 space-y-3">
+            <div>
+                <p class="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1">Method</p>
+                <pre class="text-xs bg-slate-50 rounded p-3 overflow-x-auto">{{ debug.request.method }}</pre>
+            </div>
+            <div>
+                <p class="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1">Full URL</p>
+                <pre class="text-xs bg-slate-50 rounded p-3 overflow-x-auto whitespace-pre-wrap break-all">{{ debug.request.url }}</pre>
+            </div>
+            <div>
+                <p class="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1">Headers</p>
+                <pre class="text-xs bg-slate-50 rounded p-3 overflow-x-auto whitespace-pre-wrap">{{ debug.request.headers|pprint }}</pre>
+            </div>
+            <div>
+                <p class="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1">Body</p>
+                <pre class="text-xs bg-slate-50 rounded p-3 overflow-x-auto whitespace-pre-wrap">{{ debug.request.body|default:"" }}</pre>
+            </div>
+            <div>
+                <p class="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1">Params</p>
+                <pre class="text-xs bg-slate-50 rounded p-3 overflow-x-auto whitespace-pre-wrap">{{ debug.request.params|pprint }}</pre>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-xl border {% if debug.response and debug.response.status_code < 400 %}border-emerald-200{% else %}border-rose-200{% endif %} shadow-sm overflow-hidden">
+        <div class="px-4 py-3 border-b border-slate-200 bg-slate-50 font-semibold text-sm text-slate-800">Response</div>
+        <div class="p-4 space-y-3">
+            {% if debug.error %}
+            <div>
+                <p class="text-xs font-semibold text-rose-700 uppercase tracking-wide mb-1">Error</p>
+                <pre class="text-xs bg-rose-50 text-rose-700 rounded p-3 overflow-x-auto whitespace-pre-wrap">{{ debug.error }}</pre>
+            </div>
+            {% endif %}
+
+            {% if debug.response %}
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                    <p class="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1">Status</p>
+                    <pre class="text-xs bg-slate-50 rounded p-3 overflow-x-auto">{{ debug.response.status_code }} {{ debug.response.reason }}</pre>
+                </div>
+                <div>
+                    <p class="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1">Elapsed</p>
+                    <pre class="text-xs bg-slate-50 rounded p-3 overflow-x-auto">{{ debug.response.elapsed_ms }} ms</pre>
+                </div>
+            </div>
+            <div>
+                <p class="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1">Response Headers</p>
+                <pre class="text-xs bg-slate-50 rounded p-3 overflow-x-auto whitespace-pre-wrap">{{ debug.response.headers|pprint }}</pre>
+            </div>
+            <div>
+                <p class="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1">Raw Response Body</p>
+                <pre class="text-xs bg-slate-50 rounded p-3 overflow-x-auto whitespace-pre-wrap max-h-96">{{ debug.response.text }}</pre>
+            </div>
+            <div>
+                <p class="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1">Parsed JSON (if any)</p>
+                <pre class="text-xs bg-slate-50 rounded p-3 overflow-x-auto whitespace-pre-wrap max-h-96">{{ debug.response.json|pprint }}</pre>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
