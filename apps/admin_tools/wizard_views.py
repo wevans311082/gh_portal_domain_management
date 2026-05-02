@@ -17,19 +17,24 @@ once at first-boot and then disabled via the SETUP_WIZARD_DISABLED env var.
 """
 import logging
 import os
+import smtplib
 
 from django import forms
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.shortcuts import render, redirect
+import requests
 
-from .models import WizardProgress
+from .models import IntegrationSetting, WizardProgress
 
 logger = logging.getLogger(__name__)
 
 BASE_DIR = settings.BASE_DIR
 _ENV_PATH = BASE_DIR / ".env"
+
+RESELLERCLUB_LIVE_API_URL = "https://httpapi.com/api"
+RESELLERCLUB_TEST_API_URL = "https://test.httpapi.com/api"
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -60,7 +65,37 @@ def _write_env_key(key: str, value: str):
 
 
 def _read_env_key(key: str, default: str = "") -> str:
-    return getattr(settings, key, "") or default
+    db_value = IntegrationSetting.get_value(key, "")
+    if db_value not in (None, ""):
+        return db_value
+
+    if _ENV_PATH.exists():
+        for line in _ENV_PATH.read_text(encoding="utf-8").splitlines():
+            if not line or line.lstrip().startswith("#") or "=" not in line:
+                continue
+            env_key, env_val = line.split("=", 1)
+            if env_key.strip() == key:
+                return env_val.strip().strip('"').strip("'")
+
+    env_val = os.environ.get(key)
+    if env_val not in (None, ""):
+        return env_val
+
+    setting_val = getattr(settings, key, "")
+    if setting_val not in (None, ""):
+        return str(setting_val)
+    return default
+
+
+def _as_bool(value: str) -> bool:
+    return str(value).strip().lower() in ("1", "true", "yes", "on")
+
+
+def _as_int(value: str, default: int) -> int:
+    try:
+        return int(str(value).strip())
+    except Exception:
+        return default
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -153,15 +188,39 @@ class PaymentsSettingsForm(forms.Form):
 
 class RegistrarSettingsForm(forms.Form):
     resellerclub_reseller_id = forms.CharField(max_length=50, label="ResellerClub Reseller ID", required=False)
+    resellerclub_customer_id = forms.CharField(max_length=50, label="ResellerClub Customer ID", required=False)
     resellerclub_api_key = forms.CharField(
         max_length=255, label="ResellerClub API Key", widget=forms.PasswordInput, required=False,
     )
+    resellerclub_api_mode = forms.ChoiceField(
+        label="API Environment",
+        choices=[
+            ("live", "Live (production)"),
+            ("test", "Test / sandbox"),
+            ("custom", "Custom URL"),
+        ],
+        initial="live",
+    )
     resellerclub_api_url = forms.URLField(
         label="API Base URL",
-        initial="https://test.httpapi.com/api",
-        help_text="Use https://httpapi.com/api for production.",
+        initial=RESELLERCLUB_LIVE_API_URL,
+        help_text="Live default: https://httpapi.com/api, Test default: https://test.httpapi.com/api",
         required=False,
     )
+
+    def clean(self):
+        cleaned = super().clean()
+        mode = cleaned.get("resellerclub_api_mode")
+        custom_url = (cleaned.get("resellerclub_api_url") or "").strip()
+
+        if mode == "live":
+            cleaned["resellerclub_api_url"] = RESELLERCLUB_LIVE_API_URL
+        elif mode == "test":
+            cleaned["resellerclub_api_url"] = RESELLERCLUB_TEST_API_URL
+        elif mode == "custom":
+            if not custom_url:
+                self.add_error("resellerclub_api_url", "Custom API URL is required when mode is Custom.")
+        return cleaned
 
 
 class HostingSettingsForm(forms.Form):
@@ -259,6 +318,7 @@ _STEP_ENV_KEYS = {
     },
     WizardProgress.STEP_REGISTRAR: {
         "resellerclub_reseller_id": "RESELLERCLUB_RESELLER_ID",
+        "resellerclub_customer_id": "RESELLERCLUB_CUSTOMER_ID",
         "resellerclub_api_key": "RESELLERCLUB_API_KEY",
         "resellerclub_api_url": "RESELLERCLUB_API_URL",
     },
@@ -275,6 +335,172 @@ _STEP_ENV_KEYS = {
 }
 
 
+_STEP_FIELD_DEFAULTS = {
+    WizardProgress.STEP_SITE: {
+        "site_name": "My Hosting",
+        "site_domain": "",
+        "time_zone": "Europe/London",
+        "admin_url_slug": "manage-site-a3f7c2/",
+    },
+    WizardProgress.STEP_EMAIL: {
+        "email_port": "587",
+        "email_use_tls": "true",
+    },
+    WizardProgress.STEP_PAYMENTS: {
+        "gocardless_environment": "sandbox",
+    },
+    WizardProgress.STEP_REGISTRAR: {
+        "resellerclub_api_url": RESELLERCLUB_LIVE_API_URL,
+    },
+    WizardProgress.STEP_HOSTING: {
+        "whm_port": "2087",
+        "whm_username": "root",
+    },
+}
+
+
+def _initial_for_step(step_key: str) -> dict:
+    env_map = _STEP_ENV_KEYS.get(step_key, {})
+    defaults = _STEP_FIELD_DEFAULTS.get(step_key, {})
+    initial = {}
+
+    for field_name, env_key in env_map.items():
+        default_value = defaults.get(field_name, "")
+        initial[field_name] = _read_env_key(env_key, str(default_value))
+
+    if step_key == WizardProgress.STEP_EMAIL:
+        initial["email_port"] = _as_int(initial.get("email_port", "587"), 587)
+        initial["email_use_tls"] = _as_bool(initial.get("email_use_tls", "true"))
+
+    if step_key == WizardProgress.STEP_HOSTING:
+        initial["whm_port"] = _as_int(initial.get("whm_port", "2087"), 2087)
+
+    if step_key == WizardProgress.STEP_REGISTRAR:
+        api_url = (initial.get("resellerclub_api_url") or "").rstrip("/")
+        if api_url == RESELLERCLUB_LIVE_API_URL:
+            initial["resellerclub_api_mode"] = "live"
+        elif api_url == RESELLERCLUB_TEST_API_URL:
+            initial["resellerclub_api_mode"] = "test"
+        else:
+            initial["resellerclub_api_mode"] = "custom"
+
+    return initial
+
+
+def _test_connection(step_key: str, data: dict):
+    """Run lightweight connectivity checks for a wizard step."""
+    if step_key == WizardProgress.STEP_REGISTRAR:
+        base_url = (data.get("resellerclub_api_url") or "").rstrip("/")
+        reseller_id = data.get("resellerclub_reseller_id") or ""
+        api_key = data.get("resellerclub_api_key") or ""
+        if not (base_url and reseller_id and api_key):
+            return False, "Provide API URL, Reseller ID, and API key first."
+
+        resp = requests.get(
+            f"{base_url}/domains/available",
+            auth=(reseller_id, api_key),
+            params={"domain-name": ["example"], "tlds": ["com"]},
+            timeout=12,
+        )
+        if resp.status_code >= 400:
+            return False, f"ResellerClub HTTP {resp.status_code}: {resp.text[:240]}"
+        parsed = resp.json()
+        return True, f"Connection OK. Sample response keys: {', '.join(list(parsed.keys())[:5])}"
+
+    if step_key == WizardProgress.STEP_HOSTING:
+        host = data.get("whm_host") or ""
+        port = data.get("whm_port")
+        username = data.get("whm_username") or ""
+        token = data.get("whm_api_token") or ""
+        if not (host and port and username and token):
+            return False, "Provide WHM host, port, username, and API token first."
+
+        resp = requests.get(
+            f"https://{host}:{port}/json-api/version",
+            params={"api.version": 1},
+            headers={"Authorization": f"whm {username}:{token}"},
+            timeout=12,
+        )
+        if resp.status_code >= 400:
+            return False, f"WHM HTTP {resp.status_code}: {resp.text[:240]}"
+        return True, "Connection OK. WHM version endpoint responded successfully."
+
+    if step_key == WizardProgress.STEP_CLOUDFLARE:
+        token = data.get("cloudflare_api_token") or ""
+        if not token:
+            return False, "Provide a Cloudflare API token first."
+        resp = requests.get(
+            "https://api.cloudflare.com/client/v4/user/tokens/verify",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=12,
+        )
+        if resp.status_code >= 400:
+            return False, f"Cloudflare HTTP {resp.status_code}: {resp.text[:240]}"
+        parsed = resp.json()
+        if not parsed.get("success"):
+            return False, f"Cloudflare token not verified: {parsed}"
+        return True, "Connection OK. Cloudflare token is valid."
+
+    if step_key == WizardProgress.STEP_PAYMENTS:
+        stripe_key = data.get("stripe_secret_key") or ""
+        gocardless_token = data.get("gocardless_access_token") or ""
+        gc_env = data.get("gocardless_environment") or "sandbox"
+
+        messages = []
+        if stripe_key:
+            stripe_resp = requests.get(
+                "https://api.stripe.com/v1/balance",
+                auth=(stripe_key, ""),
+                timeout=12,
+            )
+            if stripe_resp.status_code >= 400:
+                return False, f"Stripe HTTP {stripe_resp.status_code}: {stripe_resp.text[:240]}"
+            messages.append("Stripe OK")
+        else:
+            messages.append("Stripe skipped (no key)")
+
+        if gocardless_token:
+            base = "https://api.gocardless.com" if gc_env == "live" else "https://api-sandbox.gocardless.com"
+            gc_resp = requests.get(
+                f"{base}/customers?limit=1",
+                headers={
+                    "Authorization": f"Bearer {gocardless_token}",
+                    "GoCardless-Version": "2015-07-06",
+                },
+                timeout=12,
+            )
+            if gc_resp.status_code >= 400:
+                return False, f"GoCardless HTTP {gc_resp.status_code}: {gc_resp.text[:240]}"
+            messages.append("GoCardless OK")
+        else:
+            messages.append("GoCardless skipped (no token)")
+
+        return True, ", ".join(messages)
+
+    if step_key == WizardProgress.STEP_EMAIL:
+        host = data.get("email_host") or ""
+        port = data.get("email_port")
+        use_tls = bool(data.get("email_use_tls"))
+        username = data.get("email_host_user") or ""
+        password = data.get("email_host_password") or ""
+        if not (host and port):
+            return False, "Provide SMTP host and port first."
+
+        smtp = smtplib.SMTP(host, port, timeout=12)
+        try:
+            smtp.ehlo()
+            if use_tls:
+                smtp.starttls()
+                smtp.ehlo()
+            if username and password:
+                smtp.login(username, password)
+        finally:
+            smtp.quit()
+        return True, "Connection OK. SMTP server responded successfully."
+
+    return True, "No connection test is defined for this step."
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Views
 # ──────────────────────────────────────────────────────────────────────────────
@@ -287,9 +513,6 @@ def wizard_index(request):
         return redirect("admin_tools:dashboard")
 
     progress = WizardProgress.get_or_create_singleton()
-    if progress.finished:
-        messages.success(request, "Setup is already complete!")
-        return redirect("admin_tools:dashboard")
 
     steps = []
     for step_key in WizardProgress.STEPS:
@@ -309,6 +532,7 @@ def wizard_index(request):
         "progress": progress,
         "total": len(WizardProgress.STEPS),
         "done_count": len(progress.completed_steps),
+        "all_done": set(WizardProgress.STEPS).issubset(set(progress.completed_steps)),
     })
 
 
@@ -325,25 +549,35 @@ def wizard_step(request, step_key: str):
     progress = WizardProgress.get_or_create_singleton()
     meta = STEP_META[step_key]
     FormClass = meta["form_class"]
+    connection_result = None
 
     if request.method == "POST":
+        action = request.POST.get("action", "save")
         form = FormClass(request.POST)
         if form.is_valid():
-            _process_step(step_key, form.cleaned_data, request)
-            progress.mark_step_done(step_key)
+            if action == "test":
+                ok, detail = _test_connection(step_key, form.cleaned_data)
+                connection_result = {"ok": ok, "detail": detail}
+                if ok:
+                    messages.success(request, f"Connection test passed: {detail}")
+                else:
+                    messages.error(request, f"Connection test failed: {detail}")
+            else:
+                _process_step(step_key, form.cleaned_data, request)
+                progress.mark_step_done(step_key)
 
-            # Check if all steps are done
-            if set(WizardProgress.STEPS).issubset(set(progress.completed_steps)):
-                progress.finished = True
-                progress.save(update_fields=["finished"])
-                messages.success(request, "🎉 Setup complete! Your portal is ready.")
-                return redirect("admin_tools:dashboard")
+                all_done = set(WizardProgress.STEPS).issubset(set(progress.completed_steps))
+                if all_done and not progress.finished:
+                    progress.finished = True
+                    progress.save(update_fields=["finished"])
+                    messages.success(request, "🎉 Setup complete! You can revisit and edit settings at any time.")
+                    return redirect("admin_tools:wizard_index")
 
-            next_step = progress.next_step()
-            messages.success(request, f"✓ {meta['title']} saved.")
-            return redirect("admin_tools:wizard_step", step_key=next_step)
+                next_step = progress.next_step() or step_key
+                messages.success(request, f"✓ {meta['title']} saved.")
+                return redirect("admin_tools:wizard_step", step_key=next_step)
     else:
-        form = FormClass()
+        form = FormClass(initial=_initial_for_step(step_key))
 
     steps = []
     for sk in WizardProgress.STEPS:
@@ -363,6 +597,7 @@ def wizard_step(request, step_key: str):
         "progress": progress,
         "total": len(WizardProgress.STEPS),
         "done_count": len(progress.completed_steps),
+        "connection_result": connection_result,
     })
 
 
@@ -377,7 +612,13 @@ def _process_step(step_key: str, data: dict, request):
     for form_field, env_key in env_map.items():
         value = data.get(form_field)
         if value is not None:
-            _write_env_key(env_key, str(value))
+            string_value = str(value)
+            _write_env_key(env_key, string_value)
+            IntegrationSetting.set_value(
+                key=env_key,
+                value=string_value,
+                is_secret=("KEY" in env_key or "TOKEN" in env_key or "SECRET" in env_key or "PASSWORD" in env_key),
+            )
 
 
 def _create_admin_user(data: dict, request):

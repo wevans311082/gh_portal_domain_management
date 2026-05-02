@@ -4,6 +4,12 @@
 {% block page_title %}Initial Setup Wizard{% endblock %}
 
 {% block content %}
+{% if all_done %}
+<div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4 mb-6">
+    <p class="text-sm text-emerald-800 font-medium">Setup is complete. You can still open any step below to edit values and re-test integrations.</p>
+</div>
+{% endif %}
+
 <!-- Progress -->
 <div class="bg-white rounded-lg shadow p-6 mb-6">
     <div class="flex justify-between text-sm text-gray-500 mb-2">
@@ -33,12 +39,10 @@
             </p>
             <p class="text-sm text-gray-500">{{ step.description }}</p>
         </div>
-        {% if not step.done %}
         <a href="{% url 'admin_tools:wizard_step' step.key %}"
-           class="text-sm {% if step.key == next_step %}bg-sky-600 text-white px-3 py-1.5 rounded hover:bg-sky-700{% else %}text-gray-400 hover:text-gray-600{% endif %}">
-            {% if step.key == next_step %}Start &rarr;{% else %}Configure{% endif %}
+           class="text-sm {% if step.key == next_step and not step.done %}bg-sky-600 text-white px-3 py-1.5 rounded hover:bg-sky-700{% else %}text-sky-700 hover:text-sky-900{% endif %}">
+            {% if step.done %}Edit{% elif step.key == next_step %}Start &rarr;{% else %}Configure{% endif %}
         </a>
-        {% endif %}
     </div>
     {% endfor %}
 </div>
@@ -53,8 +57,12 @@
 {% else %}
 <div class="text-center">
     <a href="{% url 'admin_tools:dashboard' %}"
-       class="inline-block bg-emerald-600 text-white px-8 py-3 rounded-lg hover:bg-emerald-700 font-semibold">
-        🎉 Go to Dashboard
+       class="inline-block bg-emerald-600 text-white px-8 py-3 rounded-lg hover:bg-emerald-700 font-semibold mr-2">
+        Go to Dashboard
+    </a>
+    <a href="{% url 'admin_tools:wizard_step' 'registrar' %}"
+       class="inline-block border border-slate-300 text-slate-700 px-8 py-3 rounded-lg hover:bg-slate-50 font-semibold">
+        Edit Registrar Step
     </a>
 </div>
 {% endif %}

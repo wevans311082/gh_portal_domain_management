@@ -3,7 +3,6 @@ import hashlib
 import hmac
 import logging
 import json
-from django.conf import settings
 from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
@@ -12,6 +11,8 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
 from django.utils import timezone
 from django.db import transaction
+
+from apps.core.runtime_settings import get_runtime_setting
 
 from apps.billing.models import Invoice
 from apps.domains.models import DomainOrder, DomainRenewal
@@ -202,7 +203,7 @@ def gocardless_webhook(request):
     payload = request.body
 
     # Verify the webhook signature using the GoCardless webhook secret
-    webhook_secret = getattr(settings, "GOCARDLESS_WEBHOOK_SECRET", "")
+    webhook_secret = get_runtime_setting("GOCARDLESS_WEBHOOK_SECRET", "")
     if not webhook_secret:
         logger.error("GOCARDLESS_WEBHOOK_SECRET is not configured; rejecting webhook.")
         return HttpResponse(status=400)

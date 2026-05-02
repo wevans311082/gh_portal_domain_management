@@ -3,7 +3,8 @@ import logging
 import secrets
 import string
 import requests
-from django.conf import settings
+
+from apps.core.runtime_settings import get_runtime_int, get_runtime_setting
 
 logger = logging.getLogger(__name__)
 
@@ -17,10 +18,10 @@ class WHMClient:
     """Client for the WHM JSON API v1."""
 
     def __init__(self):
-        self.host = settings.WHM_HOST
-        self.port = settings.WHM_PORT
-        self.username = settings.WHM_USERNAME
-        self.api_token = settings.WHM_API_TOKEN
+        self.host = get_runtime_setting("WHM_HOST", "")
+        self.port = get_runtime_int("WHM_PORT", 2087)
+        self.username = get_runtime_setting("WHM_USERNAME", "root")
+        self.api_token = get_runtime_setting("WHM_API_TOKEN", "")
         self.base_url = f"https://{self.host}:{self.port}/json-api"
         self.session = requests.Session()
         self.session.headers.update({

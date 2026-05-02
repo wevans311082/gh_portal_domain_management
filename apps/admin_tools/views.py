@@ -14,6 +14,7 @@ from django.utils import timezone
 from django_celery_beat.models import CrontabSchedule, IntervalSchedule, PeriodicTask
 from django_celery_results.models import TaskResult
 
+from apps.core.runtime_settings import get_runtime_setting
 from apps.accounts.models import User
 from apps.audit.models import AuditLog, EmailLog
 from apps.billing.models import Invoice
@@ -304,7 +305,7 @@ def integrations_overview(request):
     # Cloudflare — verify token
     def _cf():
         import requests as _req
-        token = settings.CLOUDFLARE_API_TOKEN
+        token = get_runtime_setting("CLOUDFLARE_API_TOKEN", "")
         resp = _req.get(
             "https://api.cloudflare.com/client/v4/user/tokens/verify",
             headers={"Authorization": f"Bearer {token}"},
@@ -330,7 +331,7 @@ def integrations_overview(request):
 
     # Stripe
     def _stripe():
-        stripe_module.api_key = settings.STRIPE_SECRET_KEY
+        stripe_module.api_key = get_runtime_setting("STRIPE_SECRET_KEY", "")
         return stripe_module.Balance.retrieve()
 
     probes.append(_probe("Stripe", _stripe))
@@ -365,12 +366,12 @@ def integration_detail(request, service):
         "cloudflare": [
             ("Verify token", lambda: _req.get(
                 "https://api.cloudflare.com/client/v4/user/tokens/verify",
-                headers={"Authorization": f"Bearer {settings.CLOUDFLARE_API_TOKEN}"},
+                headers={"Authorization": f"Bearer {get_runtime_setting('CLOUDFLARE_API_TOKEN', '')}"},
                 timeout=10,
             ).json()),
             ("List zones (first page)", lambda: _req.get(
                 "https://api.cloudflare.com/client/v4/zones?per_page=5",
-                headers={"Authorization": f"Bearer {settings.CLOUDFLARE_API_TOKEN}"},
+                headers={"Authorization": f"Bearer {get_runtime_setting('CLOUDFLARE_API_TOKEN', '')}"},
                 timeout=10,
             ).json()),
         ],
@@ -393,7 +394,7 @@ def integration_detail(request, service):
         raise Http404(f"Unknown integration: {service}")
 
     # Set Stripe API key before probe
-    stripe_module.api_key = settings.STRIPE_SECRET_KEY
+    stripe_module.api_key = get_runtime_setting("STRIPE_SECRET_KEY", "")
 
     tests = []
     for label, fn in SERVICE_TESTS[service]:

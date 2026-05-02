@@ -3,7 +3,8 @@ import logging
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-from django.conf import settings
+
+from apps.core.runtime_settings import get_runtime_setting
 
 logger = logging.getLogger(__name__)
 
@@ -42,9 +43,9 @@ class ResellerClubClient:
     """
 
     def __init__(self):
-        self.reseller_id = settings.RESELLERCLUB_RESELLER_ID
-        self.api_key = settings.RESELLERCLUB_API_KEY
-        self.base_url = settings.RESELLERCLUB_API_URL.rstrip("/")
+        self.reseller_id = get_runtime_setting("RESELLERCLUB_RESELLER_ID", "")
+        self.api_key = get_runtime_setting("RESELLERCLUB_API_KEY", "")
+        self.base_url = get_runtime_setting("RESELLERCLUB_API_URL", "https://test.httpapi.com/api").rstrip("/")
         self.session = _build_session()
         # Credentials sent via Basic Auth header — never in the URL
         self.session.auth = (self.reseller_id, self.api_key)

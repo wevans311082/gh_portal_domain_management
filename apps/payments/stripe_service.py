@@ -1,12 +1,11 @@
 """Stripe payment service."""
 import logging
 import stripe
-from django.conf import settings
 from django.urls import reverse
 
-logger = logging.getLogger(__name__)
+from apps.core.runtime_settings import get_runtime_setting
 
-stripe.api_key = settings.STRIPE_SECRET_KEY
+logger = logging.getLogger(__name__)
 
 
 class StripeService:
@@ -15,6 +14,7 @@ class StripeService:
     @staticmethod
     def create_checkout_session(invoice, request) -> str:
         """Create a Stripe Checkout Session for an invoice and return the session URL."""
+        stripe.api_key = get_runtime_setting("STRIPE_SECRET_KEY", "")
         line_items = []
         for item in invoice.line_items.all():
             line_items.append({
@@ -68,9 +68,10 @@ class StripeService:
     @staticmethod
     def handle_webhook(payload: bytes, sig_header: str):
         """Verify and process a Stripe webhook event."""
+        stripe.api_key = get_runtime_setting("STRIPE_SECRET_KEY", "")
         try:
             event = stripe.Webhook.construct_event(
-                payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
+                payload, sig_header, get_runtime_setting("STRIPE_WEBHOOK_SECRET", "")
             )
         except stripe.error.SignatureVerificationError as e:
             logger.warning(f"Invalid Stripe webhook signature: {e}")
@@ -81,6 +82,7 @@ class StripeService:
     @staticmethod
     def create_refund(payment_intent_id: str, amount_pence: int = None) -> dict:
         """Create a refund for a payment."""
+        stripe.api_key = get_runtime_setting("STRIPE_SECRET_KEY", "")
         params = {"payment_intent": payment_intent_id}
         if amount_pence:
             params["amount"] = amount_pence

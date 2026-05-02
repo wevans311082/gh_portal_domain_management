@@ -1,6 +1,7 @@
 import logging
 import requests
-from django.conf import settings
+
+from apps.core.runtime_settings import get_runtime_setting
 
 logger = logging.getLogger(__name__)
 
@@ -9,7 +10,7 @@ class CloudflareService:
     BASE_URL = "https://api.cloudflare.com/client/v4"
 
     def __init__(self):
-        self.token = settings.CLOUDFLARE_API_TOKEN
+        self.token = get_runtime_setting("CLOUDFLARE_API_TOKEN", "")
         self.headers = {
             "Authorization": f"Bearer {self.token}",
             "Content-Type": "application/json",
