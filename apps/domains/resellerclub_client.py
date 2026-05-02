@@ -57,6 +57,27 @@ class ResellerClubClient:
             "api-key": self.api_key,
         }
 
+    @staticmethod
+    def _normalize_domain_labels(domain_names: list) -> list:
+        labels = []
+        for raw in (domain_names or []):
+            value = str(raw or "").strip().lower()
+            if not value:
+                continue
+            if "." in value:
+                value = value.split(".", 1)[0]
+            labels.append(value)
+        return labels
+
+    @staticmethod
+    def _normalize_tlds(tlds: list) -> list:
+        normalized = []
+        for raw in (tlds or []):
+            value = str(raw or "").strip().lower().lstrip(".")
+            if value:
+                normalized.append(value)
+        return normalized
+
     def _check_response(self, data: dict, endpoint: str) -> dict:
         """Raise ResellerClubError when the API returns a business-level error."""
         if isinstance(data, dict) and data.get("status") == "ERROR":
@@ -84,6 +105,17 @@ class ResellerClubClient:
             )
             response.raise_for_status()
             data = response.json()
+        except requests.HTTPError as e:
+            status_code = getattr(getattr(e, "response", None), "status_code", None)
+            body = (getattr(getattr(e, "response", None), "text", "") or "")[:300]
+            if status_code and status_code >= 500:
+                logger.error("ResellerClub GET %s server error %s: %s", endpoint, status_code, body)
+                raise ResellerClubError(
+                    "ResellerClub returned a server error. This commonly happens when request parameters "
+                    "are malformed (for example domain-name should be label only)."
+                ) from e
+            logger.error(f"ResellerClub GET {endpoint} failed: {e}")
+            raise ResellerClubError(f"API request failed: {e}") from e
         except requests.RequestException as e:
             logger.error(f"ResellerClub GET {endpoint} failed: {e}")
             raise ResellerClubError(f"API request failed: {e}") from e
@@ -101,6 +133,14 @@ class ResellerClubClient:
             )
             response.raise_for_status()
             result = response.json()
+        except requests.HTTPError as e:
+            status_code = getattr(getattr(e, "response", None), "status_code", None)
+            body = (getattr(getattr(e, "response", None), "text", "") or "")[:300]
+            if status_code and status_code >= 500:
+                logger.error("ResellerClub POST %s server error %s: %s", endpoint, status_code, body)
+                raise ResellerClubError("ResellerClub returned a server error while processing the request.") from e
+            logger.error(f"ResellerClub POST {endpoint} failed: {e}")
+            raise ResellerClubError(f"API POST failed: {e}") from e
         except requests.RequestException as e:
             logger.error(f"ResellerClub POST {endpoint} failed: {e}")
             raise ResellerClubError(f"API POST failed: {e}") from e
@@ -111,9 +151,14 @@ class ResellerClubClient:
         Check availability of domain names across TLDs.
         Returns dict of domain -> availability status.
         """
+        labels = self._normalize_domain_labels(domain_names)
+        normalized_tlds = self._normalize_tlds(tlds)
+        if not labels or not normalized_tlds:
+            raise ResellerClubError("Domain availability check requires at least one domain label and one TLD.")
+
         params = {
-            "domain-name": domain_names,
-            "tlds": tlds,
+            "domain-name": ",".join(labels),
+            "tlds": ",".join(normalized_tlds),
         }
         return self._get("domains/available", params)
 

@@ -420,8 +420,8 @@ def _test_connection(step_key: str, data: dict):
             params={
                 "auth-userid": reseller_id,
                 "api-key": api_key,
-                "domain-name": ["example"],
-                "tlds": ["com"],
+                "domain-name": "example",
+                "tlds": "com",
             },
             timeout=12,
         )

@@ -299,7 +299,7 @@ def integrations_overview(request):
     # ResellerClub — check availability of a well-known taken domain
     def _rc():
         client = ResellerClubClient()
-        return client.check_availability(["google.com"], ["com"])
+        return client.check_availability(["google"], ["com"])
 
     probes.append(_probe("ResellerClub", _rc))
 
@@ -360,8 +360,8 @@ def integration_detail(request, service):
 
     SERVICE_TESTS = {
         "resellerclub": [
-            ("Check availability (google.com)", lambda: ResellerClubClient().check_availability(["google.com"], ["com"])),
-            ("Check availability (example.com)", lambda: ResellerClubClient().check_availability(["example.com"], ["com"])),
+            ("Check availability (google.com)", lambda: ResellerClubClient().check_availability(["google"], ["com"])),
+            ("Check availability (example.com)", lambda: ResellerClubClient().check_availability(["example"], ["com"])),
             ("Get .com TLD pricing", lambda: ResellerClubClient().get_tld_pricing("com", years=1, action="registration")),
         ],
         "cloudflare": [
