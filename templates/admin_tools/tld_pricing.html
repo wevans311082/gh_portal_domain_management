@@ -1,0 +1,182 @@
+{% extends "base_admin.html" %}
+
+{% block title %}TLD Pricing - {{ SITE_NAME }}{% endblock %}
+{% block page_title %}TLD Pricing Management{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4 mb-6">
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+        <p class="text-xs uppercase tracking-wide text-slate-500 font-semibold">Total TLDs</p>
+        <p class="text-2xl font-bold text-slate-900 mt-1">{{ stats.total }}</p>
+    </div>
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+        <p class="text-xs uppercase tracking-wide text-slate-500 font-semibold">Active</p>
+        <p class="text-2xl font-bold text-emerald-700 mt-1">{{ stats.active }}</p>
+    </div>
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+        <p class="text-xs uppercase tracking-wide text-slate-500 font-semibold">Inactive</p>
+        <p class="text-2xl font-bold text-slate-700 mt-1">{{ stats.inactive }}</p>
+    </div>
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+        <p class="text-xs uppercase tracking-wide text-slate-500 font-semibold">Selling At Loss</p>
+        <p class="text-2xl font-bold text-rose-700 mt-1">{{ stats.loss_count }}</p>
+    </div>
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+        <p class="text-xs uppercase tracking-wide text-slate-500 font-semibold">Never Synced</p>
+        <p class="text-2xl font-bold text-amber-700 mt-1">{{ stats.never_synced }}</p>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-6">
+    <div class="xl:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+            <h3 class="text-sm font-semibold text-slate-800">Sync Controls</h3>
+            <div class="text-xs text-slate-500">
+                Last completed:
+                {% if settings_obj.last_sync_completed_at %}
+                {{ settings_obj.last_sync_completed_at|date:"Y-m-d H:i" }}
+                {% else %}
+                Never
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+            <form method="post" class="inline">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="sync_all">
+                <button type="submit" class="bg-sky-600 text-white px-4 py-2 rounded hover:bg-sky-700 text-sm font-semibold">
+                    Sync Supported TLDs Now
+                </button>
+            </form>
+            {% if settings_obj.last_sync_error %}
+            <span class="text-xs rounded bg-rose-100 text-rose-700 px-2 py-1">
+                Last error: {{ settings_obj.last_sync_error|truncatechars:120 }}
+            </span>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+        <h3 class="text-sm font-semibold text-slate-800 mb-3">Filters</h3>
+        <form method="get" class="space-y-3">
+            <div>
+                <label class="block text-xs text-slate-500 font-semibold mb-1">Search TLD</label>
+                <input type="text" name="q" value="{{ search_q }}" placeholder="com, co.uk, io" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+            </div>
+            <div>
+                <label class="block text-xs text-slate-500 font-semibold mb-1">Status</label>
+                <select name="status" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+                    <option value="" {% if not status_filter %}selected{% endif %}>All</option>
+                    <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active only</option>
+                    <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactive only</option>
+                </select>
+            </div>
+            <label class="flex items-center gap-2 text-sm text-slate-700">
+                <input type="checkbox" name="loss" value="1" {% if loss_filter %}checked{% endif %}>
+                Show only TLDs sold at loss
+            </label>
+            <div class="flex gap-2">
+                <button type="submit" class="bg-sky-600 text-white px-4 py-2 rounded hover:bg-sky-700 text-sm font-semibold">Apply</button>
+                <a href="{% url 'admin_tools:tld_pricing' %}" class="border border-slate-300 text-slate-700 px-4 py-2 rounded hover:bg-slate-50 text-sm font-semibold">Clear</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="bg-white rounded-xl border border-slate-200 shadow-sm p-4 mb-6">
+    <h3 class="text-sm font-semibold text-slate-800 mb-3">Global Pricing Settings</h3>
+    <form method="post" class="grid grid-cols-1 lg:grid-cols-5 gap-3 items-end">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="save_settings">
+        <div>
+            <label class="block text-xs text-slate-500 font-semibold mb-1">Default Margin %</label>
+            <input type="number" step="0.01" name="default_profit_margin_percentage" value="{{ settings_obj.default_profit_margin_percentage }}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+        </div>
+        <div>
+            <label class="block text-xs text-slate-500 font-semibold mb-1">Sync Interval (hours)</label>
+            <input type="number" min="1" max="168" name="sync_interval_hours" value="{{ settings_obj.sync_interval_hours }}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+        </div>
+        <div class="lg:col-span-2">
+            <label class="block text-xs text-slate-500 font-semibold mb-1">Supported TLDs (comma separated)</label>
+            <input type="text" name="supported_tlds" value="{{ supported_tlds_text }}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+        </div>
+        <div class="flex flex-wrap gap-2 items-center">
+            <label class="inline-flex items-center gap-2 text-sm text-slate-700 mr-2">
+                <input type="checkbox" name="sync_enabled" {% if settings_obj.sync_enabled %}checked{% endif %}>
+                Auto sync enabled
+            </label>
+            <button type="submit" class="bg-sky-600 text-white px-4 py-2 rounded hover:bg-sky-700 text-sm font-semibold">Save</button>
+        </div>
+    </form>
+</div>
+
+<div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+    {% if rows %}
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead class="bg-slate-50 border-b border-slate-200">
+                <tr>
+                    <th class="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">TLD</th>
+                    <th class="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">Reg Cost/Sell</th>
+                    <th class="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">Renew Cost/Sell</th>
+                    <th class="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">Transfer Cost/Sell</th>
+                    <th class="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">Margin</th>
+                    <th class="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">Status</th>
+                    <th class="px-3 py-3 text-right text-xs font-semibold text-slate-600 uppercase tracking-wide">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                {% for row in rows %}
+                <tr class="{% if row.any_loss %}bg-rose-50/40{% endif %}">
+                    <td class="px-3 py-3 align-top">
+                        <p class="font-semibold text-slate-900">.{{ row.obj.tld }}</p>
+                        <p class="text-xs text-slate-500">{{ row.obj.currency }}{% if row.obj.last_synced_at %} · {{ row.obj.last_synced_at|date:"Y-m-d H:i" }}{% endif %}</p>
+                    </td>
+                    <td class="px-3 py-3 align-top">
+                        <p class="text-slate-700">{{ row.obj.currency }} {{ row.obj.registration_cost|floatformat:2 }} / {{ row.registration_price|floatformat:2 }}</p>
+                        {% if row.registration_loss %}<span class="inline-flex px-2 py-0.5 rounded text-xs font-semibold bg-rose-100 text-rose-700">Sold at loss</span>{% endif %}
+                    </td>
+                    <td class="px-3 py-3 align-top">
+                        <p class="text-slate-700">{{ row.obj.currency }} {{ row.obj.renewal_cost|floatformat:2 }} / {{ row.renewal_price|floatformat:2 }}</p>
+                        {% if row.renewal_loss %}<span class="inline-flex px-2 py-0.5 rounded text-xs font-semibold bg-rose-100 text-rose-700">Sold at loss</span>{% endif %}
+                    </td>
+                    <td class="px-3 py-3 align-top">
+                        <p class="text-slate-700">{{ row.obj.currency }} {{ row.obj.transfer_cost|floatformat:2 }} / {{ row.transfer_price|floatformat:2 }}</p>
+                        {% if row.transfer_loss %}<span class="inline-flex px-2 py-0.5 rounded text-xs font-semibold bg-rose-100 text-rose-700">Sold at loss</span>{% endif %}
+                    </td>
+                    <td class="px-3 py-3 align-top text-slate-700">{{ row.margin|floatformat:2 }}%</td>
+                    <td class="px-3 py-3 align-top">
+                        {% if row.obj.is_active %}
+                        <span class="inline-flex px-2 py-0.5 rounded text-xs font-semibold bg-emerald-100 text-emerald-700">Active</span>
+                        {% else %}
+                        <span class="inline-flex px-2 py-0.5 rounded text-xs font-semibold bg-slate-200 text-slate-700">Inactive</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-3 py-3 align-top text-right">
+                        <form method="post" class="inline-flex flex-wrap justify-end gap-2">
+                            {% csrf_token %}
+                            <input type="hidden" name="tld" value="{{ row.obj.tld }}">
+                            <input type="hidden" name="currency" value="{{ row.obj.currency }}">
+                            <input type="number" step="0.01" name="registration_cost" value="{{ row.obj.registration_cost }}" class="w-24 border border-slate-300 rounded px-2 py-1 text-xs" title="Registration cost">
+                            <input type="number" step="0.01" name="renewal_cost" value="{{ row.obj.renewal_cost }}" class="w-24 border border-slate-300 rounded px-2 py-1 text-xs" title="Renewal cost">
+                            <input type="number" step="0.01" name="transfer_cost" value="{{ row.obj.transfer_cost }}" class="w-24 border border-slate-300 rounded px-2 py-1 text-xs" title="Transfer cost">
+                            <input type="number" step="0.01" name="profit_margin_percentage" value="{% if row.obj.profit_margin_percentage is not None %}{{ row.obj.profit_margin_percentage }}{% endif %}" class="w-20 border border-slate-300 rounded px-2 py-1 text-xs" placeholder="margin%" title="Blank = use default margin">
+                            <label class="inline-flex items-center gap-1 text-xs text-slate-700">
+                                <input type="checkbox" name="is_active" {% if row.obj.is_active %}checked{% endif %}>
+                                Active
+                            </label>
+                            <button type="submit" name="action" value="save_tld" class="px-2 py-1 rounded border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-semibold">Save</button>
+                            <button type="submit" name="action" value="sync_tld" class="px-2 py-1 rounded bg-sky-600 text-white hover:bg-sky-700 text-xs font-semibold">Sync</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="p-10 text-center text-slate-500">No TLD pricing records found for this filter.</div>
+    {% endif %}
+</div>
+{% endblock %}

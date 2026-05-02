@@ -117,47 +117,73 @@ def domain_check(request):
     if not _is_valid_label(domain_part):
         return HttpResponse("Invalid domain name.", status=400)
 
-    existing_tlds = set(TLDPricing.objects.filter(tld__in=POPULAR_TLDS).values_list("tld", flat=True))
-    missing_tlds = [tld for tld in POPULAR_TLDS if tld not in existing_tlds]
+    # If user typed a full domain with TLD (e.g. "example.com"), only check that TLD.
+    # Otherwise check all popular TLDs.
+    if "." in query:
+        _, typed_tld = query.split(".", 1)
+        tlds_to_check = [typed_tld]
+    else:
+        tlds_to_check = POPULAR_TLDS
+
+    existing_tlds = set(TLDPricing.objects.filter(tld__in=tlds_to_check).values_list("tld", flat=True))
+    missing_tlds = [tld for tld in tlds_to_check if tld not in existing_tlds]
     _sync_missing_tld_pricing(missing_tlds)
 
-    results = []
-    client = ResellerClubClient()
-    pricing_lookup = TLDPricing.objects.in_bulk(POPULAR_TLDS, field_name="tld")
+    pricing_lookup = TLDPricing.objects.in_bulk(tlds_to_check, field_name="tld")
 
-    for tld in POPULAR_TLDS:
-        full_domain = f"{domain_part}.{tld}"
-        cache_key = f"domain_avail:{full_domain}"
-        cached = cache.get(cache_key)
-
+    # Split TLDs into those already cached and those needing a live API call
+    cache_hits = {}
+    tlds_needing_check = []
+    for tld in tlds_to_check:
+        cached = cache.get(f"domain_avail:{domain_part}.{tld}")
         if cached is not None:
-            available = cached
+            cache_hits[tld] = cached
         else:
-            try:
-                data = client.check_availability([domain_part], [tld])
+            tlds_needing_check.append(tld)
+
+    # Single bulk API call for all uncached TLDs (ResellerClub supports multi-TLD in one request)
+    live_availability = {}
+    if tlds_needing_check:
+        try:
+            client = ResellerClubClient()
+            data = client.check_availability([domain_part], tlds_needing_check)
+            for tld in tlds_needing_check:
+                full_domain = f"{domain_part}.{tld}"
                 status = data.get(full_domain, {})
                 if isinstance(status, dict):
                     available = status.get("status") == "available"
                 else:
                     available = str(status).lower() == "available"
-                cache.set(cache_key, available, timeout=_CACHE_TTL)
-            except ResellerClubError as e:
-                logger.warning(f"Domain check failed for {full_domain}: {e}")
-                available = None  # Unknown
+                live_availability[tld] = available
+                cache.set(f"domain_avail:{full_domain}", available, timeout=_CACHE_TTL)
+        except ResellerClubError as e:
+            logger.warning(f"Domain bulk check failed for {domain_part}: {e}")
+            for tld in tlds_needing_check:
+                live_availability[tld] = None
 
+    results = []
+    for tld in tlds_to_check:
+        full_domain = f"{domain_part}.{tld}"
+        available = cache_hits.get(tld) if tld in cache_hits else live_availability.get(tld)
+        pricing = pricing_lookup.get(tld)
         results.append({
             "domain": full_domain,
             "tld": tld,
             "available": available,
-            "registration_price": pricing_lookup.get(tld).registration_price if pricing_lookup.get(tld) else None,
-            "renewal_price": pricing_lookup.get(tld).renewal_price if pricing_lookup.get(tld) else None,
-            "transfer_price": pricing_lookup.get(tld).transfer_price if pricing_lookup.get(tld) else None,
+            "registration_price": pricing.registration_price if pricing else None,
+            "renewal_price": pricing.renewal_price if pricing else None,
+            "transfer_price": pricing.transfer_price if pricing else None,
             "whois_url": f"https://lookup.icann.org/en/lookup?name={full_domain}",
         })
+
+    from apps.core.runtime_settings import get_runtime_setting
+    api_url = get_runtime_setting("RESELLERCLUB_API_URL", "")
+    prices_are_test_mode = "test.httpapi.com" in api_url
 
     return render(request, "domains/partials/availability_results.html", {
         "results": results,
         "query": query,
+        "prices_are_test_mode": prices_are_test_mode,
     })
 
 

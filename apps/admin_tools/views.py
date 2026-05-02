@@ -1,5 +1,6 @@
 import json
 import time
+from decimal import Decimal, InvalidOperation
 from datetime import timedelta
 
 from django.conf import settings
@@ -18,7 +19,7 @@ from apps.core.runtime_settings import get_runtime_setting
 from apps.accounts.models import User
 from apps.audit.models import AuditLog, EmailLog
 from apps.billing.models import Invoice
-from apps.domains.models import Domain, DomainRenewal
+from apps.domains.models import Domain, DomainPricingSettings, DomainRenewal, TLDPricing
 from apps.payments.models import Payment
 from apps.services.models import Service
 from apps.support.models import SupportTicket
@@ -500,6 +501,201 @@ def invoices(request):
         "status_choices": Invoice.STATUS_CHOICES,
         "stats": stats,
     })
+
+
+def _decimal_or_none(value):
+    if value in (None, ""):
+        return None
+    try:
+        return Decimal(str(value)).quantize(Decimal("0.01"))
+    except (InvalidOperation, ValueError, TypeError):
+        return None
+
+
+def _parse_tld_list(raw: str):
+    parts = [
+        p.strip().lower()
+        for p in (raw or "").replace("\n", ",").replace("\t", ",").split(",")
+        if p.strip()
+    ]
+    return list(dict.fromkeys(parts))
+
+
+@staff_member_required
+def tld_pricing(request):
+    settings_obj = DomainPricingSettings.get_solo()
+
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+        redirect_url = reverse("admin_tools:tld_pricing")
+
+        if action == "save_settings":
+            margin = _decimal_or_none(request.POST.get("default_profit_margin_percentage"))
+            interval_raw = (request.POST.get("sync_interval_hours") or "").strip()
+            tlds_raw = request.POST.get("supported_tlds", "")
+
+            if margin is None:
+                messages.error(request, "Default margin must be a valid number.")
+                return redirect(redirect_url)
+
+            try:
+                interval = int(interval_raw)
+            except ValueError:
+                messages.error(request, "Sync interval must be a whole number of hours.")
+                return redirect(redirect_url)
+
+            if interval < 1 or interval > 168:
+                messages.error(request, "Sync interval must be between 1 and 168 hours.")
+                return redirect(redirect_url)
+
+            parsed_tlds = _parse_tld_list(tlds_raw)
+            if not parsed_tlds:
+                messages.error(request, "Supported TLD list cannot be empty.")
+                return redirect(redirect_url)
+
+            settings_obj.default_profit_margin_percentage = margin
+            settings_obj.sync_enabled = request.POST.get("sync_enabled") == "on"
+            settings_obj.sync_interval_hours = interval
+            settings_obj.supported_tlds = parsed_tlds
+            settings_obj.save(
+                update_fields=[
+                    "default_profit_margin_percentage",
+                    "sync_enabled",
+                    "sync_interval_hours",
+                    "supported_tlds",
+                    "updated_at",
+                ]
+            )
+
+            from apps.domains.tasks import ensure_tld_pricing_sync_schedule
+
+            ensure_tld_pricing_sync_schedule(settings_obj)
+            messages.success(request, "Domain pricing settings updated.")
+            return redirect(redirect_url)
+
+        if action == "sync_all":
+            from apps.domains.tasks import sync_tld_pricing
+
+            sync_tld_pricing.delay(tlds=list(settings_obj.supported_tlds or []))
+            messages.success(request, "Queued pricing sync for supported TLDs.")
+            return redirect(redirect_url)
+
+        if action == "sync_tld":
+            from apps.domains.tasks import sync_tld_pricing
+
+            tld = (request.POST.get("tld") or "").strip().lower()
+            if not tld:
+                messages.error(request, "No TLD selected for sync.")
+                return redirect(redirect_url)
+            sync_tld_pricing.delay(tlds=[tld])
+            messages.success(request, f"Queued pricing sync for .{tld}.")
+            return redirect(redirect_url)
+
+        if action == "save_tld":
+            tld = (request.POST.get("tld") or "").strip().lower()
+            try:
+                obj = TLDPricing.objects.get(tld=tld)
+            except TLDPricing.DoesNotExist:
+                messages.error(request, f"Unknown TLD record: {tld}")
+                return redirect(redirect_url)
+
+            reg_cost = _decimal_or_none(request.POST.get("registration_cost"))
+            ren_cost = _decimal_or_none(request.POST.get("renewal_cost"))
+            trf_cost = _decimal_or_none(request.POST.get("transfer_cost"))
+            margin_raw = request.POST.get("profit_margin_percentage", "")
+            margin_override = _decimal_or_none(margin_raw) if margin_raw != "" else None
+
+            if reg_cost is None or ren_cost is None or trf_cost is None:
+                messages.error(request, f"Costs for .{tld} must be valid numbers.")
+                return redirect(redirect_url)
+
+            obj.currency = ((request.POST.get("currency") or obj.currency or "GBP").upper())[:3]
+            obj.registration_cost = reg_cost
+            obj.renewal_cost = ren_cost
+            obj.transfer_cost = trf_cost
+            obj.profit_margin_percentage = margin_override
+            obj.is_active = request.POST.get("is_active") == "on"
+            obj.save(
+                update_fields=[
+                    "currency",
+                    "registration_cost",
+                    "renewal_cost",
+                    "transfer_cost",
+                    "profit_margin_percentage",
+                    "is_active",
+                    "updated_at",
+                ]
+            )
+            messages.success(request, f"Updated pricing for .{tld}.")
+            return redirect(redirect_url)
+
+    search_q = (request.GET.get("q") or "").strip().lower()
+    status_filter = (request.GET.get("status") or "").strip().lower()
+    loss_filter = request.GET.get("loss") == "1"
+
+    qs = TLDPricing.objects.order_by("tld")
+    if search_q:
+        qs = qs.filter(tld__icontains=search_q)
+    if status_filter == "active":
+        qs = qs.filter(is_active=True)
+    elif status_filter == "inactive":
+        qs = qs.filter(is_active=False)
+
+    rows = []
+    for obj in qs:
+        reg_price = obj.registration_price
+        ren_price = obj.renewal_price
+        trf_price = obj.transfer_price
+        reg_loss = reg_price < obj.registration_cost
+        ren_loss = ren_price < obj.renewal_cost
+        trf_loss = trf_price < obj.transfer_cost
+        any_loss = reg_loss or ren_loss or trf_loss
+        if loss_filter and not any_loss:
+            continue
+
+        rows.append(
+            {
+                "obj": obj,
+                "margin": obj.effective_profit_margin_percentage,
+                "registration_price": reg_price,
+                "renewal_price": ren_price,
+                "transfer_price": trf_price,
+                "registration_loss": reg_loss,
+                "renewal_loss": ren_loss,
+                "transfer_loss": trf_loss,
+                "any_loss": any_loss,
+            }
+        )
+
+    all_rows = []
+    for obj in TLDPricing.objects.all():
+        all_rows.append(
+            obj.registration_price < obj.registration_cost
+            or obj.renewal_price < obj.renewal_cost
+            or obj.transfer_price < obj.transfer_cost
+        )
+
+    stats = {
+        "total": TLDPricing.objects.count(),
+        "active": TLDPricing.objects.filter(is_active=True).count(),
+        "inactive": TLDPricing.objects.filter(is_active=False).count(),
+        "loss_count": sum(1 for x in all_rows if x),
+        "never_synced": TLDPricing.objects.filter(last_synced_at__isnull=True).count(),
+    }
+
+    return render(
+        request,
+        "admin_tools/tld_pricing.html",
+        {
+            "settings_obj": settings_obj,
+            "rows": rows,
+            "search_q": search_q,
+            "status_filter": status_filter,
+            "loss_filter": loss_filter,
+            "stats": stats,
+            "supported_tlds_text": ", ".join(settings_obj.supported_tlds or []),
+        },
+    )
 
 
 # ---------------------------------------------------------------------------

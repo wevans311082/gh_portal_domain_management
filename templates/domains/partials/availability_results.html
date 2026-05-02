@@ -2,6 +2,11 @@
 <div class="bg-white rounded-lg shadow divide-y">
     <div class="px-4 py-3 text-sm text-gray-500">
         Results for <strong>{{ query }}</strong>
+        {% if prices_are_test_mode %}
+        <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
+            Test mode &mdash; prices are sandbox placeholders, not real rates
+        </span>
+        {% endif %}
     </div>
     {% for result in results %}
     <div class="px-4 py-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">

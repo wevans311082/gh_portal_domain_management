@@ -5,6 +5,7 @@ from django_celery_beat.models import IntervalSchedule, PeriodicTask
 from django_celery_results.models import TaskResult
 
 from apps.billing.models import Invoice
+from apps.domains.models import TLDPricing
 
 
 @pytest.mark.django_db
@@ -114,3 +115,37 @@ def test_staff_can_review_invoices_and_filter_by_status(client, django_user_mode
     assert paid_only.status_code == 200
     assert "INV-AT-002" in paid_content
     assert "INV-AT-001" not in paid_content
+
+
+@pytest.mark.django_db
+def test_tld_pricing_page_requires_staff(client):
+    response = client.get(reverse("admin_tools:tld_pricing"))
+
+    assert response.status_code == 302
+    assert reverse("admin:login") in response.url
+
+
+@pytest.mark.django_db
+def test_staff_can_view_tld_pricing_and_loss_indicator(client, django_user_model):
+    staff_user = django_user_model.objects.create_user(
+        email="pricing-admin@example.com",
+        password="password123",
+        is_staff=True,
+    )
+    TLDPricing.objects.create(
+        tld="com",
+        registration_cost="10.00",
+        renewal_cost="10.00",
+        transfer_cost="10.00",
+        profit_margin_percentage="-50.00",
+        is_active=True,
+    )
+
+    client.force_login(staff_user)
+    response = client.get(reverse("admin_tools:tld_pricing"))
+    content = response.content.decode()
+
+    assert response.status_code == 200
+    assert "TLD Pricing Management" in content
+    assert ".com" in content
+    assert "Sold at loss" in content

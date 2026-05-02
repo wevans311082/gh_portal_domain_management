@@ -12,6 +12,7 @@ urlpatterns = [
     path("users/", views.users, name="users"),
     # Commerce
     path("invoices/", views.invoices, name="invoices"),
+    path("domains/pricing/", views.tld_pricing, name="tld_pricing"),
     # System
     path("tasks/", views.task_management, name="task_management"),
     path("templates/scan/", views.template_scan, name="template_scan"),

@@ -414,15 +414,23 @@ def _test_connection(step_key: str, data: dict):
         if not (base_url and reseller_id and api_key):
             return False, "Provide API URL, Reseller ID, and API key first."
 
+        # LogicBoxes HTTP API authenticates via query params, NOT Basic Auth
         resp = requests.get(
             f"{base_url}/domains/available",
-            auth=(reseller_id, api_key),
-            params={"domain-name": ["example"], "tlds": ["com"]},
+            params={
+                "auth-userid": reseller_id,
+                "api-key": api_key,
+                "domain-name": ["example"],
+                "tlds": ["com"],
+            },
             timeout=12,
         )
         if resp.status_code >= 400:
             return False, f"ResellerClub HTTP {resp.status_code}: {resp.text[:240]}"
         parsed = resp.json()
+        if isinstance(parsed, dict) and parsed.get("status") == "ERROR":
+            msg = parsed.get("message") or parsed.get("error") or str(parsed)
+            return False, f"ResellerClub error: {msg}"
         return True, f"Connection OK. Sample response keys: {', '.join(list(parsed.keys())[:5])}"
 
     if step_key == WizardProgress.STEP_HOSTING:
