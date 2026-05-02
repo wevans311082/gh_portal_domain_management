@@ -713,7 +713,7 @@ def tld_pricing(request):
 
                 sync_tld_pricing.delay(tlds=tlds)
                 messages.success(request, "Queued pricing sync for supported TLDs.")
-            return redirect(redirect_url)
+                return redirect(redirect_url)
 
         if action == "sync_tld":
             tld = (request.POST.get("tld") or "").strip().lower()
@@ -730,7 +730,7 @@ def tld_pricing(request):
 
                 sync_tld_pricing.delay(tlds=[tld])
                 messages.success(request, f"Queued pricing sync for .{tld}.")
-            return redirect(redirect_url)
+                return redirect(redirect_url)
 
         if action == "save_tld":
             tld = (request.POST.get("tld") or "").strip().lower()
