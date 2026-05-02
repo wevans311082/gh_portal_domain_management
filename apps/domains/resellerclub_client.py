@@ -37,9 +37,13 @@ class ResellerClubClient:
     """
     HTTP API client for the ResellerClub/LogicBoxes domain registrar API.
 
-    Credentials are transmitted via HTTP Basic Auth (Authorization header)
-    rather than as query-string parameters to prevent credential leakage
-    in server logs, browser history, CDN caches, and Referer headers.
+    The LogicBoxes HTTP API authenticates via query-string parameters
+    ``auth-userid`` (your Reseller ID) and ``api-key`` on every request.
+    HTTP Basic Auth is NOT supported — using it causes JWT/token errors.
+
+    reseller_id  — your ResellerClub *Reseller* account ID (used for auth)
+    customer_id  — a customer account under your reseller (used for domain
+                   registration; can be your own master customer account)
     """
 
     def __init__(self):
@@ -47,13 +51,23 @@ class ResellerClubClient:
         self.api_key = get_runtime_setting("RESELLERCLUB_API_KEY", "")
         self.base_url = get_runtime_setting("RESELLERCLUB_API_URL", "https://test.httpapi.com/api").rstrip("/")
         self.session = _build_session()
-        # Credentials sent via Basic Auth header — never in the URL
-        self.session.auth = (self.reseller_id, self.api_key)
+        # LogicBoxes API requires these on EVERY request as query/form params
+        self._auth_params = {
+            "auth-userid": self.reseller_id,
+            "api-key": self.api_key,
+        }
 
     def _check_response(self, data: dict, endpoint: str) -> dict:
         """Raise ResellerClubError when the API returns a business-level error."""
         if isinstance(data, dict) and data.get("status") == "ERROR":
             error = data.get("message") or data.get("error") or "Unknown error"
+            # Detect auth errors explicitly so callers get a clear message
+            error_lower = str(error).lower()
+            if any(kw in error_lower for kw in ("jwt", "token", "auth", "invalid key", "unauthorized")):
+                logger.error(f"ResellerClub auth failure at {endpoint}: {error}")
+                raise ResellerClubError(
+                    f"ResellerClub authentication failed — check Reseller ID and API key: {error}"
+                )
             logger.error(f"ResellerClub API error at {endpoint}: {error}")
             raise ResellerClubError(f"ResellerClub error: {error}")
         return data
@@ -61,10 +75,11 @@ class ResellerClubClient:
     def _get(self, endpoint: str, params: dict = None) -> dict:
         """Make an authenticated GET request to the ResellerClub API."""
         url = f"{self.base_url}/{endpoint}"
+        merged_params = {**self._auth_params, **(params or {})}
         try:
             response = self.session.get(
                 url,
-                params=params or {},
+                params=merged_params,
                 timeout=(_CONNECT_TIMEOUT, _READ_TIMEOUT),
             )
             response.raise_for_status()
@@ -77,10 +92,11 @@ class ResellerClubClient:
     def _post(self, endpoint: str, data: dict = None) -> dict:
         """Make an authenticated POST request to the ResellerClub API."""
         url = f"{self.base_url}/{endpoint}"
+        merged_data = {**self._auth_params, **(data or {})}
         try:
             response = self.session.post(
                 url,
-                data=data or {},
+                data=merged_data,
                 timeout=(_CONNECT_TIMEOUT, _READ_TIMEOUT),
             )
             response.raise_for_status()

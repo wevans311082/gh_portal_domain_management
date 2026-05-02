@@ -187,10 +187,28 @@ class PaymentsSettingsForm(forms.Form):
 
 
 class RegistrarSettingsForm(forms.Form):
-    resellerclub_reseller_id = forms.CharField(max_length=50, label="ResellerClub Reseller ID", required=False)
-    resellerclub_customer_id = forms.CharField(max_length=50, label="ResellerClub Customer ID", required=False)
+    resellerclub_reseller_id = forms.CharField(
+        max_length=50,
+        label="Reseller ID",
+        required=False,
+        help_text=(
+            "Your ResellerClub <strong>Reseller</strong> account ID — used to authenticate every API call. "
+            "Find it under My Account → Personal Information in the ResellerClub control panel."
+        ),
+    )
+    resellerclub_customer_id = forms.CharField(
+        max_length=50,
+        label="Default Customer ID",
+        required=False,
+        help_text=(
+            "A <strong>Customer</strong> account under your reseller used for domain registrations. "
+            "This is <em>different</em> from your Reseller ID — create or find it under Customers in the control panel. "
+            "Typically you create a single \u2018master\u2019 customer account to act on behalf of."
+        ),
+    )
     resellerclub_api_key = forms.CharField(
-        max_length=255, label="ResellerClub API Key", widget=forms.PasswordInput, required=False,
+        max_length=255, label="API Key", widget=forms.PasswordInput(render_value=True), required=False,
+        help_text="Generate under My Account \u2192 API in the ResellerClub control panel.",
     )
     resellerclub_api_mode = forms.ChoiceField(
         label="API Environment",
