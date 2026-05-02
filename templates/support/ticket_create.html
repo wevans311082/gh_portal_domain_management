@@ -58,7 +58,7 @@
                     <label for="id_message" class="block text-sm font-medium text-gray-700 mb-1">Message</label>
                     <textarea name="message" id="id_message" rows="6"
                               class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-orange-500"
-                              placeholder="Please describe your issue in detail..."></textarea>
+                              placeholder="Please describe your issue in detail...">{{ message_value|default:'' }}</textarea>
                 </div>
             </div>
 

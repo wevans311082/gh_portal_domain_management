@@ -117,3 +117,64 @@ def test_domain_check_renders_cached_sell_price(client, monkeypatch):
 
     assert response.status_code == 200
     assert "GBP 12.00/yr" in content
+
+
+@pytest.mark.django_db
+def test_domain_check_shows_transfer_price_and_whois_for_taken_domain(client, monkeypatch):
+    settings_obj = DomainPricingSettings.get_solo()
+    settings_obj.default_profit_margin_percentage = Decimal("25.00")
+    settings_obj.save(update_fields=["default_profit_margin_percentage"])
+    TLDPricing.objects.create(
+        tld="com",
+        registration_cost=Decimal("8.00"),
+        renewal_cost=Decimal("9.00"),
+        transfer_cost=Decimal("10.00"),
+    )
+
+    class FakeClient:
+        def check_availability(self, domain_names, tlds):
+            full_domain = f"{domain_names[0]}.{tlds[0]}"
+            return {full_domain: {"status": "regthroughothers"}}
+
+    monkeypatch.setattr("apps.domains.views.ResellerClubClient", lambda: FakeClient())
+
+    response = client.get(reverse("domains:check"), {"q": "takenexample"})
+    content = response.content.decode()
+
+    assert response.status_code == 200
+    assert "Taken" in content
+    assert "Transfer GBP 12.50/yr" in content
+    assert "lookup.icann.org" in content
+    assert "Transfer In" in content
+
+
+@pytest.mark.django_db
+def test_domain_check_syncs_missing_pricing_records(client, monkeypatch):
+    class FakePricingService:
+        def sync_pricing(self, tlds=None, years=1):
+            for tld in tlds or []:
+                TLDPricing.objects.update_or_create(
+                    tld=tld,
+                    defaults={
+                        "registration_cost": Decimal("10.00"),
+                        "renewal_cost": Decimal("11.00"),
+                        "transfer_cost": Decimal("12.00"),
+                        "is_active": True,
+                    },
+                )
+            return list(TLDPricing.objects.filter(tld__in=(tlds or [])))
+
+    class FakeClient:
+        def check_availability(self, domain_names, tlds):
+            full_domain = f"{domain_names[0]}.{tlds[0]}"
+            return {full_domain: {"status": "available"}}
+
+    monkeypatch.setattr("apps.domains.views.TLDPricingService", lambda: FakePricingService())
+    monkeypatch.setattr("apps.domains.views.ResellerClubClient", lambda: FakeClient())
+
+    response = client.get(reverse("domains:check"), {"q": "freshsync"})
+    content = response.content.decode()
+
+    assert response.status_code == 200
+    assert TLDPricing.objects.filter(tld="com").exists()
+    assert "Registration GBP 12.50/yr" in content

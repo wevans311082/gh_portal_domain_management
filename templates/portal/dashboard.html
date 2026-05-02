@@ -3,105 +3,157 @@
 {% block title %}Dashboard - {{ SITE_NAME }}{% endblock %}
 {% block page_title %}Dashboard{% endblock %}
 
+{% block header_actions %}
+<a href="{% url 'domains:search' %}" class="text-xs bg-sky-600 text-white px-3 py-1.5 rounded hover:bg-sky-700">Register Domain</a>
+<a href="{% url 'support:create' %}" class="text-xs bg-slate-700 text-white px-3 py-1.5 rounded hover:bg-slate-800">Open Ticket</a>
+{% endblock %}
+
 {% block content %}
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-    <div class="bg-white rounded-lg shadow p-6">
-        <h3 class="text-sm font-medium text-gray-500">Active Services</h3>
-        <p class="text-3xl font-bold mt-2">{{ active_services_count }}</p>
+<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4 mb-6">
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
+        <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Active Services</h3>
+        <p class="text-3xl font-bold mt-2 text-slate-900">{{ active_services_count }}</p>
+        <p class="text-xs text-slate-500 mt-1">{{ due_soon_services_count }} due in 7 days</p>
     </div>
-    <div class="bg-white rounded-lg shadow p-6">
-        <h3 class="text-sm font-medium text-gray-500">Domains</h3>
-        <p class="text-3xl font-bold mt-2">{{ domains_count }}</p>
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
+        <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Domains</h3>
+        <p class="text-3xl font-bold mt-2 text-slate-900">{{ domains_count }}</p>
+        <p class="text-xs text-slate-500 mt-1">{{ expiring_30_days_count }} expiring in 30 days</p>
     </div>
-    <div class="bg-white rounded-lg shadow p-6">
-        <h3 class="text-sm font-medium text-gray-500">Outstanding Balance</h3>
-        <p class="text-3xl font-bold mt-2 {% if unpaid_amount %}text-red-500{% endif %}">£{{ unpaid_amount }}</p>
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
+        <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Outstanding Balance</h3>
+        <p class="text-3xl font-bold mt-2 {% if unpaid_amount %}text-rose-600{% else %}text-slate-900{% endif %}">GBP {{ unpaid_amount }}</p>
+        <p class="text-xs text-slate-500 mt-1">{{ unpaid_invoices_count }} unpaid invoices</p>
     </div>
-    <div class="bg-white rounded-lg shadow p-6">
-        <h3 class="text-sm font-medium text-gray-500">Open Tickets</h3>
-        <p class="text-3xl font-bold mt-2">{{ open_tickets_count }}</p>
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
+        <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Open Tickets</h3>
+        <p class="text-3xl font-bold mt-2 text-slate-900">{{ open_tickets_count }}</p>
+        <p class="text-xs text-slate-500 mt-1">{{ urgent_tickets_count }} high/urgent</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
+        <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Paid Last 30 Days</h3>
+        <p class="text-3xl font-bold mt-2 text-emerald-700">GBP {{ paid_last_30_days_amount }}</p>
+        <p class="text-xs text-slate-500 mt-1">Cash collection snapshot</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
+        <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Auto-Renew Enabled</h3>
+        <p class="text-3xl font-bold mt-2 text-slate-900">{{ auto_renew_enabled_count }}</p>
+        <p class="text-xs text-slate-500 mt-1">Across active domains</p>
     </div>
 </div>
 
-{% if expiring_domains %}
-<div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-    <h3 class="font-semibold text-yellow-800 mb-2">⚠️ Domains Expiring Soon</h3>
-    <ul class="space-y-1">
-        {% for domain in expiring_domains %}
-        <li class="text-sm text-yellow-700">
-            <a href="{% url 'domains:detail' pk=domain.pk %}" class="hover:underline font-medium">{{ domain.name }}</a>
-            — expires {{ domain.expires_at }}
-        </li>
-        {% endfor %}
-    </ul>
+{% if expiring_domains or overdue_invoices_count %}
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+    {% if expiring_domains %}
+    <div class="bg-amber-50 border border-amber-200 rounded-xl p-4">
+        <h3 class="font-semibold text-amber-900 mb-2">Domain renewals need attention</h3>
+        <p class="text-sm text-amber-800 mb-3">{{ expiring_7_days_count }} expiring in 7 days and {{ expiring_30_days_count }} expiring in 30 days.</p>
+        <ul class="space-y-1">
+            {% for domain in expiring_domains|slice:":4" %}
+            <li class="text-sm text-amber-800">
+                <a href="{% url 'domains:detail' pk=domain.pk %}" class="hover:underline font-medium">{{ domain.name }}</a>
+                expires {{ domain.expires_at|date:"Y-m-d" }}
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+    {% if overdue_invoices_count %}
+    <div class="bg-rose-50 border border-rose-200 rounded-xl p-4">
+        <h3 class="font-semibold text-rose-900 mb-2">Overdue invoices detected</h3>
+        <p class="text-sm text-rose-800 mb-3">{{ overdue_invoices_count }} overdue invoices are impacting account health.</p>
+        <a href="{% url 'invoices:list' %}" class="inline-flex text-xs font-semibold bg-rose-600 text-white px-3 py-1.5 rounded hover:bg-rose-700">Review invoices</a>
+    </div>
+    {% endif %}
 </div>
 {% endif %}
 
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-    <div class="bg-white rounded-lg shadow p-6">
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6 xl:col-span-2">
         <div class="flex justify-between items-center mb-4">
-            <h3 class="font-semibold">Active Services</h3>
-            <a href="{% url 'portal:my_services' %}" class="text-sm text-sky-600 hover:underline">View all</a>
+            <h3 class="font-semibold text-slate-900">Recent Activity</h3>
+            <a href="{% url 'invoices:list' %}" class="text-sm text-sky-700 hover:underline">View billing</a>
         </div>
-        {% if active_services %}
-        <ul class="divide-y">
-            {% for service in active_services|slice:":5" %}
-            <li class="py-3">
-                <p class="font-medium">{{ service.package.name }}</p>
-                <p class="text-sm text-gray-500">{{ service.domain_name }} — <span class="capitalize">{{ service.status }}</span></p>
+        {% if recent_activity %}
+        <ul class="divide-y divide-slate-100">
+            {% for event in recent_activity %}
+            <li class="py-3 flex items-start justify-between gap-4">
+                <div>
+                    <a href="{{ event.url }}" class="font-medium text-slate-800 hover:underline">{{ event.title }}</a>
+                    <p class="text-xs text-slate-500 mt-0.5">{{ event.detail }}</p>
+                </div>
+                <span class="text-xs text-slate-400 whitespace-nowrap">{{ event.timestamp|date:"Y-m-d H:i" }}</span>
             </li>
             {% endfor %}
         </ul>
         {% else %}
-        <p class="text-gray-500">No active services.</p>
+        <p class="text-slate-500">No recent activity yet.</p>
         {% endif %}
     </div>
 
-    <div class="bg-white rounded-lg shadow p-6">
-        <div class="flex justify-between items-center mb-4">
-            <h3 class="font-semibold">Unpaid Invoices</h3>
-            <a href="{% url 'invoices:list' %}" class="text-sm text-sky-600 hover:underline">View all</a>
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+        <h3 class="font-semibold text-slate-900 mb-4">Quick Actions</h3>
+        <div class="space-y-2">
+            <a href="{% url 'domains:search' %}" class="block w-full text-center bg-sky-600 text-white py-2 px-4 rounded-lg hover:bg-sky-700">
+                Search and Register Domain
+            </a>
+            <a href="{% url 'portal:my_services' %}" class="block w-full text-center bg-slate-700 text-white py-2 px-4 rounded-lg hover:bg-slate-800">
+                Manage Services
+            </a>
+            <a href="{% url 'support:create' %}" class="block w-full text-center border border-slate-300 text-slate-700 py-2 px-4 rounded-lg hover:bg-slate-50">
+                Open Support Ticket
+            </a>
+            <a href="{% url 'domains:my_domains' %}" class="block w-full text-center border border-slate-300 text-slate-700 py-2 px-4 rounded-lg hover:bg-slate-50">
+                View My Domains
+            </a>
         </div>
-        {% if unpaid_invoices %}
-        <ul class="divide-y">
-            {% for invoice in unpaid_invoices|slice:":5" %}
-            <li class="py-3 flex justify-between items-center">
-                <div>
-                    <a href="{% url 'invoices:detail' pk=invoice.pk %}" class="font-medium hover:underline">
-                        Invoice #{{ invoice.number }}
-                    </a>
-                    <p class="text-xs text-gray-500">Due {{ invoice.due_date }}</p>
-                </div>
-                <div class="text-right">
-                    <p class="font-medium text-red-500">£{{ invoice.total }}</p>
-                    <a href="{% url 'payments:stripe_checkout' invoice_id=invoice.pk %}"
-                       class="text-xs bg-sky-600 text-white px-2 py-1 rounded hover:bg-sky-700">
-                        Pay Now
-                    </a>
-                </div>
-            </li>
-            {% endfor %}
-        </ul>
-        {% else %}
-        <p class="text-gray-500">No outstanding invoices. ✓</p>
-        {% endif %}
     </div>
 </div>
 
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-    <div class="bg-white rounded-lg shadow p-6">
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
         <div class="flex justify-between items-center mb-4">
-            <h3 class="font-semibold">Open Tickets</h3>
-            <a href="{% url 'support:list' %}" class="text-sm text-sky-600 hover:underline">View all</a>
+            <h3 class="font-semibold text-slate-900">Unpaid Invoices</h3>
+            <a href="{% url 'invoices:list' %}" class="text-sm text-sky-700 hover:underline">View all</a>
+        </div>
+        {% if unpaid_invoices %}
+        <ul class="divide-y divide-slate-100">
+            {% for invoice in unpaid_invoices|slice:":5" %}
+            <li class="py-3 flex justify-between items-center gap-3">
+                <div>
+                    <a href="{% url 'invoices:detail' pk=invoice.pk %}" class="font-medium text-slate-800 hover:underline">
+                        Invoice #{{ invoice.number }}
+                    </a>
+                    <p class="text-xs text-slate-500">Due {{ invoice.due_date|date:"Y-m-d" }}</p>
+                </div>
+                <div class="text-right">
+                    <p class="font-semibold {% if invoice.status == 'overdue' %}text-rose-600{% else %}text-amber-700{% endif %}">GBP {{ invoice.total }}</p>
+                    <a href="{% url 'payments:stripe_checkout' invoice_id=invoice.pk %}"
+                       class="text-xs bg-sky-600 text-white px-2 py-1 rounded hover:bg-sky-700 inline-block mt-1">
+                        Pay now
+                    </a>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-slate-500">No outstanding invoices.</p>
+        {% endif %}
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="font-semibold text-slate-900">Open Tickets</h3>
+            <a href="{% url 'support:list' %}" class="text-sm text-sky-700 hover:underline">View all</a>
         </div>
         {% if open_tickets %}
-        <ul class="divide-y">
+        <ul class="divide-y divide-slate-100">
             {% for ticket in open_tickets|slice:":5" %}
             <li class="py-3">
-                <a href="{% url 'support:detail' pk=ticket.pk %}" class="font-medium hover:underline">
+                <a href="{% url 'support:detail' pk=ticket.pk %}" class="font-medium text-slate-800 hover:underline">
                     #{{ ticket.id }}: {{ ticket.subject }}
                 </a>
-                <p class="text-xs text-gray-500 mt-1">
+                <p class="text-xs text-slate-500 mt-1">
                     <span class="capitalize">{{ ticket.status }}</span> —
                     <span class="capitalize">{{ ticket.priority }}</span> priority
                 </p>
@@ -109,23 +161,33 @@
             {% endfor %}
         </ul>
         {% else %}
-        <p class="text-gray-500">No open tickets.</p>
+        <p class="text-slate-500">No open tickets.</p>
         {% endif %}
     </div>
+</div>
 
-    <div class="bg-white rounded-lg shadow p-6">
-        <h3 class="font-semibold mb-4">Quick Actions</h3>
-        <div class="space-y-2">
-            <a href="{% url 'domains:search' %}" class="block w-full text-center bg-sky-600 text-white py-2 px-4 rounded hover:bg-sky-700">
-                Search &amp; Register Domain
-            </a>
-            <a href="{% url 'support:create' %}" class="block w-full text-center bg-gray-700 text-white py-2 px-4 rounded hover:bg-gray-800">
-                Open Support Ticket
-            </a>
-            <a href="{% url 'invoices:list' %}" class="block w-full text-center border border-gray-300 text-gray-700 py-2 px-4 rounded hover:bg-gray-50">
-                View Invoices
-            </a>
-        </div>
+<div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6 mt-6">
+    <div class="flex justify-between items-center mb-4">
+        <h3 class="font-semibold text-slate-900">Active Services</h3>
+        <a href="{% url 'portal:my_services' %}" class="text-sm text-sky-700 hover:underline">View all</a>
     </div>
+    {% if active_services %}
+    <ul class="divide-y divide-slate-100">
+        {% for service in active_services|slice:":5" %}
+        <li class="py-3 flex items-center justify-between gap-3">
+            <div>
+                <p class="font-medium text-slate-800">{{ service.package.name }}</p>
+                <p class="text-sm text-slate-500">{{ service.domain_name|default:"No domain linked" }}</p>
+            </div>
+            <div class="text-right text-xs text-slate-500">
+                <p class="capitalize">{{ service.status }}</p>
+                <p>{% if service.next_due_date %}Due {{ service.next_due_date|date:"Y-m-d" }}{% else %}No due date{% endif %}</p>
+            </div>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-slate-500">No active services.</p>
+    {% endif %}
 </div>
 {% endblock %}

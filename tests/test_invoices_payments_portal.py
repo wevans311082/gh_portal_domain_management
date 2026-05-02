@@ -8,7 +8,9 @@ import json
 import hashlib
 import hmac
 import pytest
+import uuid
 from decimal import Decimal
+from datetime import timedelta
 from unittest.mock import patch, MagicMock
 from django.urls import reverse
 from django.utils import timezone
@@ -47,6 +49,52 @@ def make_line_item(invoice, description="Domain", qty="1", price="99.99"):
         quantity=Decimal(qty),
         unit_price=Decimal(price),
         line_total=Decimal(qty) * Decimal(price),
+    )
+
+
+def make_package(slug=None):
+    from apps.products.models import Package
+    slug = slug or f"starter-{uuid.uuid4().hex[:8]}"
+    return Package.objects.create(
+        name="Starter",
+        slug=slug,
+        price_monthly=Decimal("9.99"),
+        price_annually=Decimal("99.99"),
+        whm_package_name="starter_pkg",
+    )
+
+
+def make_service(user, package, domain_name="example-hosted.com", status="active", next_due_date=None):
+    from apps.services.models import Service
+    return Service.objects.create(
+        user=user,
+        package=package,
+        domain_name=domain_name,
+        status=status,
+        billing_period="monthly",
+        next_due_date=next_due_date,
+    )
+
+
+def make_domain(user, name="example.com", status="active", expires_at=None, auto_renew=True):
+    from apps.domains.models import Domain
+    return Domain.objects.create(
+        user=user,
+        name=name,
+        tld=name.split(".")[-1],
+        status=status,
+        expires_at=expires_at,
+        auto_renew=auto_renew,
+    )
+
+
+def make_ticket(user, subject="Need help", status="open", priority="normal"):
+    from apps.support.models import SupportTicket
+    return SupportTicket.objects.create(
+        user=user,
+        subject=subject,
+        status=status,
+        priority=priority,
     )
 
 
@@ -340,3 +388,65 @@ def test_dashboard_hides_other_users_data(client, django_user_model):
     client.force_login(user)
     response = client.get(reverse("portal:dashboard"))
     assert b"INV-SECRET" not in response.content
+
+
+@pytest.mark.django_db
+def test_dashboard_new_metrics_context(client, django_user_model):
+    from apps.billing.models import Invoice
+
+    user = make_user(django_user_model, email="metrics@portal.com")
+    package = make_package(slug="starter-metrics")
+
+    make_service(
+        user,
+        package=package,
+        domain_name="svc-metrics.com",
+        status="active",
+        next_due_date=timezone.localdate() + timedelta(days=3),
+    )
+    make_domain(
+        user,
+        name="soon-expiry.com",
+        status="active",
+        expires_at=timezone.localdate() + timedelta(days=5),
+        auto_renew=True,
+    )
+    make_invoice(user, number="INV-NEW-OVER", status=Invoice.STATUS_OVERDUE, total="20.00")
+    make_invoice(user, number="INV-NEW-UNP", status=Invoice.STATUS_UNPAID, total="30.00")
+    paid = make_invoice(user, number="INV-NEW-PAID", status=Invoice.STATUS_PAID, total="40.00")
+    paid.paid_at = timezone.now()
+    paid.save(update_fields=["paid_at"])
+    make_ticket(user, subject="Urgent issue", status="open", priority="urgent")
+
+    client.force_login(user)
+    response = client.get(reverse("portal:dashboard"))
+
+    assert response.status_code == 200
+    assert response.context["expiring_7_days_count"] == 1
+    assert response.context["overdue_invoices_count"] == 1
+    assert response.context["unpaid_invoices_count"] == 2
+    assert response.context["due_soon_services_count"] == 1
+    assert response.context["urgent_tickets_count"] == 1
+    assert response.context["auto_renew_enabled_count"] == 1
+    assert response.context["paid_last_30_days_amount"] == Decimal("40.00")
+
+
+@pytest.mark.django_db
+def test_dashboard_recent_activity_mixes_entities(client, django_user_model):
+    user = make_user(django_user_model, email="activity@portal.com")
+    package = make_package(slug="starter-activity")
+
+    make_service(user, package=package, domain_name="activity-service.com")
+    make_domain(user, name="activity-domain.com")
+    make_ticket(user, subject="Activity ticket")
+    make_invoice(user, number="INV-ACTIVITY", total="12.00")
+
+    client.force_login(user)
+    response = client.get(reverse("portal:dashboard"))
+
+    assert response.status_code == 200
+    titles = [event["title"] for event in response.context["recent_activity"]]
+    assert any("Service created" in title for title in titles)
+    assert any("Domain added" in title for title in titles)
+    assert any("Ticket opened" in title for title in titles)
+    assert any("Invoice issued" in title for title in titles)

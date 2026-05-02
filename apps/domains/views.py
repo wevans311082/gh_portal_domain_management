@@ -14,6 +14,7 @@ from django.views.decorators.http import require_GET, require_POST
 from apps.billing.models import Invoice, InvoiceLineItem
 from apps.domains.forms import DomainContactForm, DomainRegistrationForm
 from apps.domains.models import Domain, DomainContact, DomainOrder, DomainRenewal, TLDPricing
+from apps.domains.pricing import TLDPricingService
 from apps.domains.resellerclub_client import ResellerClubClient, ResellerClubError
 from apps.domains.services import DomainContactService
 
@@ -26,6 +27,7 @@ _DOMAIN_LABEL_RE = re.compile(r"^[a-z0-9]([a-z0-9\-]{0,61}[a-z0-9])?$")
 
 # Cache availability results for 60 seconds to reduce upstream API calls
 _CACHE_TTL = 60
+_PRICING_SYNC_TTL = 900
 
 
 def _is_valid_label(label: str) -> bool:
@@ -58,8 +60,28 @@ def _build_invoice_number(user_id: int) -> str:
     return f"DOM-{timezone.now():%Y%m%d%H%M%S%f}-{user_id}"
 
 
+def _sync_missing_tld_pricing(tlds):
+    """Sync missing TLD prices from ResellerClub with short cache lock to limit repeat calls."""
+    if not tlds:
+        return
+
+    lock_key = f"domain_pricing_sync:{','.join(sorted(tlds))}"
+    if cache.get(lock_key):
+        return
+
+    try:
+        TLDPricingService().sync_pricing(tlds=tlds)
+        cache.set(lock_key, True, timeout=_PRICING_SYNC_TTL)
+    except Exception as exc:
+        logger.warning("Unable to sync missing TLD pricing (%s): %s", tlds, exc)
+
+
 def domain_search(request):
     """Public domain search page."""
+    existing_tlds = set(TLDPricing.objects.filter(tld__in=POPULAR_TLDS).values_list("tld", flat=True))
+    missing_tlds = [tld for tld in POPULAR_TLDS if tld not in existing_tlds]
+    _sync_missing_tld_pricing(missing_tlds)
+
     pricing_lookup = TLDPricing.objects.in_bulk(POPULAR_TLDS, field_name="tld")
     featured_tlds = [
         {
@@ -95,6 +117,10 @@ def domain_check(request):
     if not _is_valid_label(domain_part):
         return HttpResponse("Invalid domain name.", status=400)
 
+    existing_tlds = set(TLDPricing.objects.filter(tld__in=POPULAR_TLDS).values_list("tld", flat=True))
+    missing_tlds = [tld for tld in POPULAR_TLDS if tld not in existing_tlds]
+    _sync_missing_tld_pricing(missing_tlds)
+
     results = []
     client = ResellerClubClient()
     pricing_lookup = TLDPricing.objects.in_bulk(POPULAR_TLDS, field_name="tld")
@@ -124,6 +150,9 @@ def domain_check(request):
             "tld": tld,
             "available": available,
             "registration_price": pricing_lookup.get(tld).registration_price if pricing_lookup.get(tld) else None,
+            "renewal_price": pricing_lookup.get(tld).renewal_price if pricing_lookup.get(tld) else None,
+            "transfer_price": pricing_lookup.get(tld).transfer_price if pricing_lookup.get(tld) else None,
+            "whois_url": f"https://lookup.icann.org/en/lookup?name={full_domain}",
         })
 
     return render(request, "domains/partials/availability_results.html", {

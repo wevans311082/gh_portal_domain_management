@@ -42,6 +42,17 @@ def ticket_list(request):
 @login_required
 def ticket_create(request):
     """Create a new support ticket."""
+    requested_domain = request.GET.get("domain", "").strip().lower()
+    initial_subject = ""
+    initial_message = ""
+    if requested_domain:
+        initial_subject = f"Domain transfer request: {requested_domain}"
+        initial_message = (
+            f"I would like to transfer {requested_domain} into my account.\n\n"
+            "Please advise next steps and validate transfer requirements.\n"
+            "I can provide the EPP/Auth code and unlock confirmation."
+        )
+
     if request.method == "POST":
         form = TicketForm(request.POST)
         if form.is_valid():
@@ -60,10 +71,18 @@ def ticket_create(request):
             messages.success(request, f"Ticket #{ticket.id} created successfully.")
             return redirect("support:detail", pk=ticket.id)
     else:
-        form = TicketForm()
+        form = TicketForm(initial={"subject": initial_subject} if initial_subject else None)
 
     departments = Department.objects.filter(is_active=True)
-    return render(request, "support/ticket_create.html", {"form": form, "departments": departments})
+    return render(
+        request,
+        "support/ticket_create.html",
+        {
+            "form": form,
+            "departments": departments,
+            "message_value": request.POST.get("message", "") if request.method == "POST" else initial_message,
+        },
+    )
 
 
 @login_required
