@@ -38,6 +38,8 @@ services:
       - .env
     environment:
       - DJANGO_SETTINGS_MODULE=grumpy_portal.settings.development
+      - AUTO_MAKEMIGRATIONS=1
+      - RUN_COLLECTSTATIC=1
     depends_on:
       db:
         condition: service_healthy
@@ -54,6 +56,8 @@ services:
       - .env
     environment:
       - DJANGO_SETTINGS_MODULE=grumpy_portal.settings.development
+      - AUTO_MAKEMIGRATIONS=1
+      - RUN_COLLECTSTATIC=0
     depends_on:
       db:
         condition: service_healthy
@@ -69,6 +73,8 @@ services:
       - .env
     environment:
       - DJANGO_SETTINGS_MODULE=grumpy_portal.settings.development
+      - AUTO_MAKEMIGRATIONS=1
+      - RUN_COLLECTSTATIC=0
     depends_on:
       db:
         condition: service_healthy

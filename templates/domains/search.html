@@ -4,7 +4,7 @@
 {% block title %}Domain Search - {{ SITE_NAME }}{% endblock %}
 
 {% block extra_head %}
-<script src="https://unpkg.com/htmx.org@1.9.10"></script>
+<script src="https://cdn.jsdelivr.net/npm/htmx.org@1.9.10/dist/htmx.min.js"></script>
 {% endblock %}
 
 {% block body %}
@@ -53,12 +53,9 @@
         <div class="flex flex-wrap gap-2">
             {% for featured in featured_tlds %}
             <button
+                type="button"
+                data-domain-tld="{{ featured.tld }}"
                 class="px-3 py-2 border border-gray-300 rounded-2xl text-left text-sm hover:bg-orange-50 hover:border-orange-400"
-                onclick="
-                    var input = document.getElementById('domain-search-input');
-                    var base = input.value.split('.')[0] || '';
-                    if (base) { input.value = base + '.{{ featured.tld }}'; htmx.trigger(input, 'input'); }
-                "
             >
                 <span class="block font-semibold text-gray-800">.{{ featured.tld }}</span>
                 <span class="block text-xs text-gray-500">
@@ -71,4 +68,8 @@
 
     <div id="availability-results" class="max-w-2xl mx-auto"></div>
 </main>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/domain-search.js' %}"></script>
 {% endblock %}
