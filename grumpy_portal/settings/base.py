@@ -138,8 +138,8 @@ LOGIN_RATE_LIMIT_WINDOW_SECONDS = env.int("LOGIN_RATE_LIMIT_WINDOW_SECONDS", def
 
 # Content Security Policy (additional sources can be added here via env)
 CSP_DEFAULT_SRC = ["'self'"]
-CSP_SCRIPT_SRC = ["'self'", "https://cdn.tailwindcss.com", "https://cdn.jsdelivr.net"]
-CSP_STYLE_SRC = ["'self'", "'unsafe-inline'", "https://cdn.tailwindcss.com"]
+CSP_SCRIPT_SRC = ["'self'"]
+CSP_STYLE_SRC = ["'self'", "'unsafe-inline'"]
 CSP_IMG_SRC = ["'self'", "data:"]
 CSP_FONT_SRC = ["'self'", "data:"]
 CSP_CONNECT_SRC = ["'self'"]

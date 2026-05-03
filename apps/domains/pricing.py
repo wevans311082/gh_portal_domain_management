@@ -8,10 +8,20 @@ from apps.domains.resellerclub_client import ResellerClubClient
 
 class TLDPricingService:
     PRICE_KEYS = (
+        "sellingCurrencyAmount",
+        "customerCurrencyAmount",
+        "resellerCurrencyAmount",
+        "sellingPrice",
+        "customerPrice",
+        "resellerPrice",
+        "selling_price",
         "selling_price",
         "customer_price",
+        "customerPrice",
         "price",
+        "price_value",
         "amount",
+        "amount_value",
         "total",
         "subtotal",
     )
@@ -24,21 +34,29 @@ class TLDPricingService:
         supported_tlds = tlds or settings_obj.supported_tlds
         synced_records = []
         synced_at = timezone.now()
+        errors = []
 
         for tld in supported_tlds:
-            payload = self.client.get_tld_costs(tld=tld, years=years)
-            pricing, _ = TLDPricing.objects.update_or_create(
-                tld=tld,
-                defaults={
-                    "registration_cost": self._extract_amount(payload.get("registration", {})),
-                    "renewal_cost": self._extract_amount(payload.get("renewal", {})),
-                    "transfer_cost": self._extract_amount(payload.get("transfer", {})),
-                    "last_synced_at": synced_at,
-                    "last_sync_payload": self._json_safe(payload),
-                    "is_active": True,
-                },
-            )
-            synced_records.append(pricing)
+            try:
+                payload = self.client.get_tld_costs(tld=tld, years=years)
+                pricing, _ = TLDPricing.objects.update_or_create(
+                    tld=tld,
+                    defaults={
+                        "registration_cost": self._extract_amount(payload.get("registration", {})),
+                        "renewal_cost": self._extract_amount(payload.get("renewal", {})),
+                        "transfer_cost": self._extract_amount(payload.get("transfer", {})),
+                        "last_synced_at": synced_at,
+                        "last_sync_payload": self._json_safe(payload),
+                        "is_active": True,
+                    },
+                )
+                synced_records.append(pricing)
+            except Exception as exc:
+                errors.append(f".{tld}: {exc}")
+
+        if errors:
+            settings_obj.last_sync_error = " | ".join(errors[:10])
+            settings_obj.save(update_fields=["last_sync_error", "updated_at"])
 
         return synced_records
 
@@ -58,12 +76,16 @@ class TLDPricingService:
         return payload
 
     def _find_price_value(self, payload):
+        if isinstance(payload, bool):
+            return None
+
         if isinstance(payload, (int, float, Decimal)):
             return payload
 
         if isinstance(payload, str):
             try:
-                return Decimal(payload)
+                cleaned = payload.replace(",", "").strip()
+                return Decimal(cleaned)
             except Exception:
                 return None
 

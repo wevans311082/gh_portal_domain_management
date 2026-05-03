@@ -57,6 +57,38 @@ def test_pricing_service_syncs_records(monkeypatch):
 
 
 @pytest.mark.django_db
+def test_pricing_service_syncs_realistic_camelcase_payloads():
+    settings_obj = DomainPricingSettings.get_solo()
+    settings_obj.supported_tlds = ["com"]
+    settings_obj.save(update_fields=["supported_tlds"])
+
+    class FakeClient:
+        def get_tld_costs(self, tld, years=1):
+            return {
+                "registration": {
+                    "description": "ok",
+                    "customerPrice": "12.34",
+                    "isPremiumDomain": False,
+                },
+                "renewal": {
+                    "sellingCurrencyAmount": "13.45",
+                    "actionstatus": "Success",
+                },
+                "transfer": {
+                    "resellerPrice": "14.56",
+                },
+            }
+
+    synced = TLDPricingService(client=FakeClient()).sync_pricing()
+
+    assert len(synced) == 1
+    pricing = TLDPricing.objects.get(tld="com")
+    assert pricing.registration_cost == Decimal("12.34")
+    assert pricing.renewal_cost == Decimal("13.45")
+    assert pricing.transfer_cost == Decimal("14.56")
+
+
+@pytest.mark.django_db
 def test_sync_schedule_uses_pricing_settings_interval():
     settings_obj = DomainPricingSettings.get_solo()
     settings_obj.sync_interval_hours = 12

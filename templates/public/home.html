@@ -4,9 +4,9 @@
 {% block title %}{{ SITE_NAME }} - Reliable UK Web Hosting{% endblock %}
 
 {% block extra_head %}
-<script src="https://cdn.jsdelivr.net/npm/htmx.org@1.9.10/dist/htmx.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.134.0/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.clouds2.min.js"></script>
+<script src="{% static 'vendor/htmx-1.9.10.min.js' %}"></script>
+<script src="{% static 'vendor/three-0.134.0.min.js' %}"></script>
+<script src="{% static 'vendor/vanta-clouds2.min.js' %}"></script>
 <style>
     :root {
         --glass-bg: rgba(255, 255, 255, 0.14);

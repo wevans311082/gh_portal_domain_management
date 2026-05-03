@@ -49,6 +49,13 @@
                     Sync Supported TLDs Now
                 </button>
             </form>
+            <form method="post" class="inline">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="import_all_tlds">
+                <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 text-sm font-semibold">
+                    Import All TLDs
+                </button>
+            </form>
             {% if settings_obj.last_sync_error %}
             <span class="text-xs rounded bg-rose-100 text-rose-700 px-2 py-1">
                 Last error: {{ settings_obj.last_sync_error|truncatechars:120 }}

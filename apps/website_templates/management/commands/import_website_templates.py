@@ -61,7 +61,7 @@ _BOOTSTRAP_BUNDLE_RE = re.compile(r"bootstrap[.-](\d+\.\d+(?:\.\d+)?)(\.min)?\.(
 _INLINE_HANDLER_RE = re.compile(r'\bon(click|load|submit|error|mouseover|mouseout)=["\']', re.IGNORECASE)
 
 JQUERY_SAFE_VERSION = (3, 7, 1)
-JQUERY_LATEST_CDN = "https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"
+JQUERY_LOCAL_SRC = "/static/vendor/jquery-3.7.1.min.js"
 
 
 def _parse_version(version_str: str) -> tuple[int, ...]:
@@ -116,8 +116,8 @@ def _audit_html_file(path: pathlib.Path) -> dict:
 
     # --- Fix CDN jquery links to latest ---
     def _replace_jquery_cdn(m):
-        notes.append(f"CDN jQuery link updated to {JQUERY_LATEST_CDN}")
-        return f'{m.group(1)}{JQUERY_LATEST_CDN}{m.group(2)}'
+        notes.append(f"CDN jQuery link updated to {JQUERY_LOCAL_SRC}")
+        return f'{m.group(1)}{JQUERY_LOCAL_SRC}{m.group(2)}'
 
     patched, n = _JQUERY_CDN_RE.subn(_replace_jquery_cdn, patched)
     if n:

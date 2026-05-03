@@ -3,7 +3,7 @@ Standalone security patcher — no Django needed.
 Run: python scripts/patch_templates.py
 Rewrites:
   - http:// CDN links → https://
-  - Old jQuery CDN (code.jquery.com / googleapis) → jQuery 3.7.1 on jsDelivr
+    - Old remote jQuery references → local /static/vendor/jquery-3.7.1.min.js
   - Reports bundled jQuery versions found in local js/ files
 """
 import pathlib
@@ -16,7 +16,7 @@ JQUERY_CDN_RE = re.compile(
     r'src=["\']https?://(?:code\.jquery\.com|ajax\.googleapis\.com/ajax/libs/jquery)/[^"\']+["\']',
     re.IGNORECASE,
 )
-JQUERY_NEW = 'src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"'
+JQUERY_NEW = 'src="/static/vendor/jquery-3.7.1.min.js"'
 HTTP_RE = re.compile(r'(src|href)=["\']http://', re.IGNORECASE)
 JQUERY_VER_RE = re.compile(r"jQuery\s+v?(\d+\.\d+(?:\.\d+)?)", re.IGNORECASE)
 
@@ -96,8 +96,8 @@ def main():
             for issue in issues:
                 print(issue)
         print(
-            f"\nTo fix: replace the local jquery.min.js files with "
-            f"https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"
+            f"\nTo fix: replace bundled jquery.min.js files with "
+            f"/static/vendor/jquery-3.7.1.min.js"
         )
 
 

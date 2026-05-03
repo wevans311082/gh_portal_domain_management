@@ -701,6 +701,54 @@ def tld_pricing(request):
             messages.success(request, "Domain pricing settings updated.")
             return redirect(redirect_url)
 
+        if action == "import_all_tlds":
+            from apps.domains.resellerclub_client import ResellerClubClient, ResellerClubError
+            from apps.domains.tasks import ensure_tld_pricing_sync_schedule
+
+            try:
+                imported_tlds = ResellerClubClient().list_available_tlds()
+            except ResellerClubError as exc:
+                messages.error(request, f"Could not import TLD list: {exc}")
+                return redirect(redirect_url)
+
+            if not imported_tlds:
+                messages.error(request, "Registrar returned no TLDs to import.")
+                return redirect(redirect_url)
+
+            settings_obj.supported_tlds = imported_tlds
+            settings_obj.save(update_fields=["supported_tlds", "updated_at"])
+            ensure_tld_pricing_sync_schedule(settings_obj)
+
+            if debug_mode:
+                from apps.domains.pricing import TLDPricingService
+                from django.utils import timezone
+
+                settings_obj.last_sync_started_at = timezone.now()
+                settings_obj.last_sync_error = ""
+                settings_obj.save(update_fields=["last_sync_started_at", "last_sync_error", "updated_at"])
+                try:
+                    synced = TLDPricingService().sync_pricing(tlds=imported_tlds)
+                    settings_obj.last_sync_completed_at = timezone.now()
+                    settings_obj.last_sync_error = ""
+                    settings_obj.save(update_fields=["last_sync_completed_at", "last_sync_error", "updated_at"])
+                    messages.success(
+                        request,
+                        f"Imported {len(imported_tlds)} TLDs and updated {len(synced)} pricing record(s) inline (debug mode).",
+                    )
+                except Exception as exc:
+                    settings_obj.last_sync_error = str(exc)
+                    settings_obj.save(update_fields=["last_sync_error", "updated_at"])
+                    messages.error(request, f"Imported TLD list but inline sync failed: {exc}")
+            else:
+                from apps.domains.tasks import sync_tld_pricing
+
+                sync_tld_pricing.delay(tlds=imported_tlds)
+                messages.success(
+                    request,
+                    f"Imported {len(imported_tlds)} TLDs and queued pricing sync.",
+                )
+                return redirect(redirect_url)
+
         if action == "sync_all":
             tlds = list(settings_obj.supported_tlds or [])
             if debug_mode:

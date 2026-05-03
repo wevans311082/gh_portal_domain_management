@@ -9,9 +9,9 @@
     <link rel="icon" type="image/svg+xml" href="{% static 'images/logo.svg' %}">
     <!-- Tailwind CSS -->
     <script src="{% static 'js/tailwind-config.js' %}"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="{% static 'vendor/tailwindcss-cdn.js' %}"></script>
     <!-- Alpine.js CSP build -->
-    <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/csp@3.14.1/dist/cdn.min.js"></script>
+    <script defer src="{% static 'vendor/alpine-csp-3.14.1.min.js' %}"></script>
     <link rel="stylesheet" href="{% static 'css/app.css' %}">
     {% block extra_head %}{% endblock %}
 </head>

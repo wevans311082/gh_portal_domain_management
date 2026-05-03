@@ -1,5 +1,6 @@
 """ResellerClub (LogicBoxes) API client for domain management."""
 import logging
+import re
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -12,6 +13,7 @@ logger = logging.getLogger(__name__)
 # Connection/read timeouts (seconds)
 _CONNECT_TIMEOUT = 10
 _READ_TIMEOUT = 30
+_TLD_RE = re.compile(r"^[a-z0-9][a-z0-9-]{1,62}(?:\.[a-z0-9][a-z0-9-]{0,62})*$")
 
 
 class ResellerClubError(Exception):
@@ -323,6 +325,73 @@ class ResellerClubClient:
             "renewal": self.get_tld_pricing(tld=tld, years=years, action="renewal"),
             "transfer": self.get_tld_pricing(tld=tld, years=years, action="transfer"),
         }
+
+    @staticmethod
+    def _normalize_tld_value(value: str) -> str:
+        normalized = str(value or "").strip().lower().lstrip(".")
+        if not normalized:
+            return ""
+        if normalized.endswith("-domain"):
+            normalized = normalized[: -len("-domain")]
+        if not _TLD_RE.match(normalized):
+            return ""
+        if normalized.isdigit():
+            return ""
+        return normalized
+
+    def _extract_tlds_from_payload(self, payload) -> list:
+        seen = set()
+
+        def walk(node, hinted=False):
+            if isinstance(node, dict):
+                for key, value in node.items():
+                    key_str = str(key or "").lower()
+                    key_hinted = hinted or ("tld" in key_str) or ("extension" in key_str)
+
+                    # Some endpoints expose product keys like "com-domain"
+                    if key_str.endswith("-domain"):
+                        tld = self._normalize_tld_value(key_str)
+                        if tld:
+                            seen.add(tld)
+
+                    walk(value, key_hinted)
+                return
+
+            if isinstance(node, (list, tuple, set)):
+                for item in node:
+                    walk(item, hinted)
+                return
+
+            if isinstance(node, str) and hinted:
+                tld = self._normalize_tld_value(node)
+                if tld:
+                    seen.add(tld)
+
+        walk(payload)
+        return sorted(seen)
+
+    def list_available_tlds(self) -> list:
+        """Return an imported TLD list by probing common LogicBoxes catalog endpoints."""
+        candidates = [
+            ("products/list", {"type": "domain"}),
+            ("domains/available-tlds", {}),
+            ("domains/tlds", {}),
+        ]
+        last_error = None
+
+        for endpoint, params in candidates:
+            try:
+                payload = self._get(endpoint, params)
+                tlds = self._extract_tlds_from_payload(payload)
+                if tlds:
+                    return tlds
+            except Exception as exc:
+                last_error = exc
+                continue
+
+        if last_error:
+            raise ResellerClubError(f"Unable to import TLD list from registrar: {last_error}")
+        raise ResellerClubError("Unable to import TLD list from registrar.")
 
     def register_domain(
         self,

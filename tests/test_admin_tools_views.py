@@ -5,7 +5,7 @@ from django_celery_beat.models import IntervalSchedule, PeriodicTask
 from django_celery_results.models import TaskResult
 
 from apps.billing.models import Invoice
-from apps.domains.models import TLDPricing
+from apps.domains.models import DomainPricingSettings, TLDPricing
 
 
 @pytest.mark.django_db
@@ -172,3 +172,49 @@ def test_staff_can_view_resellerclub_debug_page(client, django_user_model):
 
     assert response.status_code == 200
     assert "ResellerClub HTTP Debug" in response.content.decode()
+
+
+@pytest.mark.django_db
+def test_staff_can_import_all_tlds_and_sync_inline(client, django_user_model, monkeypatch):
+    staff_user = django_user_model.objects.create_user(
+        email="pricing-import-admin@example.com",
+        password="password123",
+        is_staff=True,
+    )
+
+    class FakeClient:
+        def list_available_tlds(self):
+            return ["com", "net", "co.uk"]
+
+    class FakePricingService:
+        def sync_pricing(self, tlds=None, years=1):
+            created = []
+            for tld in (tlds or []):
+                obj, _ = TLDPricing.objects.update_or_create(
+                    tld=tld,
+                    defaults={
+                        "registration_cost": "10.00",
+                        "renewal_cost": "11.00",
+                        "transfer_cost": "12.00",
+                        "is_active": True,
+                    },
+                )
+                created.append(obj)
+            return created
+
+    monkeypatch.setattr("apps.domains.resellerclub_client.ResellerClubClient", lambda: FakeClient())
+    monkeypatch.setattr("apps.domains.pricing.TLDPricingService", lambda: FakePricingService())
+    monkeypatch.setattr(
+        "apps.admin_tools.views.get_runtime_setting",
+        lambda key, default="": "true" if key == "RESELLERCLUB_DEBUG_MODE" else default,
+    )
+
+    client.force_login(staff_user)
+    response = client.post(reverse("admin_tools:tld_pricing"), {"action": "import_all_tlds"})
+
+    settings_obj = DomainPricingSettings.get_solo()
+    assert response.status_code == 200
+    assert settings_obj.supported_tlds == ["com", "net", "co.uk"]
+    assert TLDPricing.objects.filter(tld="com").exists()
+    assert TLDPricing.objects.filter(tld="net").exists()
+    assert TLDPricing.objects.filter(tld="co.uk").exists()
