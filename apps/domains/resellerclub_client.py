@@ -59,6 +59,9 @@ class ResellerClubClient:
             "auth-userid": self.reseller_id,
             "api-key": self.api_key,
         }
+        # Lazy caches populated on first pricing/classkey lookup
+        self._pricing_catalog = None  # full customer-price.json catalog
+        self._tld_classkeys = {}      # tld -> classkey mapping
 
     @staticmethod
     def _normalize_domain_labels(domain_names: list) -> list:
@@ -279,21 +282,88 @@ class ResellerClubClient:
             raise ResellerClubError(f"API POST failed: {e}") from e
         return self._check_response(result, normalized_endpoint)
 
+    # ResellerClub permits many TLDs per availability call but URLs grow long;
+    # chunk to keep query strings under typical 8KB limits.
+    _AVAILABILITY_TLD_CHUNK = 30
+
     def check_availability(self, domain_names: list, tlds: list) -> dict:
         """
         Check availability of domain names across TLDs.
-        Returns dict of domain -> availability status.
+        Returns dict of "<domain>.<tld>" -> availability info.
+
+        Per the LogicBoxes spec, ``domain-name`` and ``tlds`` MUST be sent as
+        REPEATED query parameters (e.g. ``tlds=com&tlds=net``) — comma-joined
+        values are treated by the API as a single literal TLD and produce
+        ``{"<label>.<comma-joined>": {"status": "unknown"}}``.
         """
         labels = self._normalize_domain_labels(domain_names)
         normalized_tlds = self._normalize_tlds(tlds)
         if not labels or not normalized_tlds:
             raise ResellerClubError("Domain availability check requires at least one domain label and one TLD.")
 
-        params = {
-            "domain-name": ",".join(labels),
-            "tlds": ",".join(normalized_tlds),
-        }
-        return self._get("domains/available", params)
+        merged: dict = {}
+        # Chunk TLDs to keep the URL within safe limits.
+        for i in range(0, len(normalized_tlds), self._AVAILABILITY_TLD_CHUNK):
+            chunk = normalized_tlds[i : i + self._AVAILABILITY_TLD_CHUNK]
+            params = {
+                # Lists cause requests to repeat the param: domain-name=a&domain-name=b
+                "domain-name": labels,
+                "tlds": chunk,
+            }
+            data = self._get("domains/available", params)
+            if isinstance(data, dict):
+                merged.update(data)
+        return merged
+
+    def discover_tld_classkeys(self, tlds: list, probe_label: str = "example") -> dict:
+        """
+        Return a ``{tld: classkey}`` mapping by issuing availability lookups.
+
+        ResellerClub identifies products by a short ``classkey`` (for example
+        ``domcno`` for .com, ``thirdleveldotuk`` for .co.uk).  The classkey is
+        included in every availability response and is the join key for the
+        customer pricing catalog, so this method gives us the bridge between
+        a friendly TLD string and the pricing payload.
+        """
+        normalized = self._normalize_tlds(tlds)
+        if not normalized:
+            return {}
+        response = self.check_availability([probe_label], normalized)
+        prefix = f"{probe_label}."
+        result: dict = {}
+        for full_domain, info in (response or {}).items():
+            if not isinstance(info, dict):
+                continue
+            classkey = info.get("classkey")
+            if not classkey or not full_domain.startswith(prefix):
+                continue
+            tld = full_domain[len(prefix):].strip().lower()
+            if tld:
+                result[tld] = str(classkey)
+        # Cache for later get_tld_costs() calls.
+        self._tld_classkeys.update(result)
+        return result
+
+    def get_customer_pricing(self) -> dict:
+        """
+        Fetch the FULL ResellerClub customer pricing catalog in one request.
+
+        The ``products/customer-price.json`` endpoint takes only auth params
+        and returns a dict keyed by ``classkey`` with sub-dicts for each
+        action (``addnewdomain``, ``renewdomain``, ``addtransferdomain``,
+        ``restoredomain``) mapping number-of-years strings to prices.
+
+        Result is cached on the client instance for the lifetime of the
+        instance to avoid the heavy (~120KB) repeat call.
+        """
+        if self._pricing_catalog is None:
+            self._pricing_catalog = self._get("products/customer-price")
+        return self._pricing_catalog
+
+    def prime_pricing_cache(self, tlds: list) -> None:
+        """Pre-populate classkey + catalog caches for the given TLD list."""
+        self.discover_tld_classkeys(tlds)
+        self.get_customer_pricing()
 
     def suggest_names(self, keyword: str, tlds: list) -> list:
         """Get domain name suggestions based on a keyword."""
@@ -314,9 +384,50 @@ class ResellerClubClient:
         }
         return self._get("products/customer-price", params)
 
+    # Mapping from logical action -> key used inside the customer pricing catalog.
+    _ACTION_TO_CATALOG_KEY = {
+        "registration": "addnewdomain",
+        "renewal": "renewdomain",
+        "transfer": "addtransferdomain",
+        "restore": "restoredomain",
+    }
+
     def get_tld_pricing(self, tld: str, years: int = 1, action: str = "registration") -> dict:
-        """Get pricing metadata for a TLD without needing a specific domain name."""
-        return self.get_price(domain_name=f"example.{tld}", tld=tld, action=action, years=years)
+        """Return the pricing block for a single TLD/action from the catalog.
+
+        The returned dict matches the catalog shape for that action, e.g.
+        ``{"1": 9.50, "2": 9.50, ...}``, plus a ``price`` convenience key
+        carrying the price for the requested ``years`` (falling back to 1).
+        """
+        normalized_tld = self._normalize_tld_value(tld)
+        if not normalized_tld:
+            return {}
+        catalog_action = self._ACTION_TO_CATALOG_KEY.get(action, action)
+
+        classkey = self._tld_classkeys.get(normalized_tld)
+        if not classkey:
+            self.discover_tld_classkeys([normalized_tld])
+            classkey = self._tld_classkeys.get(normalized_tld)
+        if not classkey:
+            return {}
+
+        catalog = self.get_customer_pricing() or {}
+        tld_block = catalog.get(classkey) or {}
+        action_block = tld_block.get(catalog_action) or {}
+        if not isinstance(action_block, dict):
+            return {}
+
+        # Pick the requested years, fall back to "1".
+        price = action_block.get(str(years))
+        if price is None:
+            price = action_block.get("1")
+        result = dict(action_block)
+        if price is not None:
+            result["price"] = price
+        result["classkey"] = classkey
+        result["tld"] = normalized_tld
+        result["action"] = catalog_action
+        return result
 
     def get_tld_costs(self, tld: str, years: int = 1) -> dict:
         """Return registration, renewal, and transfer pricing payloads for a TLD."""

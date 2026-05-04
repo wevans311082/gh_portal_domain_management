@@ -66,6 +66,17 @@ class TLDPricingService:
             if cleaned:
                 normalized_tlds.append(cleaned)
 
+        # Prime the client's pricing/classkey cache in 2 API calls total
+        # (1 chunked availability sweep + 1 catalog fetch) instead of 3 calls
+        # per TLD.  Tests using a mock client without prime_pricing_cache are
+        # silently skipped.
+        prime = getattr(self.client, "prime_pricing_cache", None)
+        if callable(prime):
+            try:
+                prime(normalized_tlds)
+            except Exception as exc:
+                errors.append(f"prime: {exc}")
+
         for tld in normalized_tlds:
             try:
                 payload = self.client.get_tld_costs(tld=tld, years=years)
