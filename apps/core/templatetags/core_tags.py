@@ -4,6 +4,31 @@ from django.utils.safestring import mark_safe
 register = template.Library()
 
 
+@register.filter
+def admin_table_url(table_name):
+    """Convert a DB table name to its Django admin path segment.
+
+    e.g. ``website_templates_templateinstallation`` → ``website_templates/templateinstallation``
+         ``accounts_user``                          → ``accounts/user``
+
+    Uses the app registry for accuracy so multi-word app labels (which
+    contain underscores) are handled correctly.  Falls back to replacing
+    the last underscore with a slash for any table not registered as a
+    Django model.
+    """
+    from django.apps import apps as django_apps
+
+    for model in django_apps.get_models():
+        if model._meta.db_table == table_name:
+            return f"{model._meta.app_label}/{model._meta.model_name}"
+
+    # Fallback: replace last underscore with slash
+    idx = table_name.rfind("_")
+    if idx > 0:
+        return table_name[:idx] + "/" + table_name[idx + 1:]
+    return table_name
+
+
 # Curated GitHub Octicons (MIT licensed) used across the portal/public site.
 # Each entry stores the inner <path>/<rect>/etc markup of a 16x16 octicon so
 # we can size and style the icon at the call site via Tailwind classes.

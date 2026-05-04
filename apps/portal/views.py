@@ -238,7 +238,7 @@ def shop(request):
         .prefetch_related("features")
         .order_by("card_sort_order", "sort_order", "price_monthly")
     )
-    featured_tlds = TLDPricing.objects.filter(is_active=True).order_by("registration_price", "tld")[:8]
+    featured_tlds = TLDPricing.objects.filter(is_active=True).order_by("registration_cost", "tld")[:8]
     contacts = request.user.domain_contacts.order_by("-is_default", "label")
     renewable_domains = request.user.domains.order_by("name")
     return render(

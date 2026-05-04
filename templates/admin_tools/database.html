@@ -1,5 +1,5 @@
 {% extends "base_admin.html" %}
-
+{% load core_tags %}
 {% block title %}Database — {{ SITE_NAME }}{% endblock %}
 {% block page_title %}Database Stats{% endblock %}
 
@@ -44,13 +44,17 @@
                         {% comment %}
                         Build a Django admin changelist link from the table name:
                         e.g. accounts_user → /admin/accounts/user/
+                        Split on the last underscore so multi-word app labels
+                        (e.g. website_templates_templateinstallation) work correctly.
+                        We rely on the fact that table names are app_label + "_" + model_name
+                        where app_label itself may contain underscores, but the model name
+                        never does. We therefore use a custom tag — or a simpler safe approach:
+                        replace the last underscore with a slash.
                         {% endcomment %}
-                        {% with parts=row.table|cut:"_" %}
-                        <a href="/{{ DJANGO_ADMIN_URL }}{{ row.table|cut:"_"|lower }}/"
+                        <a href="/{{ DJANGO_ADMIN_URL }}{{ row.table|admin_table_url }}/"
                            class="text-xs text-indigo-500 hover:underline" target="_blank">
                             View ↗
                         </a>
-                        {% endwith %}
                     </td>
                 </tr>
                 {% empty %}
