@@ -58,6 +58,10 @@
         <p class="text-xs text-slate-500 font-medium uppercase tracking-wide mb-1">Enabled Tasks</p>
         <p class="text-3xl font-bold text-slate-800">{{ enabled_periodic_tasks }}</p>
     </a>
+    <a href="{% url 'admin_tools:users' %}" class="bg-white rounded-xl border {% if staff_without_mfa %}border-amber-300{% else %}border-slate-200{% endif %} shadow-sm p-5 hover:shadow-md transition-shadow">
+        <p class="text-xs text-slate-500 font-medium uppercase tracking-wide mb-1">Staff Without MFA</p>
+        <p class="text-3xl font-bold {% if staff_without_mfa %}text-amber-600{% else %}text-slate-800{% endif %}">{{ staff_without_mfa }}</p>
+    </a>
 </div>
 
 <!-- Activity + Quick links grid -->

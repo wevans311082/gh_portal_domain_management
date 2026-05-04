@@ -42,6 +42,10 @@
            class="inline-block bg-gray-100 text-gray-700 px-4 py-2 rounded hover:bg-gray-200 text-sm mr-2">
             Replace authenticator
         </a>
+        <a href="{% url 'accounts_custom:mfa_manage' %}"
+           class="inline-block bg-sky-600 text-white px-4 py-2 rounded hover:bg-sky-700 text-sm mr-2">
+            Manage backup codes
+        </a>
         <!-- Disable MFA — requires current TOTP token -->
         <details class="mt-4 border rounded p-4">
             <summary class="cursor-pointer text-sm text-red-600 hover:underline">Disable two-factor authentication</summary>
@@ -66,6 +70,10 @@
         <a href="{% url 'accounts_custom:mfa_setup' %}"
            class="inline-block bg-sky-600 text-white px-4 py-2 rounded hover:bg-sky-700 text-sm font-semibold">
             Enable Two-Factor Authentication
+        </a>
+        <a href="{% url 'accounts_custom:mfa_manage' %}"
+           class="inline-block bg-gray-100 text-gray-700 px-4 py-2 rounded hover:bg-gray-200 text-sm font-semibold">
+            MFA recovery options
         </a>
         {% endif %}
     </div>

@@ -19,7 +19,7 @@
         display: inline;
     }
 </style>
-<div class="flex h-full">
+<div class="admin-shell flex h-full">
     <!-- ── Admin Sidebar ───────────────────────────────────────────────── -->
     <aside class="w-64 bg-slate-900 text-white flex-shrink-0 flex flex-col shadow-xl" style="min-height:100vh">
         <!-- Brand -->
@@ -58,7 +58,7 @@
             </details>
 
             <!-- People -->
-            <details class="admin-nav-section mb-3" {% if request.resolver_match.url_name == 'users' or request.resolver_match.url_name == 'user_create' or request.resolver_match.url_name == 'user_update' %}open{% endif %}>
+            <details class="admin-nav-section mb-3" {% if request.resolver_match.url_name == 'users' or request.resolver_match.url_name == 'user_create' or request.resolver_match.url_name == 'user_update' or request.resolver_match.url_name == 'user_mfa_manage' %}open{% endif %}>
                 <summary class="list-none cursor-pointer px-2 text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1 flex items-center justify-between">
                     <span>People</span>
                     <span class="text-slate-600"><span class="admin-nav-plus">+</span><span class="admin-nav-minus">-</span></span>
@@ -178,7 +178,7 @@
             </details>
 
             <!-- System -->
-            <details class="admin-nav-section mb-3" {% if request.resolver_match.url_name == 'task_management' or request.resolver_match.url_name == 'integrations_overview' or request.resolver_match.url_name == 'resellerclub_debug' or request.resolver_match.url_name == 'template_scan' or request.resolver_match.url_name == 'security' or request.resolver_match.url_name == 'database' or request.resolver_match.url_name == 'settings_overview' or 'wizard' in request.resolver_match.url_name %}open{% endif %}>
+            <details class="admin-nav-section mb-3" {% if request.resolver_match.url_name == 'task_management' or request.resolver_match.url_name == 'integrations_overview' or request.resolver_match.url_name == 'companies_house_config' or request.resolver_match.url_name == 'resellerclub_debug' or request.resolver_match.url_name == 'template_scan' or request.resolver_match.url_name == 'security' or request.resolver_match.url_name == 'database' or request.resolver_match.url_name == 'settings_overview' or 'wizard' in request.resolver_match.url_name %}open{% endif %}>
                 <summary class="list-none cursor-pointer px-2 text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1 flex items-center justify-between">
                     <span>System</span>
                     <span class="text-slate-600"><span class="admin-nav-plus">+</span><span class="admin-nav-minus">-</span></span>
@@ -194,6 +194,11 @@
                     <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/></svg>
                     Integrations
                 </a>
+                     <a href="{% url 'admin_tools:companies_house_config' %}"
+                         class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition-colors {% if request.resolver_match.url_name == 'companies_house_config' %}bg-slate-800 text-white{% endif %}">
+                          <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h8M8 11h5m-7 8h12a2 2 0 002-2V7a2 2 0 00-2-2h-3.586a1 1 0 01-.707-.293l-1.414-1.414a1 1 0 00-.707-.293H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                          Companies House Config
+                     </a>
                 <a href="{% url 'admin_tools:resellerclub_debug' %}"
                    class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition-colors {% if request.resolver_match.url_name == 'resellerclub_debug' %}bg-slate-800 text-white{% endif %}">
                     <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 3h4.5M6 7.5h12M7.5 21h9a2.25 2.25 0 002.25-2.25V9.75a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 005.25 9.75v9A2.25 2.25 0 007.5 21zm2.25-7.5h4.5"/></svg>
@@ -264,6 +269,11 @@
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
                 My Profile
             </a>
+                <a href="{% url 'accounts_custom:mfa_manage' %}"
+                    class="flex items-center gap-2 px-2 py-1.5 rounded text-xs text-slate-400 hover:text-white transition-colors">
+                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2h-1V9a5 5 0 00-10 0v2H6a2 2 0 00-2 2v6a2 2 0 002 2zm3-10V9a3 3 0 016 0v2H9z"/></svg>
+                     MFA &amp; Recovery
+                </a>
             <a href="{% url 'account_logout' %}"
                class="flex items-center gap-2 px-2 py-1.5 rounded text-xs text-slate-400 hover:text-red-400 transition-colors">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>

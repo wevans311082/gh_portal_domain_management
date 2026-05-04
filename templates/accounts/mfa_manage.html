@@ -1,0 +1,45 @@
+{% extends "base_portal.html" %}
+
+{% block page_title %}Manage MFA{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-6">
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+        <h2 class="text-xl font-semibold text-slate-900">MFA Recovery and Backup Codes</h2>
+        <p class="text-sm text-slate-500 mt-1">
+            Backup codes let you sign in if your authenticator app is unavailable. Each code can be used once.
+        </p>
+
+        <div class="mt-4 flex items-center gap-3">
+            <span class="text-sm text-slate-600">Unused backup codes:</span>
+            <span class="inline-flex items-center px-2 py-0.5 rounded bg-sky-100 text-sky-700 text-sm font-semibold">{{ backup_code_count }}</span>
+        </div>
+    </div>
+
+    {% if fresh_backup_codes %}
+    <div class="bg-amber-50 border border-amber-200 rounded-xl p-5">
+        <h3 class="text-base font-semibold text-amber-900">Save these backup codes now</h3>
+        <p class="text-sm text-amber-800 mt-1">These codes are only shown once. Store them in a secure password manager.</p>
+        <div class="mt-4 grid grid-cols-2 gap-2">
+            {% for code in fresh_backup_codes %}
+            <div class="font-mono text-sm rounded bg-white border border-amber-200 px-3 py-2 text-amber-900">{{ code }}</div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+        <h3 class="text-base font-semibold text-slate-900">Regenerate backup codes</h3>
+        <p class="text-sm text-slate-500 mt-1">Regeneration invalidates all existing backup codes immediately.</p>
+
+        <form method="post" class="mt-4 space-y-3 max-w-sm">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="regenerate_codes">
+            <label class="block text-sm font-medium text-slate-700" for="{{ regenerate_form.token.id_for_label }}">{{ regenerate_form.token.label }}</label>
+            {{ regenerate_form.token }}
+            {% for err in regenerate_form.token.errors %}<p class="text-xs text-red-600">{{ err }}</p>{% endfor %}
+            <button type="submit" class="px-4 py-2 rounded-lg bg-sky-600 text-white text-sm font-semibold hover:bg-sky-700">Regenerate codes</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

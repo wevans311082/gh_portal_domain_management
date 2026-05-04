@@ -17,6 +17,7 @@
             <div>
                 <label class="mb-2 block text-sm font-semibold text-slate-700" for="{{ form.contact.id_for_label }}">Registrant contact</label>
                 {{ form.contact }}
+                <p class="mt-2 text-xs text-slate-500">Only contacts with validated registrant details can be used for registration. <a href="{% url 'domains:contact_list' %}" class="text-sky-700 hover:underline">Manage contacts</a>.</p>
                 {% if form.contact.errors %}<p class="mt-2 text-sm text-rose-600">{{ form.contact.errors|join:", " }}</p>{% endif %}
             </div>
             <div class="grid gap-5 md:grid-cols-2">

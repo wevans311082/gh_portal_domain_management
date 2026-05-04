@@ -15,9 +15,17 @@ from django.shortcuts import render, redirect
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
+from django.utils.crypto import get_random_string
 
 from apps.audit.models import AuditLog
-from .forms import RegistrationForm, ProfileUpdateForm, TOTPVerifyForm
+from .forms import (
+    MFALoginVerifyForm,
+    MFARegenerateBackupCodesForm,
+    ProfileUpdateForm,
+    RegistrationForm,
+    TOTPVerifyForm,
+)
+from .mfa import active_backup_code_count, consume_backup_code, regenerate_backup_codes
 from .models import ClientProfile, User
 
 logger = logging.getLogger(__name__)
@@ -26,6 +34,8 @@ logger = logging.getLogger(__name__)
 _MFA_USER_SESSION_KEY = "_mfa_pending_user_id"
 _LOGIN_RATE_MAX = getattr(settings, "LOGIN_RATE_LIMIT_MAX_ATTEMPTS", 5)
 _LOGIN_RATE_WINDOW = getattr(settings, "LOGIN_RATE_LIMIT_WINDOW_SECONDS", 300)
+_SUPPORT_LOGIN_CODE_SESSION_KEY = "support_login_code"
+_SUPPORT_LOGIN_CODE_TS_SESSION_KEY = "support_login_code_ts"
 
 
 def _login_rate_key(request) -> str:
@@ -34,6 +44,33 @@ def _login_rate_key(request) -> str:
         or request.META.get("REMOTE_ADDR", "unknown")
     )
     return f"login_rl:{ip}"
+
+
+def _resolve_support_email() -> str:
+    try:
+        from apps.core.models import SiteContentSettings
+
+        email = (SiteContentSettings.get_solo().support_email or "").strip()
+        if email:
+            return email
+    except Exception:
+        pass
+    return f"support@{getattr(settings, 'SITE_DOMAIN', 'example.com')}"
+
+
+def _issue_support_login_code(request) -> str:
+    existing = request.session.get(_SUPPORT_LOGIN_CODE_SESSION_KEY)
+    issued_at = request.session.get(_SUPPORT_LOGIN_CODE_TS_SESSION_KEY)
+    now = timezone.now().timestamp()
+
+    if existing and issued_at and (now - float(issued_at)) < 900:
+        return existing
+
+    code = f"AUTH-{get_random_string(8, allowed_chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789')}"
+    request.session[_SUPPORT_LOGIN_CODE_SESSION_KEY] = code
+    request.session[_SUPPORT_LOGIN_CODE_TS_SESSION_KEY] = now
+    request.session.modified = True
+    return code
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -76,6 +113,9 @@ def custom_login(request):
 
     next_url = request.GET.get("next", "") or request.POST.get("next", "")
 
+    support_email = _resolve_support_email()
+    support_code = _issue_support_login_code(request)
+
     if request.method == "POST":
         # Rate limiting by IP
         rl_key = _login_rate_key(request)
@@ -83,7 +123,16 @@ def custom_login(request):
         if attempts >= _LOGIN_RATE_MAX:
             wait = _LOGIN_RATE_WINDOW // 60
             messages.error(request, f"Too many failed login attempts. Please wait {wait} minutes.")
-            return render(request, "accounts/login.html", {"next": next_url, "rate_limited": True})
+            return render(
+                request,
+                "accounts/login.html",
+                {
+                    "next": next_url,
+                    "rate_limited": True,
+                    "support_email": support_email,
+                    "support_login_code": support_code,
+                },
+            )
 
         email = request.POST.get("email", "").strip()
         password = request.POST.get("password", "")
@@ -107,7 +156,15 @@ def custom_login(request):
             # Increment failure counter
             cache.set(rl_key, attempts + 1, timeout=_LOGIN_RATE_WINDOW)
             messages.error(request, "Invalid email or password.")
-            return render(request, "accounts/login.html", {"next": next_url})
+            return render(
+                request,
+                "accounts/login.html",
+                {
+                    "next": next_url,
+                    "support_email": support_email,
+                    "support_login_code": support_code,
+                },
+            )
 
         # No MFA — complete login immediately; reset failure counter
         cache.delete(rl_key)
@@ -119,7 +176,15 @@ def custom_login(request):
             return redirect("admin_tools:dashboard")
         return redirect("portal:dashboard")
 
-    return render(request, "accounts/login.html", {"next": next_url})
+    return render(
+        request,
+        "accounts/login.html",
+        {
+            "next": next_url,
+            "support_email": support_email,
+            "support_login_code": support_code,
+        },
+    )
 
 
 def mfa_verify(request):
@@ -139,12 +204,15 @@ def mfa_verify(request):
 
     next_url = request.GET.get("next", "") or request.POST.get("next", "")
 
+    support_email = _resolve_support_email()
+    support_code = _issue_support_login_code(request)
+
     if request.method == "POST":
-        form = TOTPVerifyForm(request.POST)
+        form = MFALoginVerifyForm(request.POST)
         if form.is_valid():
-            token = form.cleaned_data["token"]
+            token = form.cleaned_data["code"]
             totp = pyotp.TOTP(pending_user.mfa_secret)
-            if totp.verify(token, valid_window=1):
+            if token.isdigit() and len(token) == 6 and totp.verify(token, valid_window=1):
                 del request.session[_MFA_USER_SESSION_KEY]
                 login(request, pending_user, backend="apps.accounts.backends.EmailBackend")
                 if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
@@ -152,13 +220,35 @@ def mfa_verify(request):
                 if pending_user.is_staff:
                     return redirect("admin_tools:dashboard")
                 return redirect("portal:dashboard")
-            else:
-                logger.warning("Invalid MFA token for user %s", pending_user.pk)
-                form.add_error("token", "Invalid code. Please try again.")
-    else:
-        form = TOTPVerifyForm()
+            if consume_backup_code(pending_user, token):
+                del request.session[_MFA_USER_SESSION_KEY]
+                login(request, pending_user, backend="apps.accounts.backends.EmailBackend")
+                messages.warning(
+                    request,
+                    "Signed in using a backup code. Generate a fresh set soon.",
+                )
+                if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+                    return redirect(next_url)
+                if pending_user.is_staff:
+                    return redirect("admin_tools:dashboard")
+                return redirect("portal:dashboard")
 
-    return render(request, "accounts/mfa_verify.html", {"form": form, "next": next_url})
+            logger.warning("Invalid MFA code for user %s", pending_user.pk)
+            form.add_error("code", "Invalid authenticator or backup code. Please try again.")
+    else:
+        form = MFALoginVerifyForm()
+
+    return render(
+        request,
+        "accounts/mfa_verify.html",
+        {
+            "form": form,
+            "next": next_url,
+            "backup_code_count": active_backup_code_count(pending_user),
+            "support_email": support_email,
+            "support_login_code": support_code,
+        },
+    )
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -209,9 +299,11 @@ def mfa_setup(request):
                 user.mfa_secret = secret
                 user.mfa_enabled = True
                 user.save(update_fields=["mfa_secret", "mfa_enabled"])
+                fresh_codes = regenerate_backup_codes(user)
+                request.session["fresh_mfa_backup_codes"] = fresh_codes
                 del request.session["mfa_setup_secret"]
                 messages.success(request, "Two-factor authentication has been enabled.")
-                return redirect("accounts_custom:profile")
+                return redirect("accounts_custom:mfa_manage")
             else:
                 form.add_error("token", "Invalid code — make sure your authenticator app is synced.")
     else:
@@ -256,10 +348,44 @@ def mfa_disable(request):
         user.mfa_enabled = False
         user.mfa_secret = ""
         user.save(update_fields=["mfa_enabled", "mfa_secret"])
+        user.mfa_backup_codes.all().delete()
         messages.success(request, "Two-factor authentication has been disabled.")
     else:
         messages.error(request, "Invalid code. MFA has not been disabled.")
     return redirect("accounts_custom:profile")
+
+
+@login_required
+def mfa_manage(request):
+    user = request.user
+    regenerate_form = MFARegenerateBackupCodesForm()
+
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+        if action == "regenerate_codes":
+            regenerate_form = MFARegenerateBackupCodesForm(request.POST)
+            if not user.mfa_enabled:
+                messages.error(request, "Enable MFA before generating backup codes.")
+            elif regenerate_form.is_valid():
+                token = regenerate_form.cleaned_data["token"]
+                totp = pyotp.TOTP(user.mfa_secret)
+                if totp.verify(token, valid_window=1):
+                    request.session["fresh_mfa_backup_codes"] = regenerate_backup_codes(user)
+                    messages.success(request, "Backup codes regenerated. Save them now.")
+                    return redirect("accounts_custom:mfa_manage")
+                regenerate_form.add_error("token", "Invalid code. Backup codes were not regenerated.")
+
+    fresh_codes = request.session.pop("fresh_mfa_backup_codes", None)
+
+    return render(
+        request,
+        "accounts/mfa_manage.html",
+        {
+            "backup_code_count": active_backup_code_count(user),
+            "fresh_backup_codes": fresh_codes,
+            "regenerate_form": regenerate_form,
+        },
+    )
 
 
 # ──────────────────────────────────────────────────────────────────────────────

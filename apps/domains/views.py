@@ -538,7 +538,7 @@ def domain_register(request):
 def my_domains(request):
     """Client portal: list user's domains â€" paginated."""
     from django.core.paginator import Paginator
-    qs = Domain.objects.filter(user=request.user).order_by("name")
+    qs = Domain.objects.filter(user=request.user).select_related("order__registration_contact").order_by("name")
     paginator = Paginator(qs, 20)
     page_obj = paginator.get_page(request.GET.get("page"))
     return render(request, "domains/my_domains.html", {"domains": page_obj.object_list, "page_obj": page_obj})
@@ -547,7 +547,11 @@ def my_domains(request):
 @login_required
 def domain_detail(request, pk):
     """Domain detail and management page."""
-    domain = get_object_or_404(Domain, pk=pk, user=request.user)
+    domain = get_object_or_404(
+        Domain.objects.select_related("order__registration_contact"),
+        pk=pk,
+        user=request.user,
+    )
     return render(request, "domains/domain_detail.html", {"domain": domain})
 
 

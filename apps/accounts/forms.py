@@ -81,3 +81,41 @@ class TOTPVerifyForm(forms.Form):
         if not token.isdigit():
             raise forms.ValidationError("Enter the 6-digit code from your authenticator app.")
         return token
+
+
+class MFALoginVerifyForm(forms.Form):
+    code = forms.CharField(
+        label="Authentication code or backup code",
+        max_length=16,
+        widget=forms.TextInput(attrs={
+            "autocomplete": "one-time-code",
+            "placeholder": "000000 or ABCD-EFGH",
+        }),
+    )
+
+    def clean_code(self):
+        value = (self.cleaned_data.get("code") or "").strip().upper()
+        compact = value.replace(" ", "")
+        if not compact:
+            raise forms.ValidationError("Enter your authenticator code or backup code.")
+        return value
+
+
+class MFARegenerateBackupCodesForm(forms.Form):
+    token = forms.CharField(
+        label="Current authenticator code",
+        max_length=6,
+        min_length=6,
+        widget=forms.TextInput(attrs={
+            "autocomplete": "one-time-code",
+            "inputmode": "numeric",
+            "pattern": "[0-9]{6}",
+            "placeholder": "000000",
+        }),
+    )
+
+    def clean_token(self):
+        token = (self.cleaned_data.get("token") or "").strip()
+        if not token.isdigit():
+            raise forms.ValidationError("Enter the 6-digit code from your authenticator app.")
+        return token

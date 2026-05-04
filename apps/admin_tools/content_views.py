@@ -1,10 +1,15 @@
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
+from django.http import JsonResponse
+from django.contrib.auth import login
+from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
+from django.utils import timezone
 
 from apps.accounts.models import User
+from apps.accounts.mfa import active_backup_code_count, regenerate_backup_codes
 from apps.admin_tools.forms import (
     AdminUserCreateForm,
     AdminUserUpdateForm,
@@ -17,6 +22,7 @@ from apps.admin_tools.forms import (
 )
 from apps.core.models import ErrorPageContent, HomeFAQ, HomeServiceCard, LegalPage, SiteContentSettings
 from apps.products.models import Package, PackageFeature
+from apps.companies.services import CompaniesHouseService
 
 
 @staff_member_required
@@ -44,6 +50,154 @@ def user_edit(request, pk):
     else:
         form = AdminUserUpdateForm(instance=user)
     return render(request, "admin_tools/content/user_form.html", {"form": form, "mode": "edit", "obj": user})
+
+
+@staff_member_required
+def company_lookup(request):
+    company_number = (request.GET.get("company_number") or "").strip().replace(" ", "").upper()
+    if not company_number:
+        return JsonResponse({"ok": False, "error": "Please provide a company number."}, status=400)
+
+    payload = CompaniesHouseService().get_company(company_number)
+    if not payload:
+        return JsonResponse(
+            {
+                "ok": False,
+                "error": "Company not found or Companies House API is not configured.",
+            },
+            status=404,
+        )
+
+    office = payload.get("registered_office_address") or {}
+    address_parts = [
+        office.get("address_line_1", ""),
+        office.get("address_line_2", ""),
+        office.get("locality", ""),
+        office.get("region", ""),
+        office.get("postal_code", ""),
+        office.get("country", ""),
+    ]
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "company_number": payload.get("company_number") or company_number,
+            "company_name": payload.get("company_name") or "",
+            "company_status": payload.get("company_status") or "",
+            "company_type": payload.get("type") or "",
+            "address": ", ".join([part for part in address_parts if part]),
+        }
+    )
+
+
+@staff_member_required
+def user_mfa_manage(request, pk):
+    user = get_object_or_404(User, pk=pk)
+    generated_codes = None
+
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+
+        if action == "disable_mfa":
+            user.mfa_enabled = False
+            user.mfa_secret = ""
+            user.save(update_fields=["mfa_enabled", "mfa_secret"])
+            user.mfa_backup_codes.all().delete()
+            messages.success(request, f"MFA disabled for {user.email}.")
+            return redirect("admin_tools:user_mfa_manage", pk=user.pk)
+
+        if action == "enable_mfa_pending_setup":
+            user.mfa_enabled = False
+            user.mfa_secret = ""
+            user.save(update_fields=["mfa_enabled", "mfa_secret"])
+            user.mfa_backup_codes.all().delete()
+            messages.success(request, f"MFA reset for {user.email}. User must reconfigure on next setup.")
+            return redirect("admin_tools:user_mfa_manage", pk=user.pk)
+
+        if action == "regenerate_backup_codes":
+            if not user.mfa_enabled:
+                messages.error(request, "User must have MFA enabled before backup codes can be generated.")
+            else:
+                generated_codes = regenerate_backup_codes(user)
+                messages.success(request, f"New backup codes generated for {user.email}.")
+
+    return render(
+        request,
+        "admin_tools/content/user_mfa_manage.html",
+        {
+            "obj": user,
+            "backup_code_count": active_backup_code_count(user),
+            "generated_codes": generated_codes,
+        },
+    )
+
+
+@staff_member_required
+@require_POST
+def user_su_start(request, pk):
+    target = get_object_or_404(User, pk=pk)
+    actor = request.user
+
+    if actor.pk == target.pk:
+        messages.info(request, "You are already this user.")
+        return redirect("portal:dashboard")
+
+    if request.session.get("impersonator_user_id"):
+        messages.error(request, "Finish the current impersonation session before starting another.")
+        return redirect("admin_tools:users")
+
+    try:
+        from apps.audit.models import AuditLog
+
+        AuditLog.objects.create(
+            user=actor,
+            action="impersonation.started",
+            model_name="accounts.User",
+            object_id=str(target.pk),
+            ip_address=request.META.get("REMOTE_ADDR") or None,
+            data={"target_email": target.email},
+        )
+    except Exception:
+        pass
+
+    login(request, target, backend="apps.accounts.backends.EmailBackend")
+    request.session["impersonator_user_id"] = actor.pk
+    request.session["impersonator_started_at"] = timezone.now().isoformat()
+    request.session.modified = True
+    messages.warning(request, f"Impersonating {target.email}. Actions are audited.")
+    return redirect("portal:dashboard")
+
+
+@login_required
+@require_POST
+def user_su_stop(request):
+    impersonator_id = request.session.get("impersonator_user_id")
+    if not impersonator_id:
+        messages.info(request, "No active impersonation session.")
+        return redirect("admin_tools:dashboard")
+
+    impersonator = get_object_or_404(User, pk=impersonator_id, is_staff=True)
+    request.session.pop("impersonator_user_id", None)
+    request.session.pop("impersonator_started_at", None)
+    request.session.modified = True
+
+    try:
+        from apps.audit.models import AuditLog
+
+        AuditLog.objects.create(
+            user=impersonator,
+            action="impersonation.stopped",
+            model_name="accounts.User",
+            object_id=str(request.user.pk),
+            ip_address=request.META.get("REMOTE_ADDR") or None,
+            data={"acted_as_email": request.user.email},
+        )
+    except Exception:
+        pass
+
+    login(request, impersonator, backend="apps.accounts.backends.EmailBackend")
+    messages.success(request, f"Returned to staff account {impersonator.email}.")
+    return redirect("admin_tools:users")
 
 
 @staff_member_required

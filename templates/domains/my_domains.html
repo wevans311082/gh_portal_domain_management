@@ -21,6 +21,7 @@
                 <th class="px-4 py-3 text-left font-semibold text-gray-700">Expires</th>
                 <th class="px-4 py-3 text-left font-semibold text-gray-700">Auto-Renew</th>
                 <th class="px-4 py-3 text-left font-semibold text-gray-700">DNS</th>
+                <th class="px-4 py-3 text-left font-semibold text-gray-700">Registrant</th>
                 <th class="px-4 py-3"></th>
             </tr>
         </thead>
@@ -46,6 +47,15 @@
                     {% endif %}
                 </td>
                 <td class="px-4 py-3 text-gray-600 capitalize">{{ domain.dns_provider }}</td>
+                <td class="px-4 py-3">
+                    <span class="px-2 py-0.5 rounded-full text-xs font-medium
+                        {% if domain.registrant_validation_status == 'validated' %}bg-emerald-100 text-emerald-700
+                        {% elif domain.registrant_validation_status == 'pending' %}bg-amber-100 text-amber-700
+                        {% elif domain.registrant_validation_status == 'rejected' %}bg-red-100 text-red-700
+                        {% else %}bg-slate-100 text-slate-700{% endif %}">
+                        {{ domain.registrant_validation_status|title }}
+                    </span>
+                </td>
                 <td class="px-4 py-3 text-right">
                     <a href="{% url 'domains:detail' pk=domain.pk %}"
                        class="text-sky-600 hover:underline text-sm">Manage</a>

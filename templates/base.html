@@ -20,11 +20,36 @@
 </head>
 <body class="h-full bg-sky-50" data-noise-texture="{% static 'images/noise.png' %}">
     {% if messages %}
-    <div class="fixed top-4 right-4 z-50 space-y-2">
+    <div id="toast-stack" class="fixed top-4 right-4 z-50 space-y-2 w-[22rem] max-w-[calc(100vw-2rem)]">
         {% for message in messages %}
-        <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 4000)"
-             class="px-4 py-3 rounded shadow-lg text-sm font-medium {% if message.tags == 'error' %}bg-red-600{% elif message.tags == 'success' %}bg-emerald-600{% else %}bg-sky-600{% endif %} text-white">
-            {{ message }}
+        <div class="toast-item rounded-xl border shadow-lg backdrop-blur-sm px-4 py-3 text-sm flex gap-3 items-start transition-all duration-300
+                    {% if 'error' in message.tags %}bg-red-50/95 border-red-200 text-red-800
+                    {% elif 'warning' in message.tags %}bg-amber-50/95 border-amber-200 text-amber-800
+                    {% elif 'success' in message.tags %}bg-emerald-50/95 border-emerald-200 text-emerald-800
+                    {% else %}bg-sky-50/95 border-sky-200 text-sky-800{% endif %}"
+             role="status"
+             data-toast
+             data-timeout="5000">
+            <div class="pt-0.5" aria-hidden="true">
+                {% if 'error' in message.tags %}
+                <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M10.29 3.86l-7.3 12.65A1 1 0 003.86 18h16.28a1 1 0 00.87-1.49l-7.3-12.65a1 1 0 00-1.74 0z"/></svg>
+                {% elif 'warning' in message.tags %}
+                <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M12 21a9 9 0 100-18 9 9 0 000 18z"/></svg>
+                {% elif 'success' in message.tags %}
+                <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                {% else %}
+                <svg class="w-5 h-5 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M12 21a9 9 0 100-18 9 9 0 000 18z"/></svg>
+                {% endif %}
+            </div>
+            <div class="flex-1">
+                <p class="font-semibold leading-tight">
+                    {% if 'error' in message.tags %}Error{% elif 'warning' in message.tags %}Warning{% elif 'success' in message.tags %}Success{% else %}Notice{% endif %}
+                </p>
+                <p class="mt-0.5 leading-snug">{{ message }}</p>
+            </div>
+            <button type="button" class="toast-close text-slate-500 hover:text-slate-700 transition-colors" aria-label="Dismiss notification">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
         </div>
         {% endfor %}
     </div>
@@ -37,6 +62,43 @@
     {% include "partials/resellerclub_debug_tray.html" %}
 
     <script src="{% static 'js/app.js' %}"></script>
+    <script>
+        (function () {
+            function dismissToast(el) {
+                el.classList.add('opacity-0', 'translate-x-4');
+                setTimeout(function () { el.remove(); }, 260);
+            }
+
+            document.querySelectorAll('[data-toast]').forEach(function (toast) {
+                var timeout = parseInt(toast.getAttribute('data-timeout') || '5000', 10);
+                var closeBtn = toast.querySelector('.toast-close');
+                if (closeBtn) {
+                    closeBtn.addEventListener('click', function () {
+                        dismissToast(toast);
+                    });
+                }
+                setTimeout(function () {
+                    if (document.body.contains(toast)) {
+                        dismissToast(toast);
+                    }
+                }, timeout);
+            });
+
+            var scopedRoot = document.querySelector('.admin-shell, .portal-shell, .auth-shell');
+            if (!scopedRoot) {
+                return;
+            }
+
+            scopedRoot.querySelectorAll('form').forEach(function (formEl) {
+                if (formEl.closest('nav') || formEl.closest('header') || formEl.hasAttribute('data-no-form-card')) {
+                    return;
+                }
+                if (formEl.querySelector('input:not([type="hidden"]), select, textarea')) {
+                    formEl.classList.add('form-surface');
+                }
+            });
+        })();
+    </script>
     {% block extra_js %}{% endblock %}
 </body>
 </html>

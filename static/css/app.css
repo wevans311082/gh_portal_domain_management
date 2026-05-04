@@ -15,3 +15,87 @@
 .btn-primary:hover {
     background-color: var(--color-primary-dark);
 }
+
+/* Scoped form styling for admin/client/auth shells */
+:is(.admin-shell, .portal-shell, .auth-shell) .form-surface {
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    border: 1px solid #d7e2ee;
+    border-radius: 0.875rem;
+    padding: 1rem 1.125rem;
+    box-shadow: 0 1px 1px rgba(15, 23, 42, 0.03);
+}
+
+:is(.admin-shell, .portal-shell, .auth-shell) .form-surface :is(input, select, textarea) {
+    margin-top: 0.25rem;
+}
+
+:is(.admin-shell, .portal-shell, .auth-shell) :is(label, legend) {
+    color: #334155;
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+:is(.admin-shell, .portal-shell, .auth-shell) :is(
+    input[type="text"],
+    input[type="email"],
+    input[type="password"],
+    input[type="number"],
+    input[type="date"],
+    input[type="datetime-local"],
+    input[type="time"],
+    input[type="url"],
+    input[type="search"],
+    input[type="tel"],
+    input[type="month"],
+    input[type="week"],
+    input[type="file"],
+    select,
+    textarea
+) {
+    width: 100%;
+    border: 1px solid #b7c8db;
+    background-color: #f8fbff;
+    border-radius: 0.625rem;
+    color: #0f172a;
+    min-height: 2.5rem;
+    padding: 0.55rem 0.75rem;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+:is(.admin-shell, .portal-shell, .auth-shell) textarea {
+    min-height: 7rem;
+    resize: vertical;
+}
+
+:is(.admin-shell, .portal-shell, .auth-shell) :is(input, select, textarea)::placeholder {
+    color: #94a3b8;
+}
+
+:is(.admin-shell, .portal-shell, .auth-shell) :is(input, select, textarea):focus {
+    outline: none;
+    border-color: #0284c7;
+    background-color: #ffffff;
+    box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
+}
+
+:is(.admin-shell, .portal-shell, .auth-shell) :is(input[type="checkbox"], input[type="radio"]) {
+    accent-color: #0284c7;
+}
+
+:is(.admin-shell, .portal-shell, .auth-shell) .helptext {
+    display: block;
+    margin-top: 0.35rem;
+    color: #64748b;
+    font-size: 0.75rem;
+}
+
+:is(.admin-shell, .portal-shell, .auth-shell) .errorlist {
+    list-style: none;
+    margin: 0.35rem 0 0;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid #fecaca;
+    background: #fff1f2;
+    color: #b91c1c;
+    border-radius: 0.5rem;
+    font-size: 0.8rem;
+}

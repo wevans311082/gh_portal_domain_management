@@ -23,7 +23,7 @@ from apps.website_templates.models import WebsiteTemplate
 @staff_member_required
 def domains_list(request):
     q = (request.GET.get("q") or "").strip()
-    qs = Domain.objects.select_related("user").order_by("name")
+    qs = Domain.objects.select_related("user", "order__registration_contact").order_by("name")
     if q:
         qs = qs.filter(Q(name__icontains=q) | Q(user__email__icontains=q) | Q(status__icontains=q))
     page_obj = Paginator(qs, 30).get_page(request.GET.get("page"))

@@ -52,8 +52,16 @@
                 Default
               </span>
               {% endif %}
+              <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium
+                {% if contact.registrant_validation_status == 'validated' %}bg-emerald-100 text-emerald-700
+                {% elif contact.registrant_validation_status == 'pending' %}bg-amber-100 text-amber-700
+                {% elif contact.registrant_validation_status == 'rejected' %}bg-red-100 text-red-700
+                {% else %}bg-slate-100 text-slate-700{% endif %}">
+                Registrant {{ contact.get_registrant_validation_status_display }}
+              </span>
             </div>
             <p class="text-sm text-gray-600 mt-0.5">{{ contact.name }}{% if contact.company %} &mdash; {{ contact.company }}{% endif %}</p>
+            {% if contact.company_number %}<p class="text-xs text-gray-500">Company no: {{ contact.company_number }}</p>{% endif %}
             <p class="text-xs text-gray-400 mt-1">
               {{ contact.email }} &bull;
               +{{ contact.phone_country_code }} {{ contact.phone }}

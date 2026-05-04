@@ -93,6 +93,7 @@ def dashboard(request):
 
     context = {
         "total_users": User.objects.count(),
+        "staff_without_mfa": User.objects.filter(is_staff=True, mfa_enabled=False).count(),
         "active_services": Service.objects.filter(status="active").count(),
         "unpaid_invoices": Invoice.objects.filter(status=Invoice.STATUS_UNPAID).count(),
         "total_domains": Domain.objects.count(),
@@ -569,7 +570,7 @@ def resellerclub_debug(request):
 def users(request):
     """Paginated user list with search."""
     q = request.GET.get("q", "").strip()
-    qs = User.objects.order_by("-created_at")
+    qs = User.objects.select_related("business_profile").order_by("-created_at")
     if q:
         qs = qs.filter(Q(email__icontains=q) | Q(full_name__icontains=q))
 
@@ -1088,7 +1089,67 @@ def settings_overview(request):
         },
     }
 
-    return render(request, "admin_tools/settings_overview.html", {"cfg": cfg})
+    has_companies_house_key = bool(get_runtime_setting("COMPANIES_HOUSE_API_KEY", ""))
+
+    return render(
+        request,
+        "admin_tools/settings_overview.html",
+        {
+            "cfg": cfg,
+            "has_companies_house_key": has_companies_house_key,
+        },
+    )
+
+
+@staff_member_required
+def companies_house_config(request):
+    from apps.admin_tools.models import IntegrationSetting
+    from apps.companies.services import CompaniesHouseService
+
+    test_number = ""
+    lookup_result = None
+    key_value = get_runtime_setting("COMPANIES_HOUSE_API_KEY", "")
+
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+
+        if action == "save_key":
+            new_key = (request.POST.get("companies_house_api_key") or "").strip()
+            if not new_key:
+                messages.error(request, "API key cannot be empty.")
+            else:
+                IntegrationSetting.set_value(
+                    "COMPANIES_HOUSE_API_KEY",
+                    new_key,
+                    is_secret=True,
+                )
+                key_value = new_key
+                messages.success(request, "Companies House API key saved.")
+
+        if action == "test_lookup":
+            test_number = (request.POST.get("company_number") or "").strip().replace(" ", "").upper()
+            if not test_number:
+                messages.warning(request, "Enter a company number to test lookup.")
+            else:
+                lookup_result = CompaniesHouseService().get_company(test_number)
+                if lookup_result:
+                    messages.success(request, f"Lookup succeeded for company {test_number}.")
+                else:
+                    messages.error(
+                        request,
+                        "Lookup failed. Check the API key and company number, then try again.",
+                    )
+
+    return render(
+        request,
+        "admin_tools/companies_house_config.html",
+        {
+            "has_api_key": bool(key_value),
+            "api_key_hint": "Configured" if key_value else "Not configured",
+            "test_number": test_number,
+            "lookup_result": lookup_result,
+        },
+    )
 
 
 # ---------------------------------------------------------------------------

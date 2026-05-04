@@ -38,6 +38,7 @@
             <tr>
                 <th class="px-4 py-3 text-left font-semibold text-slate-600">Email</th>
                 <th class="px-4 py-3 text-left font-semibold text-slate-600">Name</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-600">Company</th>
                 <th class="px-4 py-3 text-left font-semibold text-slate-600">Joined</th>
                 <th class="px-4 py-3 text-left font-semibold text-slate-600">Flags</th>
                 <th class="px-4 py-3 text-left font-semibold text-slate-600">Actions</th>
@@ -48,6 +49,19 @@
             <tr class="hover:bg-slate-50 transition-colors">
                 <td class="px-4 py-3 font-medium text-slate-800">{{ u.email }}</td>
                 <td class="px-4 py-3 text-slate-600">{{ u.full_name|default:"—" }}</td>
+                <td class="px-4 py-3 text-slate-600">
+                    {% if u.business_profile %}
+                    <p class="font-medium text-slate-700">{{ u.business_profile.company_name|default:"—" }}</p>
+                    <p class="text-xs text-slate-500">{{ u.business_profile.company_number|default:"No number" }}</p>
+                    {% if u.business_profile.is_verified %}
+                    <span class="inline-flex items-center mt-1 text-xs px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-medium">Verified</span>
+                    {% elif u.business_profile.company_number %}
+                    <span class="inline-flex items-center mt-1 text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-medium">Unverified</span>
+                    {% endif %}
+                    {% else %}
+                    <span class="text-slate-400">—</span>
+                    {% endif %}
+                </td>
                 <td class="px-4 py-3 text-slate-400 text-xs">{{ u.created_at|date:"d M Y" }}</td>
                 <td class="px-4 py-3">
                     <div class="flex gap-1 flex-wrap">
@@ -58,11 +72,19 @@
                     </div>
                 </td>
                 <td class="px-4 py-3">
-                    <a href="{% url 'admin_tools:user_edit' u.pk %}" class="text-xs text-indigo-600 hover:underline">Edit user</a>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <a href="{% url 'admin_tools:user_edit' u.pk %}" class="text-xs text-indigo-600 hover:underline">Edit user</a>
+                        <a href="{% url 'admin_tools:user_mfa_manage' u.pk %}" class="text-xs text-sky-700 hover:underline">Manage MFA</a>
+                        {% if u.pk != request.user.pk %}
+                        <form method="post" action="{% url 'admin_tools:user_su_start' u.pk %}" class="inline">{% csrf_token %}
+                            <button class="text-xs text-amber-700 hover:underline" onclick="return confirm('Impersonate this user in the customer portal?')">SU as user</button>
+                        </form>
+                        {% endif %}
+                    </div>
                 </td>
             </tr>
             {% empty %}
-            <tr><td colspan="5" class="px-4 py-8 text-center text-slate-400 text-sm">No users found.</td></tr>
+            <tr><td colspan="6" class="px-4 py-8 text-center text-slate-400 text-sm">No users found.</td></tr>
             {% endfor %}
         </tbody>
     </table>

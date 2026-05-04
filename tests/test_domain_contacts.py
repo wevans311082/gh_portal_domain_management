@@ -277,3 +277,26 @@ def test_contact_set_default_requires_post(client, django_user_model):
     client.force_login(user)
     url = reverse("domains:contact_set_default", kwargs={"pk": contact.pk})
     assert client.get(url).status_code == 405
+
+
+@pytest.mark.django_db
+def test_contact_create_individual_auto_validates_registrant(client, django_user_model):
+    user = make_user(django_user_model)
+    client.force_login(user)
+    payload = dict(VALID_PAYLOAD, company="", company_number="")
+    client.post(reverse("domains:contact_create"), payload)
+
+    contact = DomainContact.objects.get(user=user, label="Primary")
+    assert contact.registrant_validation_status == DomainContact.VALIDATION_VALIDATED
+
+
+@pytest.mark.django_db
+def test_contact_create_company_without_number_rejected(client, django_user_model):
+    user = make_user(django_user_model)
+    client.force_login(user)
+    payload = dict(VALID_PAYLOAD, company="Example Ltd", company_number="")
+    response = client.post(reverse("domains:contact_create"), payload)
+
+    assert response.status_code == 302
+    contact = DomainContact.objects.get(user=user, label="Primary")
+    assert contact.registrant_validation_status == DomainContact.VALIDATION_REJECTED

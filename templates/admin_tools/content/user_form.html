@@ -2,9 +2,183 @@
 {% block title %}User · {{ SITE_NAME }}{% endblock %}
 {% block page_title %}{% if mode == 'create' %}Create User{% else %}Edit User{% endif %}{% endblock %}
 {% block content %}
-<form method="post" class="bg-white rounded-xl border border-slate-200 p-6 max-w-3xl space-y-4">{% csrf_token %}
-  {{ form.as_p }}
-  <button class="px-4 py-2 rounded bg-sky-600 text-white">{% if mode == 'create' %}Create user{% else %}Save user{% endif %}</button>
-  <a href="{% url 'admin_tools:users' %}" class="ml-3 text-sm text-slate-500">Back</a>
+{% if mode == 'edit' and obj %}
+<div class="mb-4 flex flex-wrap items-center gap-2">
+  <a href="{% url 'admin_tools:user_mfa_manage' obj.pk %}" class="px-3 py-1.5 rounded border border-slate-300 text-sm text-slate-700 hover:bg-slate-50">Manage MFA</a>
+  {% if obj.pk != request.user.pk %}
+  <form method="post" action="{% url 'admin_tools:user_su_start' obj.pk %}" class="inline">{% csrf_token %}
+    <button class="px-3 py-1.5 rounded border border-amber-300 text-sm text-amber-700 hover:bg-amber-50" onclick="return confirm('Impersonate this user in customer portal?')">SU as user</button>
+  </form>
+  {% endif %}
+</div>
+{% endif %}
+
+<form method="post" class="bg-white rounded-xl border border-slate-200 p-6 max-w-4xl space-y-6">{% csrf_token %}
+  {% if form.non_field_errors %}
+  <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+    {% for err in form.non_field_errors %}<p>{{ err }}</p>{% endfor %}
+  </div>
+  {% endif %}
+
+  <section class="space-y-4">
+    <h3 class="text-sm font-semibold text-slate-800 uppercase tracking-wide">User Details</h3>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-semibold text-slate-700 mb-1" for="{{ form.email.id_for_label }}">Email</label>
+        {{ form.email }}
+        {{ form.email.errors }}
+      </div>
+      <div>
+        <label class="block text-sm font-semibold text-slate-700 mb-1" for="{{ form.phone.id_for_label }}">Phone</label>
+        {{ form.phone }}
+        {{ form.phone.errors }}
+      </div>
+      <div>
+        <label class="block text-sm font-semibold text-slate-700 mb-1" for="{{ form.first_name.id_for_label }}">First name</label>
+        {{ form.first_name }}
+        {{ form.first_name.errors }}
+      </div>
+      <div>
+        <label class="block text-sm font-semibold text-slate-700 mb-1" for="{{ form.last_name.id_for_label }}">Last name</label>
+        {{ form.last_name }}
+        {{ form.last_name.errors }}
+      </div>
+    </div>
+  </section>
+
+  {% if mode == 'create' %}
+  <section class="space-y-4">
+    <h3 class="text-sm font-semibold text-slate-800 uppercase tracking-wide">Security</h3>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-semibold text-slate-700 mb-1" for="{{ form.password1.id_for_label }}">Password</label>
+        {{ form.password1 }}
+        {{ form.password1.errors }}
+      </div>
+      <div>
+        <label class="block text-sm font-semibold text-slate-700 mb-1" for="{{ form.password2.id_for_label }}">Confirm password</label>
+        {{ form.password2 }}
+        {{ form.password2.errors }}
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  <section class="space-y-4">
+    <div class="flex items-center justify-between gap-3">
+      <h3 class="text-sm font-semibold text-slate-800 uppercase tracking-wide">Company Association</h3>
+      <a href="{% url 'admin_tools:companies_house_config' %}" class="text-xs text-sky-700 hover:underline">Manage Companies House API</a>
+    </div>
+
+    <div class="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-4">
+      <div class="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 items-end">
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1" for="{{ form.company_number.id_for_label }}">UK company number</label>
+          {{ form.company_number }}
+          {% if form.company_number.help_text %}<p class="text-xs text-slate-500 mt-1">{{ form.company_number.help_text }}</p>{% endif %}
+          {{ form.company_number.errors }}
+        </div>
+        <button id="company-lookup-btn" type="button" class="px-4 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 text-sm font-semibold hover:bg-slate-50">Lookup company</button>
+      </div>
+
+      <div>
+        <label class="block text-sm font-semibold text-slate-700 mb-1" for="{{ form.company_name.id_for_label }}">Company name</label>
+        {{ form.company_name }}
+        {% if form.company_name.help_text %}<p class="text-xs text-slate-500 mt-1">{{ form.company_name.help_text }}</p>{% endif %}
+        {{ form.company_name.errors }}
+      </div>
+
+      <div class="flex items-center gap-2">
+        {{ form.validate_company_with_companies_house }}
+        <label for="{{ form.validate_company_with_companies_house.id_for_label }}" class="text-sm text-slate-700">Validate with Companies House on save</label>
+      </div>
+      {{ form.validate_company_with_companies_house.errors }}
+
+      <div id="company-lookup-result" class="hidden rounded-lg border px-3 py-2 text-sm"></div>
+    </div>
+  </section>
+
+  <section class="space-y-3">
+    <h3 class="text-sm font-semibold text-slate-800 uppercase tracking-wide">Access Flags</h3>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <label class="inline-flex items-center gap-2 text-sm text-slate-700">{{ form.is_active }} Active account</label>
+      <label class="inline-flex items-center gap-2 text-sm text-slate-700">{{ form.is_staff }} Staff access</label>
+      <label class="inline-flex items-center gap-2 text-sm text-slate-700">{{ form.is_superuser }} Superuser access</label>
+      {% if form.mfa_enabled %}<label class="inline-flex items-center gap-2 text-sm text-slate-700">{{ form.mfa_enabled }} MFA enabled</label>{% endif %}
+    </div>
+  </section>
+
+  <div class="pt-3 border-t border-slate-200">
+    <button class="px-4 py-2 rounded bg-sky-600 text-white font-semibold hover:bg-sky-700">{% if mode == 'create' %}Create user{% else %}Save user{% endif %}</button>
+    <a href="{% url 'admin_tools:users' %}" class="ml-3 text-sm text-slate-500 hover:text-slate-700">Back</a>
+  </div>
 </form>
+
+<script>
+  (function () {
+    var btn = document.getElementById('company-lookup-btn');
+    var numberInput = document.getElementById('{{ form.company_number.id_for_label }}');
+    var nameInput = document.getElementById('{{ form.company_name.id_for_label }}');
+    var resultBox = document.getElementById('company-lookup-result');
+    if (!btn || !numberInput || !resultBox) {
+      return;
+    }
+
+    function showResult(kind, text) {
+      resultBox.classList.remove('hidden', 'border-emerald-200', 'bg-emerald-50', 'text-emerald-800', 'border-amber-200', 'bg-amber-50', 'text-amber-800', 'border-red-200', 'bg-red-50', 'text-red-800');
+      if (kind === 'ok') {
+        resultBox.classList.add('border-emerald-200', 'bg-emerald-50', 'text-emerald-800');
+      } else if (kind === 'warn') {
+        resultBox.classList.add('border-amber-200', 'bg-amber-50', 'text-amber-800');
+      } else {
+        resultBox.classList.add('border-red-200', 'bg-red-50', 'text-red-800');
+      }
+      resultBox.textContent = text;
+    }
+
+    btn.addEventListener('click', function () {
+      var value = (numberInput.value || '').trim();
+      if (!value) {
+        showResult('warn', 'Enter a company number first.');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Looking up...';
+
+      fetch('{% url "admin_tools:company_lookup" %}?company_number=' + encodeURIComponent(value), {
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest'
+        }
+      })
+        .then(function (response) {
+          return response.json().then(function (body) {
+            return { status: response.status, body: body };
+          });
+        })
+        .then(function (data) {
+          if (data.status >= 200 && data.status < 300 && data.body.ok) {
+            numberInput.value = data.body.company_number || value;
+            if (nameInput && data.body.company_name) {
+              nameInput.value = data.body.company_name;
+            }
+            var details = 'Verified: ' + (data.body.company_name || data.body.company_number);
+            if (data.body.company_status) {
+              details += ' (' + data.body.company_status + ')';
+            }
+            showResult('ok', details);
+            return;
+          }
+          showResult('error', data.body.error || 'Lookup failed.');
+        })
+        .catch(function () {
+          showResult('error', 'Lookup failed due to a network or server error.');
+        })
+        .finally(function () {
+          btn.disabled = false;
+          btn.textContent = 'Lookup company';
+        });
+    });
+  })();
+</script>
 {% endblock %}

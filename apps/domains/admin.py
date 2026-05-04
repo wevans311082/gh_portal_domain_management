@@ -69,9 +69,18 @@ class DomainPricingSettingsAdmin(admin.ModelAdmin):
 
 @admin.register(DomainContact)
 class DomainContactAdmin(admin.ModelAdmin):
-    list_display = ["label", "user", "email", "country", "registrar_contact_id", "is_default"]
-    list_filter = ["country", "is_default"]
-    search_fields = ["label", "email", "user__email", "name"]
+    list_display = [
+        "label",
+        "user",
+        "email",
+        "country",
+        "registrant_validation_status",
+        "registrant_validated_at",
+        "registrar_contact_id",
+        "is_default",
+    ]
+    list_filter = ["country", "is_default", "registrant_validation_status"]
+    search_fields = ["label", "email", "user__email", "name", "company", "company_number"]
     raw_id_fields = ["user"]
 
 

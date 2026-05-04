@@ -4,7 +4,7 @@
 
 {% block content %}
 <h2 class="text-2xl font-bold text-center mb-2">Two-factor authentication</h2>
-<p class="text-center text-sm text-gray-500 mb-6">Open your authenticator app and enter the 6-digit code.</p>
+<p class="text-center text-sm text-gray-500 mb-6">Enter a 6-digit authenticator code or one of your backup codes.</p>
 
 <form method="post" class="space-y-4">
     {% csrf_token %}
@@ -18,11 +18,12 @@
     {% endif %}
 
     <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.token.label }}</label>
-        <input type="text" name="token" inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
-               autocomplete="one-time-code" placeholder="000000"
+         <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.code.label }}</label>
+         <input type="text" name="code" maxlength="16"
+             autocomplete="one-time-code" placeholder="000000 or ABCD-EFGH"
                class="w-full border rounded px-3 py-2 text-center text-2xl tracking-widest focus:outline-none focus:ring-2 focus:ring-orange-400"
                autofocus>
+         <p class="mt-2 text-xs text-gray-500">Backup codes remaining: {{ backup_code_count }}</p>
     </div>
 
     <button type="submit"
@@ -33,6 +34,6 @@
 
 <p class="text-center mt-4 text-sm text-gray-500">
     Lost access to your authenticator?
-    <a href="mailto:support@{{ SITE_DOMAIN }}" class="text-sky-600 hover:underline">Contact support</a>
+    <a href="mailto:{{ support_email }}?subject=MFA%20support%20request%20{{ support_login_code }}&body=I%20need%20MFA%20help.%20Support%20code:%20{{ support_login_code }}" class="text-sky-600 hover:underline">Contact support (code {{ support_login_code }})</a>
 </p>
 {% endblock %}

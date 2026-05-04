@@ -4,7 +4,9 @@ from django.utils import timezone
 from django_celery_beat.models import IntervalSchedule, PeriodicTask
 from django_celery_results.models import TaskResult
 
+from apps.admin_tools.models import IntegrationSetting
 from apps.billing.models import Invoice
+from apps.companies.models import BusinessProfile
 from apps.domains.models import DomainPricingSettings, TLDPricing
 
 
@@ -256,3 +258,144 @@ def test_staff_sync_all_runs_inline_without_celery(client, django_user_model, mo
     assert response.status_code == 200
     assert TLDPricing.objects.filter(tld="com").exists()
     assert TLDPricing.objects.filter(tld="net").exists()
+
+
+@pytest.mark.django_db
+def test_companies_house_config_requires_staff(client):
+    response = client.get(reverse("admin_tools:companies_house_config"))
+
+    assert response.status_code == 302
+    assert reverse("admin:login") in response.url
+
+
+@pytest.mark.django_db
+def test_staff_can_save_companies_house_api_key(client, django_user_model):
+    staff_user = django_user_model.objects.create_user(
+        email="ch-admin@example.com",
+        password="password123",
+        is_staff=True,
+    )
+    client.force_login(staff_user)
+
+    response = client.post(
+        reverse("admin_tools:companies_house_config"),
+        {
+            "action": "save_key",
+            "companies_house_api_key": "test-key-123",
+        },
+    )
+
+    assert response.status_code == 200
+    assert IntegrationSetting.get_value("COMPANIES_HOUSE_API_KEY") == "test-key-123"
+
+
+@pytest.mark.django_db
+def test_company_lookup_endpoint_returns_company_data(client, django_user_model, monkeypatch):
+    staff_user = django_user_model.objects.create_user(
+        email="lookup-admin@example.com",
+        password="password123",
+        is_staff=True,
+    )
+    client.force_login(staff_user)
+
+    monkeypatch.setattr(
+        "apps.companies.services.CompaniesHouseService.get_company",
+        lambda self, number: {
+            "company_number": number,
+            "company_name": "Test Company Ltd",
+            "company_status": "active",
+            "type": "ltd",
+            "registered_office_address": {
+                "address_line_1": "1 Example Street",
+                "locality": "London",
+                "postal_code": "SW1A 1AA",
+            },
+        },
+    )
+
+    response = client.get(reverse("admin_tools:company_lookup"), {"company_number": "00445790"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["ok"] is True
+    assert payload["company_name"] == "Test Company Ltd"
+    assert payload["company_number"] == "00445790"
+
+
+@pytest.mark.django_db
+def test_user_create_with_company_number_creates_verified_business_profile(client, django_user_model, monkeypatch):
+    staff_user = django_user_model.objects.create_user(
+        email="users-admin@example.com",
+        password="password123",
+        is_staff=True,
+    )
+    client.force_login(staff_user)
+
+    monkeypatch.setattr(
+        "apps.admin_tools.forms.CompaniesHouseService.get_company",
+        lambda self, number: {
+            "company_number": number,
+            "company_name": "Verified Widgets Ltd",
+            "company_status": "active",
+            "type": "ltd",
+            "registered_office_address": {
+                "address_line_1": "21 River Road",
+                "locality": "Bristol",
+                "postal_code": "BS1 4DJ",
+                "country": "United Kingdom",
+            },
+        },
+    )
+
+    response = client.post(
+        reverse("admin_tools:user_create"),
+        {
+            "email": "new-client@example.com",
+            "first_name": "New",
+            "last_name": "Client",
+            "phone": "0123456789",
+            "is_active": "on",
+            "is_staff": "",
+            "is_superuser": "",
+            "password1": "StrongPass123!",
+            "password2": "StrongPass123!",
+            "company_name": "",
+            "company_number": "00445790",
+            "validate_company_with_companies_house": "on",
+        },
+        follow=True,
+    )
+
+    assert response.status_code == 200
+    user = django_user_model.objects.get(email="new-client@example.com")
+    profile = BusinessProfile.objects.get(user=user)
+    assert profile.company_name == "Verified Widgets Ltd"
+    assert profile.company_number == "00445790"
+    assert profile.is_verified is True
+
+
+@pytest.mark.django_db
+def test_user_mfa_manage_requires_staff(client, django_user_model):
+    target = django_user_model.objects.create_user(email="target@example.com", password="password123")
+    response = client.get(reverse("admin_tools:user_mfa_manage", args=[target.pk]))
+
+    assert response.status_code == 302
+    assert reverse("admin:login") in response.url
+
+
+@pytest.mark.django_db
+def test_staff_can_su_as_user_and_stop(client, django_user_model):
+    staff = django_user_model.objects.create_user(email="staff@example.com", password="password123", is_staff=True)
+    target = django_user_model.objects.create_user(email="portal-user@example.com", password="password123")
+    client.force_login(staff)
+
+    start = client.post(reverse("admin_tools:user_su_start", args=[target.pk]))
+    assert start.status_code == 302
+    assert start.url == reverse("portal:dashboard")
+
+    session = client.session
+    assert session.get("impersonator_user_id") == staff.pk
+
+    stop = client.post(reverse("admin_tools:user_su_stop"))
+    assert stop.status_code == 302
+    assert stop.url == reverse("admin_tools:users")

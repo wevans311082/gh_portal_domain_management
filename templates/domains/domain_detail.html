@@ -45,6 +45,18 @@
                     <dt class="text-gray-500">DNS Provider</dt>
                     <dd class="font-medium capitalize">{{ domain.dns_provider }}</dd>
                 </div>
+                <div>
+                    <dt class="text-gray-500">Registrant validation</dt>
+                    <dd>
+                        <span class="px-2 py-0.5 rounded-full text-xs font-medium
+                            {% if domain.registrant_validation_status == 'validated' %}bg-emerald-100 text-emerald-700
+                            {% elif domain.registrant_validation_status == 'pending' %}bg-amber-100 text-amber-700
+                            {% elif domain.registrant_validation_status == 'rejected' %}bg-red-100 text-red-700
+                            {% else %}bg-slate-100 text-slate-700{% endif %}">
+                            {{ domain.registrant_validation_status|title }}
+                        </span>
+                    </dd>
+                </div>
             </dl>
         </div>
 

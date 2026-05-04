@@ -175,7 +175,7 @@ def test_mfa_verify_valid_token_logs_in(client, django_user_model):
     session.save()
 
     token = pyotp.TOTP(secret).now()
-    response = client.post(reverse("accounts_custom:mfa_verify"), {"token": token})
+    response = client.post(reverse("accounts_custom:mfa_verify"), {"code": token})
     assert response.status_code == 302
     assert response.url == reverse("portal:dashboard")
 
@@ -187,9 +187,25 @@ def test_mfa_verify_invalid_token_shows_error(client, django_user_model):
     session["_mfa_pending_user_id"] = user.pk
     session.save()
 
-    response = client.post(reverse("accounts_custom:mfa_verify"), {"token": "000000"})
+    response = client.post(reverse("accounts_custom:mfa_verify"), {"code": "000000"})
     assert response.status_code == 200
-    assert b"Invalid code" in response.content
+    assert b"Invalid authenticator or backup code" in response.content
+
+
+@pytest.mark.django_db
+def test_mfa_verify_accepts_backup_code(client, django_user_model):
+    from apps.accounts.mfa import regenerate_backup_codes
+
+    user, _ = make_mfa_user(django_user_model, email="mfabackup@test.com")
+    codes = regenerate_backup_codes(user, count=1)
+
+    session = client.session
+    session["_mfa_pending_user_id"] = user.pk
+    session.save()
+
+    response = client.post(reverse("accounts_custom:mfa_verify"), {"code": codes[0]})
+    assert response.status_code == 302
+    assert response.url == reverse("portal:dashboard")
 
 
 # ─────────────────────────────────────────────
@@ -255,6 +271,7 @@ def test_mfa_setup_valid_token_enables_mfa(client, django_user_model):
     assert response.status_code == 302
     user.refresh_from_db()
     assert user.mfa_enabled is True
+    assert user.mfa_backup_codes.filter(used_at__isnull=True).count() == 10
 
 
 @pytest.mark.django_db
@@ -295,6 +312,12 @@ def test_mfa_disable_wrong_token_rejected(client, django_user_model):
     })
     user.refresh_from_db()
     assert user.mfa_enabled is True
+
+
+@pytest.mark.django_db
+def test_mfa_manage_requires_login(client):
+    response = client.get(reverse("accounts_custom:mfa_manage"))
+    assert response.status_code == 302
 
 
 # ─────────────────────────────────────────────

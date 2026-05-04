@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-from .models import User, ClientProfile
+from .models import ClientProfile, MFABackupCode, User
 
 
 @admin.register(User)
@@ -29,3 +29,11 @@ class UserAdmin(BaseUserAdmin):
 class ClientProfileAdmin(admin.ModelAdmin):
     list_display = ["user", "city", "country", "is_business"]
     search_fields = ["user__email", "city", "postcode"]
+
+
+@admin.register(MFABackupCode)
+class MFABackupCodeAdmin(admin.ModelAdmin):
+    list_display = ["user", "used_at", "created_at"]
+    list_filter = ["used_at", "created_at"]
+    search_fields = ["user__email"]
+    readonly_fields = ["code_hash", "created_at", "updated_at", "used_at"]

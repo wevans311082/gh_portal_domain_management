@@ -61,6 +61,20 @@ class Domain(TimeStampedModel):
     def __str__(self):
         return self.name
 
+    @property
+    def registrant_validation_status(self) -> str:
+        try:
+            order = self.order
+        except DomainOrder.DoesNotExist:
+            return DomainContact.VALIDATION_UNVALIDATED
+        if not order or not order.registration_contact:
+            return DomainContact.VALIDATION_UNVALIDATED
+        return order.registration_contact.registrant_validation_status
+
+    @property
+    def is_registrant_validated(self) -> bool:
+        return self.registrant_validation_status == DomainContact.VALIDATION_VALIDATED
+
 
 class DomainPricingSettings(TimeStampedModel):
     default_profit_margin_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("25.00"))
@@ -130,10 +144,23 @@ class TLDPricing(TimeStampedModel):
 
 
 class DomainContact(TimeStampedModel):
+    VALIDATION_UNVALIDATED = "unvalidated"
+    VALIDATION_PENDING = "pending"
+    VALIDATION_VALIDATED = "validated"
+    VALIDATION_REJECTED = "rejected"
+
+    VALIDATION_CHOICES = [
+        (VALIDATION_UNVALIDATED, "Unvalidated"),
+        (VALIDATION_PENDING, "Pending review"),
+        (VALIDATION_VALIDATED, "Validated"),
+        (VALIDATION_REJECTED, "Rejected"),
+    ]
+
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="domain_contacts")
     label = models.CharField(max_length=100)
     name = models.CharField(max_length=255)
     company = models.CharField(max_length=255, blank=True)
+    company_number = models.CharField(max_length=20, blank=True)
     email = models.EmailField()
     phone_country_code = models.CharField(max_length=8, default="44")
     phone = models.CharField(max_length=32)
@@ -145,6 +172,13 @@ class DomainContact(TimeStampedModel):
     country = models.CharField(max_length=2, default="GB")
     is_default = models.BooleanField(default=False)
     registrar_contact_id = models.CharField(max_length=255, blank=True)
+    registrant_validation_status = models.CharField(
+        max_length=20,
+        choices=VALIDATION_CHOICES,
+        default=VALIDATION_UNVALIDATED,
+    )
+    registrant_validated_at = models.DateTimeField(null=True, blank=True)
+    registrant_validation_notes = models.TextField(blank=True)
 
     class Meta:
         ordering = ["user__email", "label"]
@@ -153,6 +187,10 @@ class DomainContact(TimeStampedModel):
 
     def __str__(self):
         return f"{self.label} - {self.email}"
+
+    @property
+    def is_registrant_validated(self) -> bool:
+        return self.registrant_validation_status == self.VALIDATION_VALIDATED
 
     def as_resellerclub_payload(self, customer_id: str) -> dict:
         return {

@@ -10,6 +10,20 @@
     (or directly in <code class="font-mono bg-slate-100 px-1 py-0.5 rounded">.env</code>) and restart the server.
 </p>
 
+<div class="mb-5 rounded-xl border {% if has_companies_house_key %}border-emerald-200 bg-emerald-50{% else %}border-amber-200 bg-amber-50{% endif %} p-4 flex items-center justify-between gap-4">
+    <div>
+        <p class="text-sm font-semibold {% if has_companies_house_key %}text-emerald-800{% else %}text-amber-800{% endif %}">UK Companies House API</p>
+        <p class="text-xs {% if has_companies_house_key %}text-emerald-700{% else %}text-amber-700{% endif %}">
+            {% if has_companies_house_key %}
+            API key detected. You can run test lookups and manage this integration.
+            {% else %}
+            API key missing. User company validation and company lookup will fail until configured.
+            {% endif %}
+        </p>
+    </div>
+    <a href="{% url 'admin_tools:companies_house_config' %}" class="px-4 py-2 rounded-lg bg-sky-600 text-white text-sm font-semibold hover:bg-sky-700">Open Companies House Config</a>
+</div>
+
 <div class="space-y-5">
     {% for section, values in cfg.items %}
     <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">

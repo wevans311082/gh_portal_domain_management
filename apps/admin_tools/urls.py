@@ -15,6 +15,10 @@ urlpatterns = [
     path("users/", views.users, name="users"),
     path("users/new/", content_views.user_create, name="user_create"),
     path("users/<int:pk>/", content_views.user_edit, name="user_edit"),
+    path("users/<int:pk>/mfa/", content_views.user_mfa_manage, name="user_mfa_manage"),
+    path("users/<int:pk>/su/", content_views.user_su_start, name="user_su_start"),
+    path("users/su/stop/", content_views.user_su_stop, name="user_su_stop"),
+    path("users/company-lookup/", content_views.company_lookup, name="company_lookup"),
     # Commerce
     path("invoices/", views.invoices, name="invoices"),
     # Billing workbench
@@ -55,6 +59,7 @@ urlpatterns = [
     path("templates/scan/", views.template_scan, name="template_scan"),
     path("integrations/", views.integrations_overview, name="integrations_overview"),
     path("integrations/<str:service>/", views.integration_detail, name="integration_detail"),
+    path("integrations/companies-house/config/", views.companies_house_config, name="companies_house_config"),
     path("integrations/resellerclub/debug/", views.resellerclub_debug, name="resellerclub_debug"),
     path("security/", views.security, name="security"),
     path("database/", views.database, name="database"),
