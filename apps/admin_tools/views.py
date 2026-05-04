@@ -131,7 +131,7 @@ def task_management(request):
     context = _build_task_summary()
     context["periodic_tasks"] = PeriodicTask.objects.select_related("interval", "crontab").order_by(
         "name"
-    )[:25]
+    )
     return render(request, "admin_tools/task_management.html", context)
 
 
