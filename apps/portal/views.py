@@ -9,7 +9,7 @@ from django.utils import timezone
 
 from apps.services.models import Service
 from apps.domains.models import Domain
-from apps.billing.models import Invoice
+from apps.billing.models import Invoice, Quote
 from apps.support.models import SupportTicket
 
 _PAGE_SIZE = 20
@@ -156,6 +156,11 @@ def dashboard(request):
 
     recent_activity = _build_recent_activity(user)
 
+    pending_quotes = Quote.objects.filter(
+        user=user,
+        status__in=[Quote.STATUS_SENT, Quote.STATUS_VIEWED],
+    ).order_by("-created_at")[:5]
+
     context = {
         "active_services": active_services,
         "domains": domains,
@@ -178,6 +183,8 @@ def dashboard(request):
             status=Domain.STATUS_ACTIVE,
         ).count(),
         "recent_activity": recent_activity,
+        "pending_quotes": pending_quotes,
+        "pending_quotes_count": pending_quotes.count(),
     }
 
     return render(request, "portal/dashboard.html", context)
@@ -194,3 +201,15 @@ def my_services(request):
     paginator = Paginator(services_qs, _PAGE_SIZE)
     page_obj = paginator.get_page(request.GET.get("page"))
     return render(request, "portal/my_services.html", {"page_obj": page_obj, "services": page_obj.object_list})
+
+
+@login_required
+def my_quotes(request):
+    """List the authenticated user's quotes."""
+    qs = (
+        Quote.objects.filter(user=request.user)
+        .order_by("-created_at")
+    )
+    paginator = Paginator(qs, _PAGE_SIZE)
+    page_obj = paginator.get_page(request.GET.get("page"))
+    return render(request, "portal/my_quotes.html", {"page_obj": page_obj, "quotes": page_obj.object_list})

@@ -1,0 +1,106 @@
+{% extends "base_portal.html" %}
+
+{% block title %}My Quotes - {{ SITE_NAME }}{% endblock %}
+{% block page_title %}My Quotes{% endblock %}
+
+{% block header_actions %}
+<a href="{% url 'billing_public:quote_builder' %}"
+   class="text-xs bg-sky-600 text-white px-3 py-1.5 rounded hover:bg-sky-700 inline-flex items-center gap-1.5">
+    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+    Request a Quote
+</a>
+{% endblock %}
+
+{% block content %}
+{% if not quotes %}
+<div class="bg-white rounded-xl border border-slate-200 shadow-sm p-10 text-center">
+    <svg class="mx-auto w-12 h-12 text-slate-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+    <p class="text-slate-600 font-medium mb-1">No quotes yet</p>
+    <p class="text-sm text-slate-500 mb-4">Request a custom quote and it will appear here once submitted.</p>
+    <a href="{% url 'billing_public:quote_builder' %}"
+       class="inline-block bg-sky-600 text-white px-5 py-2.5 rounded-lg hover:bg-sky-700 font-semibold text-sm">
+        Request a Quote
+    </a>
+</div>
+{% else %}
+<div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+    <table class="w-full text-sm">
+        <thead class="bg-slate-50 border-b border-slate-200">
+            <tr>
+                <th class="text-left px-5 py-3 font-semibold text-slate-700">Quote #</th>
+                <th class="text-left px-5 py-3 font-semibold text-slate-700">Date</th>
+                <th class="text-left px-5 py-3 font-semibold text-slate-700">Total</th>
+                <th class="text-left px-5 py-3 font-semibold text-slate-700">Valid Until</th>
+                <th class="text-left px-5 py-3 font-semibold text-slate-700">Status</th>
+                <th class="px-5 py-3"></th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+            {% for quote in quotes %}
+            <tr class="hover:bg-slate-50 transition-colors">
+                <td class="px-5 py-3 font-mono font-semibold text-slate-800">{{ quote.number }}</td>
+                <td class="px-5 py-3 text-slate-600">{{ quote.created_at|date:"Y-m-d" }}</td>
+                <td class="px-5 py-3 font-semibold text-slate-800">{{ quote.currency }} {{ quote.total }}</td>
+                <td class="px-5 py-3 text-slate-600">
+                    {% if quote.valid_until %}
+                        {% if quote.is_expired %}
+                        <span class="text-rose-600">{{ quote.valid_until|date:"Y-m-d" }} (expired)</span>
+                        {% else %}
+                        {{ quote.valid_until|date:"Y-m-d" }}
+                        {% endif %}
+                    {% else %}
+                    —
+                    {% endif %}
+                </td>
+                <td class="px-5 py-3">
+                    {% if quote.status == 'draft' %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700">Draft</span>
+                    {% elif quote.status == 'sent' %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-sky-100 text-sky-700">Sent</span>
+                    {% elif quote.status == 'viewed' %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-700">Viewed</span>
+                    {% elif quote.status == 'accepted' %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-700">Accepted</span>
+                    {% elif quote.status == 'declined' %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-rose-100 text-rose-700">Declined</span>
+                    {% elif quote.status == 'expired' %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">Expired</span>
+                    {% elif quote.status == 'converted' %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-violet-100 text-violet-700">Converted</span>
+                    {% elif quote.status == 'void' %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-500">Void</span>
+                    {% else %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600">{{ quote.get_status_display }}</span>
+                    {% endif %}
+                </td>
+                <td class="px-5 py-3 text-right">
+                    <a href="{% url 'billing_public:quote_public' token=quote.public_token %}"
+                       class="text-xs text-sky-700 hover:underline font-medium mr-3">View</a>
+                    {% if quote.is_acceptable %}
+                    <a href="{% url 'billing_public:quote_public_accept' token=quote.public_token %}"
+                       class="text-xs bg-emerald-600 text-white px-2.5 py-1 rounded hover:bg-emerald-700 font-medium">Accept</a>
+                    {% endif %}
+                    {% if quote.converted_invoice %}
+                    <a href="{% url 'invoices:detail' pk=quote.converted_invoice.pk %}"
+                       class="text-xs text-slate-600 hover:underline ml-1">View Invoice</a>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if page_obj.has_other_pages %}
+<div class="flex justify-center mt-6 gap-2">
+    {% if page_obj.has_previous %}
+    <a href="?page={{ page_obj.previous_page_number }}" class="px-3 py-1.5 text-sm border border-slate-300 rounded hover:bg-slate-50">Previous</a>
+    {% endif %}
+    <span class="px-3 py-1.5 text-sm text-slate-500">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}
+    <a href="?page={{ page_obj.next_page_number }}" class="px-3 py-1.5 text-sm border border-slate-300 rounded hover:bg-slate-50">Next</a>
+    {% endif %}
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}

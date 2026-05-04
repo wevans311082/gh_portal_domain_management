@@ -89,6 +89,96 @@ class LegalPage(TimeStampedModel):
         return self.title
 
 
+class ContactFormSettings(TimeStampedModel):
+    """Configures the public Contact Us form destination behaviour."""
+
+    DESTINATION_DB = "db"
+    DESTINATION_EMAIL = "email"
+    DESTINATION_BOTH = "both"
+    DESTINATION_CHOICES = [
+        (DESTINATION_DB, "Store in database (admin review table)"),
+        (DESTINATION_EMAIL, "Send by email only"),
+        (DESTINATION_BOTH, "Both — store in DB and send email"),
+    ]
+
+    destination = models.CharField(
+        max_length=10,
+        choices=DESTINATION_CHOICES,
+        default=DESTINATION_DB,
+        help_text="Where submitted contact forms are delivered.",
+    )
+    destination_email = models.EmailField(
+        blank=True,
+        help_text="Required when destination includes email.",
+    )
+    notify_on_submit = models.BooleanField(
+        default=True,
+        help_text="Send a notification email to destination_email for each submission.",
+    )
+    form_title = models.CharField(
+        max_length=120,
+        default="Contact Us",
+        help_text="Heading shown on the public contact page.",
+    )
+    form_intro = models.TextField(
+        blank=True,
+        default="Fill in the form below and we'll get back to you as soon as possible.",
+        help_text="Introductory text above the form.",
+    )
+    thank_you_message = models.CharField(
+        max_length=255,
+        default="Thank you for getting in touch. We'll be in touch shortly.",
+        help_text="Success message shown after form submission.",
+    )
+
+    class Meta:
+        verbose_name = "Contact form settings"
+        verbose_name_plural = "Contact form settings"
+
+    def __str__(self):
+        return "Contact form settings"
+
+    @classmethod
+    def get_solo(cls):
+        obj = cls.objects.order_by("id").first()
+        if obj:
+            return obj
+        return cls.objects.create()
+
+
+class ContactSubmission(TimeStampedModel):
+    """A submitted contact form entry stored for admin review."""
+
+    STATUS_NEW = "new"
+    STATUS_READ = "read"
+    STATUS_REPLIED = "replied"
+    STATUS_ARCHIVED = "archived"
+    STATUS_CHOICES = [
+        (STATUS_NEW, "New"),
+        (STATUS_READ, "Read"),
+        (STATUS_REPLIED, "Replied"),
+        (STATUS_ARCHIVED, "Archived"),
+    ]
+
+    name = models.CharField(max_length=200)
+    email = models.EmailField()
+    phone = models.CharField(max_length=50, blank=True)
+    subject = models.CharField(max_length=255, blank=True)
+    message = models.TextField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_NEW)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.CharField(max_length=512, blank=True)
+    admin_notes = models.TextField(blank=True, help_text="Staff-only notes on this enquiry.")
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Contact submission"
+        verbose_name_plural = "Contact submissions"
+
+    def __str__(self):
+        return f"Contact from {self.name} <{self.email}> ({self.created_at:%Y-%m-%d})"
+
+
 class ErrorPageContent(TimeStampedModel):
     STATUS_404 = "404"
     STATUS_500 = "500"

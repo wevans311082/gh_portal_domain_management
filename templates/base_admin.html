@@ -103,7 +103,7 @@
             </details>
 
             <!-- Website -->
-            <details class="admin-nav-section mb-3" {% if request.resolver_match.url_name == 'content_dashboard' or request.resolver_match.url_name == 'content_settings' or 'package_card' in request.resolver_match.url_name or 'service_card' in request.resolver_match.url_name or 'faq_' in request.resolver_match.url_name or 'error_page' in request.resolver_match.url_name %}open{% endif %}>
+            <details class="admin-nav-section mb-3" {% if request.resolver_match.url_name == 'content_dashboard' or request.resolver_match.url_name == 'content_settings' or 'package_card' in request.resolver_match.url_name or 'service_card' in request.resolver_match.url_name or 'faq_' in request.resolver_match.url_name or 'error_page' in request.resolver_match.url_name or 'contact_submission' in request.resolver_match.url_name or request.resolver_match.url_name == 'contact_form_config' %}open{% endif %}">
                 <summary class="list-none cursor-pointer px-2 text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1 flex items-center justify-between">
                     <span>Website</span>
                     <span class="text-slate-600"><span class="admin-nav-plus">+</span><span class="admin-nav-minus">-</span></span>
@@ -138,6 +138,11 @@
                    class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition-colors {% if 'error_page' in request.resolver_match.url_name %}bg-slate-800 text-white{% endif %}">
                     <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M10.29 3.86l-7.3 12.65A1 1 0 003.86 18h16.28a1 1 0 00.87-1.49l-7.3-12.65a1 1 0 00-1.74 0z"/></svg>
                     Error Pages
+                </a>
+                <a href="{% url 'admin_tools:contact_submissions_list' %}"
+                   class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition-colors {% if 'contact_submission' in request.resolver_match.url_name or request.resolver_match.url_name == 'contact_form_config' %}bg-slate-800 text-white{% endif %}">
+                    <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                    Contact Submissions
                 </a>
                 </div>
             </details>

@@ -1,0 +1,80 @@
+{% extends "base_admin.html" %}
+
+{% block title %}Contact Submissions - {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Contact Submissions{% endblock %}
+
+{% block header_actions %}
+{% if new_count %}
+<span class="bg-rose-500 text-white text-xs font-bold px-2.5 py-1 rounded-full">{{ new_count }} new</span>
+{% endif %}
+<a href="{% url 'admin_tools:contact_form_config' %}" class="text-sm text-sky-700 hover:underline ml-3">Form Settings</a>
+{% endblock %}
+
+{% block content %}
+<form method="get" class="flex gap-2 mb-5">
+    <input name="q" value="{{ search_q }}" placeholder="Search name, email, subject…"
+           class="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500">
+    <select name="status" class="rounded-lg border border-slate-300 px-3 py-2 text-sm">
+        <option value="">All statuses</option>
+        {% for val, label in status_choices %}
+        <option value="{{ val }}" {% if status_filter == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+    <button type="submit" class="px-4 py-2 rounded-lg bg-sky-600 text-white text-sm hover:bg-sky-700">Filter</button>
+    {% if search_q or status_filter %}<a href="{% url 'admin_tools:contact_submissions_list' %}" class="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 text-sm hover:bg-slate-50">Clear</a>{% endif %}
+</form>
+
+{% if submissions %}
+<div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+    <table class="w-full text-sm">
+        <thead class="bg-slate-50 border-b border-slate-200">
+            <tr>
+                <th class="text-left px-5 py-3 font-semibold text-slate-700">Status</th>
+                <th class="text-left px-5 py-3 font-semibold text-slate-700">Name</th>
+                <th class="text-left px-5 py-3 font-semibold text-slate-700">Email</th>
+                <th class="text-left px-5 py-3 font-semibold text-slate-700">Subject</th>
+                <th class="text-left px-5 py-3 font-semibold text-slate-700">Received</th>
+                <th class="px-5 py-3"></th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+            {% for sub in submissions %}
+            <tr class="hover:bg-slate-50 transition-colors {% if sub.status == 'new' %}font-semibold{% endif %}">
+                <td class="px-5 py-3">
+                    {% if sub.status == 'new' %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-rose-100 text-rose-700">New</span>
+                    {% elif sub.status == 'read' %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-sky-100 text-sky-700">Read</span>
+                    {% elif sub.status == 'replied' %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-700">Replied</span>
+                    {% elif sub.status == 'archived' %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-500">Archived</span>
+                    {% endif %}
+                </td>
+                <td class="px-5 py-3 text-slate-800">{{ sub.name }}</td>
+                <td class="px-5 py-3 text-slate-600">{{ sub.email }}</td>
+                <td class="px-5 py-3 text-slate-600">{{ sub.subject|default:"—"|truncatechars:40 }}</td>
+                <td class="px-5 py-3 text-slate-500 whitespace-nowrap">{{ sub.created_at|date:"Y-m-d H:i" }}</td>
+                <td class="px-5 py-3 text-right">
+                    <a href="{% url 'admin_tools:contact_submission_detail' pk=sub.pk %}" class="text-xs text-sky-700 hover:underline font-medium">Open</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if page_obj.has_other_pages %}
+<div class="flex justify-center mt-5 gap-2">
+    {% if page_obj.has_previous %}<a href="?page={{ page_obj.previous_page_number }}&q={{ search_q }}&status={{ status_filter }}" class="px-3 py-1.5 text-sm border border-slate-300 rounded hover:bg-slate-50">Previous</a>{% endif %}
+    <span class="px-3 py-1.5 text-sm text-slate-500">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}<a href="?page={{ page_obj.next_page_number }}&q={{ search_q }}&status={{ status_filter }}" class="px-3 py-1.5 text-sm border border-slate-300 rounded hover:bg-slate-50">Next</a>{% endif %}
+</div>
+{% endif %}
+
+{% else %}
+<div class="bg-white rounded-xl border border-slate-200 shadow-sm p-10 text-center">
+    <p class="text-slate-500">No contact submissions{% if search_q or status_filter %} matching your filter{% endif %}.</p>
+</div>
+{% endif %}
+{% endblock %}

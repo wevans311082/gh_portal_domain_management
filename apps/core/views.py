@@ -109,7 +109,79 @@ def pricing(request):
 
 
 def contact(request):
-    return render(request, "public/contact.html")
+    from apps.core.models import ContactFormSettings, ContactSubmission
+    from apps.core.forms import ContactForm
+
+    settings = ContactFormSettings.get_solo()
+
+    if request.method == "POST":
+        form = ContactForm(request.POST)
+        if form.is_valid():
+            # Honeypot check
+            if form.cleaned_data.get("website"):
+                # Silent bot reject — show thank-you without saving
+                return render(
+                    request,
+                    "public/contact.html",
+                    {"form": ContactForm(), "settings": settings, "submitted": True},
+                )
+
+            name = form.cleaned_data["name"]
+            email = form.cleaned_data["email"]
+            phone = form.cleaned_data.get("phone", "")
+            subject = form.cleaned_data.get("subject", "")
+            message = form.cleaned_data["message"]
+
+            def _client_ip():
+                fwd = request.META.get("HTTP_X_FORWARDED_FOR", "")
+                return fwd.split(",")[0].strip() if fwd else request.META.get("REMOTE_ADDR", "")
+
+            # Store in DB if destination includes db
+            if settings.destination in (ContactFormSettings.DESTINATION_DB, ContactFormSettings.DESTINATION_BOTH):
+                ContactSubmission.objects.create(
+                    name=name,
+                    email=email,
+                    phone=phone,
+                    subject=subject,
+                    message=message,
+                    ip_address=_client_ip() or None,
+                    user_agent=request.META.get("HTTP_USER_AGENT", "")[:512],
+                )
+
+            # Send email if destination includes email
+            if settings.destination in (ContactFormSettings.DESTINATION_EMAIL, ContactFormSettings.DESTINATION_BOTH):
+                dest = settings.destination_email
+                if dest:
+                    try:
+                        from django.core.mail import send_mail
+                        from django.conf import settings as django_settings
+
+                        body = (
+                            f"Name: {name}\n"
+                            f"Email: {email}\n"
+                            f"Phone: {phone}\n"
+                            f"Subject: {subject}\n\n"
+                            f"Message:\n{message}"
+                        )
+                        send_mail(
+                            subject=f"[Contact] {subject or 'New enquiry'} from {name}",
+                            message=body,
+                            from_email=django_settings.DEFAULT_FROM_EMAIL,
+                            recipient_list=[dest],
+                            fail_silently=True,
+                        )
+                    except Exception:
+                        pass
+
+            return render(
+                request,
+                "public/contact.html",
+                {"form": ContactForm(), "settings": settings, "submitted": True},
+            )
+    else:
+        form = ContactForm()
+
+    return render(request, "public/contact.html", {"form": form, "settings": settings, "submitted": False})
 
 
 def legal_page(request, slug):

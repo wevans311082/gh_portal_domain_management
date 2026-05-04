@@ -125,6 +125,9 @@
             <a href="{% url 'domains:my_domains' %}" class="block w-full text-center border border-slate-300 text-slate-700 py-2 px-4 rounded-lg hover:bg-slate-50">
                 View My Domains
             </a>
+            <a href="{% url 'billing_public:quote_builder' %}" class="block w-full text-center border border-slate-300 text-slate-700 py-2 px-4 rounded-lg hover:bg-slate-50">
+                Request a Quote
+            </a>
         </div>
     </div>
 </div>
@@ -184,6 +187,29 @@
         {% endif %}
     </div>
 </div>
+
+{% if pending_quotes %}
+<div class="bg-white rounded-xl border border-sky-200 shadow-sm p-6 mt-6">
+    <div class="flex justify-between items-center mb-4">
+        <h3 class="font-semibold text-slate-900">Quotes Awaiting Your Response</h3>
+        <a href="{% url 'portal:my_quotes' %}" class="text-sm text-sky-700 hover:underline">View all quotes</a>
+    </div>
+    <ul class="divide-y divide-slate-100">
+        {% for quote in pending_quotes %}
+        <li class="py-3 flex items-center justify-between gap-3">
+            <div>
+                <a href="{% url 'billing_public:quote_public' token=quote.public_token %}" class="font-medium text-slate-800 hover:underline">Quote #{{ quote.number }}</a>
+                <p class="text-xs text-slate-500 mt-0.5">{{ quote.currency }} {{ quote.total }} &mdash; {% if quote.valid_until %}Valid until {{ quote.valid_until|date:"Y-m-d" }}{% else %}No expiry set{% endif %}</p>
+            </div>
+            <a href="{% url 'billing_public:quote_public_accept' token=quote.public_token %}"
+               class="text-xs bg-emerald-600 text-white px-3 py-1.5 rounded hover:bg-emerald-700 font-semibold whitespace-nowrap">
+                Accept
+            </a>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
 
 <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6 mt-6">
     <div class="flex justify-between items-center mb-4">

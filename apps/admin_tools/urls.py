@@ -54,6 +54,11 @@ urlpatterns = [
     path("templates/new/", operations_views.templates_create, name="templates_create"),
     path("templates/<int:pk>/", operations_views.templates_edit, name="templates_edit"),
     path("templates/<int:pk>/delete/", operations_views.templates_delete, name="templates_delete"),
+    # Contact submissions
+    path("contact/submissions/", operations_views.contact_submissions_list, name="contact_submissions_list"),
+    path("contact/submissions/<int:pk>/", operations_views.contact_submission_detail, name="contact_submission_detail"),
+    path("contact/submissions/<int:pk>/delete/", operations_views.contact_submission_delete, name="contact_submission_delete"),
+    path("contact/config/", operations_views.contact_form_config, name="contact_form_config"),
     # System
     path("tasks/", views.task_management, name="task_management"),
     path("templates/scan/", views.template_scan, name="template_scan"),

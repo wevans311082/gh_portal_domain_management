@@ -13,6 +13,7 @@ from apps.admin_tools.forms import (
     SupportTicketForm,
     WebsiteTemplateForm,
 )
+from apps.core.models import ContactFormSettings, ContactSubmission
 from apps.domains.models import Domain
 from apps.payments.models import Payment
 from apps.services.models import Service
@@ -263,3 +264,101 @@ def templates_delete(request, pk):
     obj.delete()
     messages.success(request, f"Template {name} deleted.")
     return redirect("admin_tools:templates_list")
+
+
+# ---------------------------------------------------------------------------
+# Contact submissions inbox
+# ---------------------------------------------------------------------------
+
+@staff_member_required
+def contact_submissions_list(request):
+    q = (request.GET.get("q") or "").strip()
+    status_filter = (request.GET.get("status") or "").strip()
+
+    qs = ContactSubmission.objects.all()
+    if q:
+        qs = qs.filter(
+            Q(name__icontains=q) | Q(email__icontains=q) | Q(subject__icontains=q) | Q(message__icontains=q)
+        )
+    if status_filter:
+        qs = qs.filter(status=status_filter)
+
+    page_obj = Paginator(qs, 25).get_page(request.GET.get("page"))
+    new_count = ContactSubmission.objects.filter(status=ContactSubmission.STATUS_NEW).count()
+    return render(
+        request,
+        "admin_tools/contact_submissions.html",
+        {
+            "page_obj": page_obj,
+            "submissions": page_obj.object_list,
+            "search_q": q,
+            "status_filter": status_filter,
+            "status_choices": ContactSubmission.STATUS_CHOICES,
+            "new_count": new_count,
+        },
+    )
+
+
+@staff_member_required
+def contact_submission_detail(request, pk):
+    obj = get_object_or_404(ContactSubmission, pk=pk)
+    # Auto-mark as read when opened
+    if obj.status == ContactSubmission.STATUS_NEW:
+        obj.status = ContactSubmission.STATUS_READ
+        obj.save(update_fields=["status"])
+
+    if request.method == "POST":
+        action = request.POST.get("action", "")
+        if action == "save_notes":
+            obj.admin_notes = request.POST.get("admin_notes", "")
+            new_status = request.POST.get("status", obj.status)
+            if new_status in dict(ContactSubmission.STATUS_CHOICES):
+                obj.status = new_status
+            obj.save(update_fields=["admin_notes", "status"])
+            messages.success(request, "Notes saved.")
+            return redirect("admin_tools:contact_submission_detail", pk=pk)
+        if action == "delete":
+            obj.delete()
+            messages.success(request, "Submission deleted.")
+            return redirect("admin_tools:contact_submissions_list")
+
+    return render(
+        request,
+        "admin_tools/contact_submission_detail.html",
+        {"obj": obj, "status_choices": ContactSubmission.STATUS_CHOICES},
+    )
+
+
+@staff_member_required
+@require_POST
+def contact_submission_delete(request, pk):
+    obj = get_object_or_404(ContactSubmission, pk=pk)
+    obj.delete()
+    messages.success(request, "Submission deleted.")
+    return redirect("admin_tools:contact_submissions_list")
+
+
+@staff_member_required
+def contact_form_config(request):
+    """Edit the contact form destination settings."""
+    cfg = ContactFormSettings.get_solo()
+
+    if request.method == "POST":
+        cfg.destination = request.POST.get("destination", cfg.destination)
+        cfg.destination_email = (request.POST.get("destination_email") or "").strip()
+        cfg.notify_on_submit = bool(request.POST.get("notify_on_submit"))
+        cfg.form_title = (request.POST.get("form_title") or "Contact Us").strip()
+        cfg.form_intro = (request.POST.get("form_intro") or "").strip()
+        cfg.thank_you_message = (request.POST.get("thank_you_message") or "").strip()
+        cfg.save()
+        messages.success(request, "Contact form settings saved.")
+        return redirect("admin_tools:contact_form_config")
+
+    return render(
+        request,
+        "admin_tools/contact_form_config.html",
+        {
+            "cfg": cfg,
+            "destination_choices": ContactFormSettings.DESTINATION_CHOICES,
+        },
+    )
