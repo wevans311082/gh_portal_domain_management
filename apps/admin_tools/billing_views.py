@@ -11,7 +11,6 @@ from decimal import Decimal, InvalidOperation
 from typing import List
 
 from django.contrib import messages
-from django.contrib.admin.views.decorators import staff_member_required
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.http import HttpResponse
@@ -50,6 +49,7 @@ from apps.portal.cart_service import (
     get_active_cart,
     remove_cart_item,
 )
+from .decorators import staff_member_required
 from apps.products.models import Package
 
 

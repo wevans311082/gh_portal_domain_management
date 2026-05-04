@@ -17,7 +17,7 @@ def test_task_management_requires_staff(client):
     response = client.get(reverse("admin_tools:task_management"))
 
     assert response.status_code == 302
-    assert reverse("admin:login") in response.url
+    assert reverse("account_login") in response.url
 
 
 @pytest.mark.django_db
@@ -69,7 +69,7 @@ def test_invoices_page_requires_staff(client):
     response = client.get(reverse("admin_tools:invoices"))
 
     assert response.status_code == 302
-    assert reverse("admin:login") in response.url
+    assert reverse("account_login") in response.url
 
 
 @pytest.mark.django_db
@@ -126,7 +126,7 @@ def test_tld_pricing_page_requires_staff(client):
     response = client.get(reverse("admin_tools:tld_pricing"))
 
     assert response.status_code == 302
-    assert reverse("admin:login") in response.url
+    assert reverse("account_login") in response.url
 
 
 @pytest.mark.django_db
@@ -160,7 +160,7 @@ def test_resellerclub_debug_page_requires_staff(client):
     response = client.get(reverse("admin_tools:resellerclub_debug"))
 
     assert response.status_code == 302
-    assert reverse("admin:login") in response.url
+    assert reverse("account_login") in response.url
 
 
 @pytest.mark.django_db
@@ -306,7 +306,7 @@ def test_companies_house_config_requires_staff(client):
     response = client.get(reverse("admin_tools:companies_house_config"))
 
     assert response.status_code == 302
-    assert reverse("admin:login") in response.url
+    assert reverse("account_login") in response.url
 
 
 @pytest.mark.django_db
@@ -468,7 +468,7 @@ def test_user_mfa_manage_requires_staff(client, django_user_model):
     response = client.get(reverse("admin_tools:user_mfa_manage", args=[target.pk]))
 
     assert response.status_code == 302
-    assert reverse("admin:login") in response.url
+    assert reverse("account_login") in response.url
 
 
 @pytest.mark.django_db

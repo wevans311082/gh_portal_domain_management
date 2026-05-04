@@ -1,5 +1,4 @@
 from django.contrib import messages
-from django.contrib.admin.views.decorators import staff_member_required
 from django.http import JsonResponse
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
@@ -30,6 +29,7 @@ from apps.core.models import BlogPost, ErrorPageContent, HomeFAQ, HomeServiceCar
 from apps.notifications.models import NotificationTemplate
 from apps.products.models import Package, PackageFeature
 from apps.companies.services import CompaniesHouseService
+from .decorators import staff_member_required
 
 
 @staff_member_required

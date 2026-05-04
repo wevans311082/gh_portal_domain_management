@@ -6,7 +6,6 @@ import requests
 
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.admin.views.decorators import staff_member_required
 from django.core.paginator import Paginator
 from django.db.models import Count, Q, Sum
 from django.db.models.functions import TruncMonth
@@ -25,6 +24,7 @@ from apps.payments.models import Payment
 from apps.services.models import Service
 from apps.support.models import SupportTicket
 from . import wizard_views
+from .decorators import staff_member_required
 
 
 def _build_task_summary():

@@ -1,0 +1,36 @@
+{% extends "base_auth.html" %}
+
+{% block title %}Sign Out · {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="text-center">
+        <h1 class="text-2xl font-bold text-slate-900">Sign out</h1>
+        <p class="mt-2 text-sm text-slate-600">You are about to end your session on this device.</p>
+    </div>
+
+    <form method="post" action="{% url 'account_logout' %}" class="space-y-4" data-no-form-card>
+        {% csrf_token %}
+        {% if redirect_field_value %}
+        <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}">
+        {% endif %}
+
+        <button type="submit"
+                class="w-full inline-flex items-center justify-center rounded-lg bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-rose-700 transition-colors">
+            Yes, sign me out
+        </button>
+
+        {% if request.user.is_authenticated %}
+        <a href="{% url 'portal:dashboard' %}"
+           class="w-full inline-flex items-center justify-center rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
+            Cancel
+        </a>
+        {% else %}
+        <a href="{% url 'core:home' %}"
+           class="w-full inline-flex items-center justify-center rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
+            Back to home
+        </a>
+        {% endif %}
+    </form>
+</div>
+{% endblock %}

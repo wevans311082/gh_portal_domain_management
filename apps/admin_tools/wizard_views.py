@@ -22,10 +22,10 @@ import smtplib
 from django import forms
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.admin.views.decorators import staff_member_required
 from django.shortcuts import render, redirect
 import requests
 
+from .decorators import staff_member_required
 from .models import IntegrationSetting, WizardProgress
 
 logger = logging.getLogger(__name__)
