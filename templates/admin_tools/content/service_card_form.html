@@ -1,0 +1,40 @@
+{% extends "base_admin.html" %}
+{% block title %}Service Card · {{ SITE_NAME }}{% endblock %}
+{% block page_title %}{% if mode == 'create' %}New Service Card{% else %}Edit Service Card{% endif %}{% endblock %}
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+<form method="post" class="bg-white rounded-xl border border-slate-200 p-6 space-y-4">{% csrf_token %}
+  {{ form.as_p }}
+  <button class="px-4 py-2 rounded bg-sky-600 text-white">Save</button>
+</form>
+<div class="bg-white rounded-xl border border-slate-200 p-6">
+  <p class="text-xs uppercase text-slate-500 mb-2">Live preview</p>
+  <div class="text-center p-6 border rounded-lg">
+    <div id="preview_icon" class="text-5xl mb-3">{{ form.icon_emoji.value|default:'⚡' }}</div>
+    <h3 id="preview_title" class="text-xl font-semibold">{{ form.title.value|default:'Service title' }}</h3>
+    <p id="preview_subtitle" class="text-sm text-slate-500">{{ form.subtitle.value|default:'Subtitle' }}</p>
+    <p id="preview_description" class="text-sm mt-2">{{ form.description.value|default:'Description preview.' }}</p>
+  </div>
+</div>
+</div>
+<script>
+(function () {
+  function val(name) {
+    var el = document.querySelector('[name="' + name + '"]');
+    return el ? el.value : '';
+  }
+  function text(id, value, fallback) {
+    var el = document.getElementById(id);
+    if (el) el.textContent = value || fallback;
+  }
+  function sync() {
+    text('preview_icon', val('icon_emoji'), '⚡');
+    text('preview_title', val('title'), 'Service title');
+    text('preview_subtitle', val('subtitle'), 'Subtitle');
+    text('preview_description', val('description'), 'Description preview.');
+  }
+  document.addEventListener('input', sync);
+  sync();
+})();
+</script>
+{% endblock %}

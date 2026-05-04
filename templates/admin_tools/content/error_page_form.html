@@ -1,0 +1,38 @@
+{% extends "base_admin.html" %}
+{% block title %}Error Page · {{ SITE_NAME }}{% endblock %}
+{% block page_title %}{% if mode == 'create' %}New Error Page Content{% else %}Edit Error Page Content{% endif %}{% endblock %}
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+<form method="post" class="bg-white rounded-xl border border-slate-200 p-6 space-y-4">{% csrf_token %}
+  {{ form.as_p }}
+  <button class="px-4 py-2 rounded bg-sky-600 text-white">Save</button>
+</form>
+<div class="bg-slate-900 text-white rounded-xl border border-slate-700 p-6 relative overflow-hidden">
+  <p class="text-xs uppercase text-slate-400">Live preview</p>
+  <h2 id="preview_status" class="text-4xl font-bold mt-3">{{ form.status_code.value|default:'404' }}</h2>
+  <p id="preview_title" class="text-xl mt-2">{{ form.title.value|default:'Page not found' }}</p>
+  <p id="preview_subtitle" class="text-slate-300 mt-2">{{ form.subtitle.value }}</p>
+  <a href="#" id="preview_cta" class="inline-block mt-4 px-4 py-2 rounded bg-cyan-500 text-slate-900 text-sm font-semibold">{{ form.cta_label.value|default:'Back to home' }}</a>
+</div>
+</div>
+<script>
+(function () {
+  function val(name) {
+    var el = document.querySelector('[name="' + name + '"]');
+    return el ? el.value : '';
+  }
+  function text(id, value, fallback) {
+    var el = document.getElementById(id);
+    if (el) el.textContent = value || fallback;
+  }
+  function sync() {
+    text('preview_status', val('status_code'), '404');
+    text('preview_title', val('title'), 'Page not found');
+    text('preview_subtitle', val('subtitle'), '');
+    text('preview_cta', val('cta_label'), 'Back to home');
+  }
+  document.addEventListener('input', sync);
+  sync();
+})();
+</script>
+{% endblock %}

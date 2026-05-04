@@ -1,0 +1,17 @@
+{% extends "base_admin.html" %}
+{% block title %}Service Cards · {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Homepage Service Cards{% endblock %}
+{% block content %}
+<div class="mb-4"><a href="{% url 'admin_tools:service_card_create' %}" class="px-4 py-2 rounded bg-sky-600 text-white text-sm">New Service Card</a></div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+{% for c in cards %}
+  <div class="bg-white rounded-xl border border-slate-200 p-5">
+    <div class="text-3xl">{{ c.icon_emoji }}</div>
+    <h3 class="font-semibold mt-2">{{ c.title }}</h3>
+    <p class="text-sm text-slate-500">{{ c.subtitle }}</p>
+    <p class="text-sm mt-2">{{ c.description|truncatechars:120 }}</p>
+    <a href="{% url 'admin_tools:service_card_edit' c.pk %}" class="text-xs text-sky-700">Edit</a>
+  </div>
+{% empty %}<div class="text-slate-500">No cards yet.</div>{% endfor %}
+</div>
+{% endblock %}

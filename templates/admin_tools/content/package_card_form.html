@@ -1,0 +1,55 @@
+{% extends "base_admin.html" %}
+{% block title %}Package Card · {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Edit Package Card{% endblock %}
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+<form method="post" class="bg-white rounded-xl border border-slate-200 p-6 space-y-4">{% csrf_token %}
+  {{ form.as_p }}
+  <label class="block text-sm font-medium text-slate-700">Features (+ good / - limitation)</label>
+  <textarea name="feature_lines" rows="8" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">{{ feature_lines }}</textarea>
+  <button class="px-4 py-2 rounded bg-sky-600 text-white">Save</button>
+</form>
+<div class="bg-white rounded-xl border border-slate-200 p-6">
+  <p class="text-xs uppercase text-slate-500 mb-2">Live preview</p>
+  <div class="rounded-xl border p-6 border-slate-200" id="preview_card_wrap">
+    <span id="preview_badge" class="inline-block mb-2 bg-sky-600 text-white text-xs px-2 py-1 rounded-full" style="display:none"></span>
+    <h3 id="preview_name" class="text-xl font-bold mb-1">{{ form.name.value }}</h3>
+    <p class="text-3xl font-bold text-sky-600 mb-1">£<span id="preview_price">{{ form.price_monthly.value }}</span><span class="text-sm text-slate-500">/mo</span></p>
+    <p id="preview_blurb" class="text-sm text-slate-500 mb-3">{{ form.card_blurb.value }}</p>
+    <ul class="text-sm space-y-1 mb-4">{% for f in preview_features %}<li>{% if f.is_positive %}✓{% else %}✗{% endif %} {{ f.text }}</li>{% endfor %}</ul>
+    <button type="button" id="preview_cta" class="w-full py-2 rounded bg-sky-600 text-white text-sm">{{ form.card_cta_label.value|default:'Get Started' }}</button>
+  </div>
+</div>
+</div>
+<script>
+(function () {
+  function val(name) {
+    var el = document.querySelector('[name="' + name + '"]');
+    return el ? el.value : '';
+  }
+  function setText(id, value, fallback) {
+    var el = document.getElementById(id);
+    if (el) el.textContent = value || fallback;
+  }
+  function sync() {
+    var badge = val('card_badge');
+    var badgeEl = document.getElementById('preview_badge');
+    var wrap = document.getElementById('preview_card_wrap');
+    if (badgeEl) {
+      badgeEl.style.display = badge ? 'inline-block' : 'none';
+      badgeEl.textContent = badge;
+    }
+    if (wrap) {
+      wrap.classList.toggle('border-cyan-300', !!badge);
+      wrap.classList.toggle('border-slate-200', !badge);
+    }
+    setText('preview_name', val('name'), 'Package');
+    setText('preview_price', val('price_monthly'), '0');
+    setText('preview_blurb', val('card_blurb'), 'Card blurb');
+    setText('preview_cta', val('card_cta_label'), 'Get Started');
+  }
+  document.addEventListener('input', sync);
+  sync();
+})();
+</script>
+{% endblock %}

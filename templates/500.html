@@ -3,12 +3,37 @@
 {% block title %}500 Server Error{% endblock %}
 
 {% block body %}
-<div class="min-h-full flex items-center justify-center">
-    <div class="text-center">
-        <h1 class="text-9xl font-bold text-gray-300">500</h1>
-        <p class="text-2xl font-semibold text-gray-700 mt-4">Server Error</p>
-        <p class="text-gray-500 mt-2">Something went wrong. We're working on it.</p>
-        <a href="/" class="mt-6 inline-block bg-sky-600 text-white px-6 py-3 rounded hover:bg-sky-700">Go Home</a>
+<div class="min-h-screen flex items-center justify-center bg-slate-950 text-white relative overflow-hidden">
+        <canvas id="error-grid" class="absolute inset-0 w-full h-full"></canvas>
+        <div class="text-center relative z-10 max-w-xl px-6">
+                <h1 class="text-8xl font-bold text-amber-300">500</h1>
+                <p class="text-3xl font-semibold mt-4">{{ page.title|default:'Server Error' }}</p>
+                <p class="text-slate-300 mt-2">{{ page.subtitle|default:'Something went wrong. We are already on it.' }}</p>
+                {% if page.body %}<p class="text-slate-400 mt-3 text-sm">{{ page.body }}</p>{% endif %}
+                <a href="{{ page.cta_url|default:'/' }}" class="mt-6 inline-block bg-amber-400 text-slate-900 px-6 py-3 rounded hover:bg-amber-300 font-semibold">{{ page.cta_label|default:'Back to home' }}</a>
     </div>
 </div>
+<script>
+(function(){
+    var c = document.getElementById('error-grid');
+    if (!c) return;
+    var ctx = c.getContext('2d');
+    function resize(){ c.width = window.innerWidth; c.height = window.innerHeight; }
+    resize(); window.addEventListener('resize', resize);
+    var t = 0;
+    function draw(){
+        t += 0.01;
+        ctx.clearRect(0,0,c.width,c.height);
+        ctx.strokeStyle = 'rgba(251,191,36,0.12)';
+        for (var x=0; x<c.width; x+=32){
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x + Math.sin(t + x*0.01)*6, c.height);
+            ctx.stroke();
+        }
+        requestAnimationFrame(draw);
+    }
+    draw();
+})();
+</script>
 {% endblock %}

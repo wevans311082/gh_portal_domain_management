@@ -27,7 +27,7 @@
                class="border border-slate-200 rounded-lg px-3 py-2 text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-indigo-400">
         <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700">Search</button>
         {% if search_q %}<a href="{% url 'admin_tools:users' %}" class="border border-slate-200 text-slate-600 px-4 py-2 rounded-lg text-sm hover:bg-slate-50">Clear</a>{% endif %}
-        <a href="{% url 'admin:accounts_user_add' %}" class="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-700">+ New User</a>
+        <a href="{% url 'admin_tools:user_create' %}" class="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-700">+ New User</a>
     </form>
 </div>
 
@@ -58,7 +58,7 @@
                     </div>
                 </td>
                 <td class="px-4 py-3">
-                    <a href="{% url 'admin:accounts_user_change' u.pk %}" class="text-xs text-indigo-600 hover:underline">Edit in Admin</a>
+                    <a href="{% url 'admin_tools:user_edit' u.pk %}" class="text-xs text-indigo-600 hover:underline">Edit user</a>
                 </td>
             </tr>
             {% empty %}

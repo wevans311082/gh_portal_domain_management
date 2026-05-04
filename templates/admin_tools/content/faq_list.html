@@ -1,0 +1,10 @@
+{% extends "base_admin.html" %}
+{% block title %}FAQs · {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Homepage FAQs{% endblock %}
+{% block content %}
+<div class="mb-4"><a href="{% url 'admin_tools:faq_create' %}" class="px-4 py-2 rounded bg-sky-600 text-white text-sm">New FAQ</a></div>
+<div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+<table class="w-full text-sm"><thead class="bg-slate-50"><tr><th class="px-4 py-2 text-left">Question</th><th class="px-4 py-2">Order</th><th class="px-4 py-2">Active</th><th class="px-4 py-2 text-right">Actions</th></tr></thead><tbody class="divide-y">
+{% for f in faqs %}<tr><td class="px-4 py-2">{{ f.question }}</td><td class="px-4 py-2 text-center">{{ f.sort_order }}</td><td class="px-4 py-2 text-center">{% if f.is_active %}Yes{% else %}No{% endif %}</td><td class="px-4 py-2 text-right"><a href="{% url 'admin_tools:faq_edit' f.pk %}" class="text-sky-700 text-xs mr-3">Edit</a><form method="post" action="{% url 'admin_tools:faq_delete' f.pk %}" class="inline">{% csrf_token %}<button class="text-rose-600 text-xs" onclick="return confirm('Delete FAQ?')">Delete</button></form></td></tr>{% empty %}<tr><td colspan="4" class="px-4 py-8 text-center text-slate-500">No FAQs yet.</td></tr>{% endfor %}
+</tbody></table></div>
+{% endblock %}

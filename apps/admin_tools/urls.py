@@ -2,6 +2,7 @@ from django.urls import path
 from . import views
 from . import wizard_views
 from . import billing_views
+from . import content_views
 
 app_name = "admin_tools"
 
@@ -11,6 +12,8 @@ urlpatterns = [
     path("stats/", views.stats, name="stats"),
     # People
     path("users/", views.users, name="users"),
+    path("users/new/", content_views.user_create, name="user_create"),
+    path("users/<int:pk>/", content_views.user_edit, name="user_edit"),
     # Commerce
     path("invoices/", views.invoices, name="invoices"),
     # Billing workbench
@@ -40,4 +43,25 @@ urlpatterns = [
     path("setup/wizard/", wizard_views.wizard_index, name="wizard_index"),
     path("setup/wizard/<str:step_key>/", wizard_views.wizard_step, name="wizard_step"),
     path("setup/wizard/reset/", wizard_views.wizard_reset, name="wizard_reset"),
+    # Website content CMS
+    path("content/", content_views.content_dashboard, name="content_dashboard"),
+    path("content/settings/", content_views.content_settings_edit, name="content_settings"),
+    path("content/faqs/", content_views.faq_list, name="faq_list"),
+    path("content/faqs/new/", content_views.faq_create, name="faq_create"),
+    path("content/faqs/<int:pk>/", content_views.faq_edit, name="faq_edit"),
+    path("content/faqs/<int:pk>/delete/", content_views.faq_delete, name="faq_delete"),
+    path("content/service-cards/", content_views.service_card_list, name="service_card_list"),
+    path("content/service-cards/new/", content_views.service_card_create, name="service_card_create"),
+    path("content/service-cards/<int:pk>/", content_views.service_card_edit, name="service_card_edit"),
+    path("content/service-cards/<int:pk>/delete/", content_views.service_card_delete, name="service_card_delete"),
+    path("content/package-cards/", content_views.package_card_list, name="package_card_list"),
+    path("content/package-cards/<int:pk>/", content_views.package_card_edit, name="package_card_edit"),
+    path("content/legal/", content_views.legal_page_list, name="legal_page_list"),
+    path("content/legal/new/", content_views.legal_page_create, name="legal_page_create"),
+    path("content/legal/<int:pk>/", content_views.legal_page_edit, name="legal_page_edit"),
+    path("content/legal/<int:pk>/delete/", content_views.legal_page_delete, name="legal_page_delete"),
+    path("content/errors/", content_views.error_page_list, name="error_page_list"),
+    path("content/errors/new/", content_views.error_page_create, name="error_page_create"),
+    path("content/errors/<int:pk>/", content_views.error_page_edit, name="error_page_edit"),
+    path("content/errors/<int:pk>/delete/", content_views.error_page_delete, name="error_page_delete"),
 ]

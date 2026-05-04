@@ -34,9 +34,25 @@ class Package(TimeStampedModel):
         blank=True,
         help_text="Free-text category label for grouping in the public quote builder (e.g. Hosting, Email, Security).",
     )
+    show_on_homepage = models.BooleanField(
+        default=True,
+        help_text="Show this package card on the public homepage.",
+    )
+    card_blurb = models.CharField(
+        max_length=180,
+        blank=True,
+        help_text="Short subtitle for the homepage package card.",
+    )
+    card_badge = models.CharField(
+        max_length=40,
+        blank=True,
+        help_text="Optional badge text (e.g. Most Popular).",
+    )
+    card_cta_label = models.CharField(max_length=60, default="Get Started")
+    card_sort_order = models.PositiveIntegerField(default=0)
 
     class Meta:
-        ordering = ["sort_order", "price_monthly"]
+        ordering = ["card_sort_order", "sort_order", "price_monthly"]
 
     def __str__(self):
         return self.name

@@ -31,7 +31,7 @@
         <p class="text-xs text-slate-500 font-medium uppercase tracking-wide mb-1">Failed Tasks (7d)</p>
         <p class="text-3xl font-bold {% if failed_tasks_7d %}text-amber-600{% else %}text-slate-800{% endif %}">{{ failed_tasks_7d }}</p>
     </a>
-    <a href="{% url 'admin:billing_invoice_changelist' %}" class="bg-white rounded-xl border {% if unpaid_invoices %}border-red-300{% else %}border-slate-200{% endif %} shadow-sm p-5 hover:shadow-md transition-shadow">
+    <a href="{% url 'admin_tools:invoice_list' %}" class="bg-white rounded-xl border {% if unpaid_invoices %}border-red-300{% else %}border-slate-200{% endif %} shadow-sm p-5 hover:shadow-md transition-shadow">
         <p class="text-xs text-slate-500 font-medium uppercase tracking-wide mb-1">Unpaid Invoices</p>
         <p class="text-3xl font-bold {% if unpaid_invoices %}text-red-600{% else %}text-slate-800{% endif %}">{{ unpaid_invoices }}</p>
     </a>
@@ -43,6 +43,7 @@
     <a href="{% url 'admin:support_supportticket_changelist' %}" class="bg-white rounded-xl border {% if open_tickets %}border-indigo-300{% else %}border-slate-200{% endif %} shadow-sm p-5 hover:shadow-md transition-shadow">
         <p class="text-xs text-slate-500 font-medium uppercase tracking-wide mb-1">Open Support Tickets</p>
         <p class="text-3xl font-bold {% if open_tickets %}text-indigo-600{% else %}text-slate-800{% endif %}">{{ open_tickets }}</p>
+        <p class="text-xs text-slate-400 mt-1">Django admin fallback</p>
     </a>
     <a href="{% url 'admin_tools:integrations_overview' %}" class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 hover:shadow-md transition-shadow">
         <p class="text-xs text-slate-500 font-medium uppercase tracking-wide mb-1">Enabled Tasks</p>
@@ -78,7 +79,7 @@
     <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
         <div class="flex items-center justify-between mb-3">
             <h3 class="font-semibold text-slate-800 text-sm">Recent Support Tickets</h3>
-            <a href="{% url 'admin:support_supportticket_changelist' %}" class="text-xs text-indigo-600 hover:underline">View all →</a>
+            <a href="{% url 'admin:support_supportticket_changelist' %}" class="text-xs text-indigo-600 hover:underline">View all in Django admin →</a>
         </div>
         <ul class="space-y-2">
             {% for ticket in recent_tickets %}

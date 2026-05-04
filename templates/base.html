@@ -32,6 +32,8 @@
 
     {% block body %}{% endblock %}
 
+    {% include "partials/cookie_banner.html" %}
+
     {% include "partials/resellerclub_debug_tray.html" %}
 
     <script src="{% static 'js/app.js' %}"></script>

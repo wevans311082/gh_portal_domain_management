@@ -3,12 +3,35 @@
 {% block title %}404 Not Found{% endblock %}
 
 {% block body %}
-<div class="min-h-full flex items-center justify-center">
-    <div class="text-center">
-        <h1 class="text-9xl font-bold text-gray-300">404</h1>
-        <p class="text-2xl font-semibold text-gray-700 mt-4">Page Not Found</p>
-        <p class="text-gray-500 mt-2">The page you're looking for doesn't exist.</p>
-        <a href="/" class="mt-6 inline-block bg-sky-600 text-white px-6 py-3 rounded hover:bg-sky-700">Go Home</a>
+<div class="min-h-screen flex items-center justify-center bg-slate-950 text-white overflow-hidden relative">
+        <div id="error-orbs" class="absolute inset-0"></div>
+        <div class="text-center relative z-10 max-w-xl px-6">
+                <h1 class="text-8xl font-bold text-cyan-300">404</h1>
+                <p class="text-3xl font-semibold mt-4">{{ page.title|default:'Page Not Found' }}</p>
+                <p class="text-slate-300 mt-2">{{ page.subtitle|default:'The page you are looking for does not exist or has moved.' }}</p>
+                {% if page.body %}<p class="text-slate-400 mt-3 text-sm">{{ page.body }}</p>{% endif %}
+                <a href="{{ page.cta_url|default:'/' }}" class="mt-6 inline-block bg-cyan-400 text-slate-900 px-6 py-3 rounded hover:bg-cyan-300 font-semibold">{{ page.cta_label|default:'Back to home' }}</a>
     </div>
 </div>
+<script>
+(function(){
+    var root = document.getElementById('error-orbs');
+    if (!root) return;
+    for (var i = 0; i < 14; i++) {
+        var o = document.createElement('div');
+        o.style.position = 'absolute';
+        o.style.width = (40 + Math.random()*120) + 'px';
+        o.style.height = o.style.width;
+        o.style.left = (Math.random()*100) + '%';
+        o.style.top = (Math.random()*100) + '%';
+        o.style.borderRadius = '9999px';
+        o.style.background = 'radial-gradient(circle, rgba(34,211,238,0.25), rgba(34,211,238,0.02))';
+        o.style.animation = 'float' + i + ' ' + (8 + Math.random()*10) + 's ease-in-out infinite alternate';
+        root.appendChild(o);
+        var key = document.createElement('style');
+        key.textContent = '@keyframes float' + i + '{from{transform:translateY(0) translateX(0)}to{transform:translateY(' + (-20 - Math.random()*60) + 'px) translateX(' + (-20 + Math.random()*40) + 'px)}}';
+        document.head.appendChild(key);
+    }
+})();
+</script>
 {% endblock %}

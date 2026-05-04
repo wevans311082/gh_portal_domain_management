@@ -1,7 +1,12 @@
 (function () {
     function initVanta() {
         var hero = document.getElementById("vanta-hero");
-        if (!hero || !window.VANTA || !window.VANTA.CLOUDS2) {
+        if (!hero) {
+            return;
+        }
+
+        if (!window.VANTA || !window.VANTA.CLOUDS2) {
+            hero.classList.add("hero-fallback-bg");
             return;
         }
 
@@ -14,19 +19,21 @@
 
         window.VANTA.CLOUDS2({
             el: "#vanta-hero",
-            mouseControls: true,
-            touchControls: true,
+            mouseControls: false,
+            touchControls: false,
             gyroControls: false,
             minHeight: 350,
             minWidth: 200,
+            scale: 1,
+            scaleMobile: 1,
             texturePath: texturePath,
-            skyColor: 0x0f172a,
-            cloudColor: 0xb6e2ff,
-            cloudShadowColor: 0x1e293b,
-            sunColor: 0x38bdf8,
-            sunGlareColor: 0x7dd3fc,
-            sunlightColor: 0x0ea5e9,
-            speed: 0.8
+            skyColor: 0x0b1e36,
+            cloudColor: 0xe8f6ff,
+            cloudShadowColor: 0x23435f,
+            sunColor: 0xffd7a8,
+            sunGlareColor: 0xffefcf,
+            sunlightColor: 0xfff7df,
+            speed: 0.38
         });
     }
 

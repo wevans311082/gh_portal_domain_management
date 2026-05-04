@@ -1,0 +1,25 @@
+{% extends "base_admin.html" %}
+{% block title %}Website Content · {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Website Content{% endblock %}
+{% block content %}
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+  <a href="{% url 'admin_tools:faq_list' %}" class="bg-white rounded-xl border border-slate-200 p-5 hover:shadow-sm">
+    <p class="text-xs uppercase text-slate-500">FAQs</p><p class="text-3xl font-bold">{{ faq_count }}</p>
+  </a>
+  <a href="{% url 'admin_tools:service_card_list' %}" class="bg-white rounded-xl border border-slate-200 p-5 hover:shadow-sm">
+    <p class="text-xs uppercase text-slate-500">Service Cards</p><p class="text-3xl font-bold">{{ service_count }}</p>
+  </a>
+  <a href="{% url 'admin_tools:package_card_list' %}" class="bg-white rounded-xl border border-slate-200 p-5 hover:shadow-sm">
+    <p class="text-xs uppercase text-slate-500">Package Cards</p><p class="text-3xl font-bold">{{ package_count }}</p>
+  </a>
+  <a href="{% url 'admin_tools:legal_page_list' %}" class="bg-white rounded-xl border border-slate-200 p-5 hover:shadow-sm">
+    <p class="text-xs uppercase text-slate-500">Legal Pages</p><p class="text-3xl font-bold">{{ legal_count }}</p>
+  </a>
+  <a href="{% url 'admin_tools:error_page_list' %}" class="bg-white rounded-xl border border-slate-200 p-5 hover:shadow-sm">
+    <p class="text-xs uppercase text-slate-500">Error Pages</p><p class="text-3xl font-bold">{{ error_page_count }}</p>
+  </a>
+  <a href="{% url 'admin_tools:content_settings' %}" class="bg-white rounded-xl border border-slate-200 p-5 hover:shadow-sm">
+    <p class="text-xs uppercase text-slate-500">Footer & Cookie</p><p class="text-lg font-semibold">Settings</p>
+  </a>
+</div>
+{% endblock %}

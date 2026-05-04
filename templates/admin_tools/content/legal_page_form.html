@@ -1,0 +1,12 @@
+{% extends "base_admin.html" %}
+{% block title %}Legal Page · {{ SITE_NAME }}{% endblock %}
+{% block page_title %}{% if mode == 'create' %}New Legal Page{% else %}Edit Legal Page{% endif %}{% endblock %}
+{% block content %}
+<form method="post" class="bg-white rounded-xl border border-slate-200 p-6 max-w-5xl space-y-4">{% csrf_token %}
+  {{ form.as_p }}
+  <button class="px-4 py-2 rounded bg-sky-600 text-white">Save</button>
+  {% if obj and obj.is_published %}
+  <a href="{% url 'core:legal_page' obj.slug %}" target="_blank" class="ml-4 text-sm text-sky-700">View live</a>
+  {% endif %}
+</form>
+{% endblock %}

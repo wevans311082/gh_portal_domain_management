@@ -1,0 +1,31 @@
+{% if CONTENT_SETTINGS.enable_cookie_banner %}
+<div id="cookie-banner" class="fixed bottom-0 inset-x-0 z-50 hidden">
+  <div class="mx-auto max-w-6xl p-3">
+    <div class="rounded-xl border border-slate-200 bg-white shadow-xl p-4 md:p-5 flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
+      <p class="text-sm text-slate-700">{{ CONTENT_SETTINGS.cookie_banner_text }}</p>
+      <div class="flex gap-2">
+        <button id="cookie-reject" class="px-3 py-2 text-xs border border-slate-300 rounded">Reject non-essential</button>
+        <button id="cookie-accept" class="px-3 py-2 text-xs bg-emerald-600 text-white rounded">Accept all</button>
+        <a href="{% if CONTENT_SETTINGS.cookie_policy_slug %}{% url 'core:legal_page' CONTENT_SETTINGS.cookie_policy_slug %}{% else %}{% url 'core:contact' %}{% endif %}" class="px-3 py-2 text-xs text-sky-700 underline">Cookie policy</a>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+(function () {
+  var key = 'gh_cookie_consent_v1';
+  var existing = localStorage.getItem(key);
+  var banner = document.getElementById('cookie-banner');
+  if (!banner) return;
+  if (!existing) banner.classList.remove('hidden');
+  function save(value) {
+    localStorage.setItem(key, value);
+    banner.classList.add('hidden');
+  }
+  var accept = document.getElementById('cookie-accept');
+  var reject = document.getElementById('cookie-reject');
+  if (accept) accept.addEventListener('click', function () { save('accept'); });
+  if (reject) reject.addEventListener('click', function () { save('reject'); });
+})();
+</script>
+{% endif %}

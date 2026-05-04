@@ -1,0 +1,44 @@
+{% extends "base_admin.html" %}
+{% block title %}Footer & Cookie Settings · {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Footer & Cookie Settings{% endblock %}
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+<form method="post" class="bg-white rounded-xl border border-slate-200 p-6 space-y-4">{% csrf_token %}
+  {{ form.as_p }}
+  <button class="px-4 py-2 rounded bg-sky-600 text-white">Save settings</button>
+</form>
+<div class="bg-white rounded-xl border border-slate-200 p-6">
+  <p class="text-xs uppercase text-slate-500 mb-2">Footer preview</p>
+  <div class="bg-sky-800 text-slate-200 rounded-lg p-5 text-sm">
+    <p class="font-semibold text-white">{{ SITE_NAME }}</p>
+    <p id="preview_footer_about" class="mt-1">{{ form.footer_about.value }}</p>
+    <div class="mt-4 flex flex-wrap gap-3">
+      {% for p in legal_links %}<span class="underline">{{ p.title }}</span>{% empty %}<span class="text-slate-400">No legal links yet.</span>{% endfor %}
+    </div>
+  </div>
+  <p class="text-xs uppercase text-slate-500 mt-6 mb-2">Cookie banner preview</p>
+  <div class="border rounded-lg p-4 bg-slate-50 text-sm">
+    <span id="preview_cookie_text">{{ form.cookie_banner_text.value }}</span>
+    <div class="mt-2"><span class="inline-block bg-emerald-600 text-white px-2 py-1 rounded text-xs">Accept</span> <span class="inline-block border border-slate-300 px-2 py-1 rounded text-xs">Reject</span></div>
+  </div>
+</div>
+</div>
+<script>
+(function () {
+  function val(name) {
+    var el = document.querySelector('[name="' + name + '"]');
+    return el ? el.value : '';
+  }
+  function text(id, value, fallback) {
+    var el = document.getElementById(id);
+    if (el) el.textContent = value || fallback;
+  }
+  function sync() {
+    text('preview_footer_about', val('footer_about'), 'Footer about copy');
+    text('preview_cookie_text', val('cookie_banner_text'), 'Cookie banner text');
+  }
+  document.addEventListener('input', sync);
+  sync();
+})();
+</script>
+{% endblock %}
