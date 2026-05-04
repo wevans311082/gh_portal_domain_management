@@ -1,0 +1,6 @@
+{% extends "base_admin.html" %}
+{% block title %}Payment · {{ SITE_NAME }}{% endblock %}
+{% block page_title %}{% if mode == 'create' %}Create Payment{% else %}Edit Payment{% endif %}{% endblock %}
+{% block content %}
+<form method="post" class="bg-white border rounded-xl p-6 max-w-5xl">{% csrf_token %}{{ form.as_p }}<button class="px-4 py-2 bg-sky-600 text-white rounded text-sm">Save</button></form>
+{% endblock %}

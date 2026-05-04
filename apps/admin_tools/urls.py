@@ -3,6 +3,7 @@ from . import views
 from . import wizard_views
 from . import billing_views
 from . import content_views
+from . import operations_views
 
 app_name = "admin_tools"
 
@@ -29,6 +30,26 @@ urlpatterns = [
     path("billing/quotes/<int:pk>/pdf/", billing_views.quote_pdf, name="quote_pdf"),
     path("billing/quotes/<int:pk>/<str:action>/", billing_views.quote_action, name="quote_action"),
     path("domains/pricing/", views.tld_pricing, name="tld_pricing"),
+    path("domains/", operations_views.domains_list, name="domains_list"),
+    path("domains/new/", operations_views.domains_create, name="domains_create"),
+    path("domains/<int:pk>/", operations_views.domains_edit, name="domains_edit"),
+    path("domains/<int:pk>/delete/", operations_views.domains_delete, name="domains_delete"),
+    path("services/", operations_views.services_list, name="services_list"),
+    path("services/new/", operations_views.services_create, name="services_create"),
+    path("services/<int:pk>/", operations_views.services_edit, name="services_edit"),
+    path("services/<int:pk>/delete/", operations_views.services_delete, name="services_delete"),
+    path("support/", operations_views.tickets_list, name="tickets_list"),
+    path("support/new/", operations_views.tickets_create, name="tickets_create"),
+    path("support/<int:pk>/", operations_views.tickets_edit, name="tickets_edit"),
+    path("support/<int:pk>/delete/", operations_views.tickets_delete, name="tickets_delete"),
+    path("payments/", operations_views.payments_list, name="payments_list"),
+    path("payments/new/", operations_views.payments_create, name="payments_create"),
+    path("payments/<int:pk>/", operations_views.payments_edit, name="payments_edit"),
+    path("payments/<int:pk>/delete/", operations_views.payments_delete, name="payments_delete"),
+    path("templates/", operations_views.templates_list, name="templates_list"),
+    path("templates/new/", operations_views.templates_create, name="templates_create"),
+    path("templates/<int:pk>/", operations_views.templates_edit, name="templates_edit"),
+    path("templates/<int:pk>/delete/", operations_views.templates_delete, name="templates_delete"),
     # System
     path("tasks/", views.task_management, name="task_management"),
     path("templates/scan/", views.template_scan, name="template_scan"),

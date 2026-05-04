@@ -5,8 +5,6 @@
 
 {% block extra_head %}
 <script src="{% static 'vendor/htmx-1.9.10.min.js' %}"></script>
-<script src="{% static 'vendor/three-0.134.0.min.js' %}"></script>
-<script src="{% static 'vendor/vanta-clouds2.min.js' %}"></script>
 <style>
     :root {
         --glass-bg: rgba(255, 255, 255, 0.14);
@@ -22,7 +20,7 @@
         -webkit-backdrop-filter: blur(12px);
     }
 
-    #vanta-hero.hero-fallback-bg {
+    #hero-bg {
         background: radial-gradient(1200px 500px at 20% -10%, rgba(34, 211, 238, 0.22), transparent 60%),
                     radial-gradient(900px 420px at 80% -20%, rgba(125, 211, 252, 0.20), transparent 58%),
                     linear-gradient(180deg, #0b1e36 0%, #0a1a2d 55%, #101f35 100%);
@@ -42,7 +40,7 @@
 {% endblock %}
 
 {% block body %}
-<div id="vanta-hero" class="relative overflow-hidden">
+<div id="hero-bg" class="relative overflow-hidden">
 <div class="hero-atmosphere"></div>
 <!-- Navigation -->
 <header class="text-white sticky top-0 z-40">

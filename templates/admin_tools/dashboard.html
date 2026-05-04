@@ -4,6 +4,16 @@
 {% block page_title %}Admin Dashboard{% endblock %}
 
 {% block content %}
+<div class="mb-6 bg-cyan-50 border border-cyan-200 rounded-xl p-4">
+    <div class="flex flex-wrap items-center gap-3 justify-between">
+        <div>
+            <p class="text-xs uppercase tracking-wide text-cyan-800 font-semibold">Frontpage Customization</p>
+            <p class="text-sm text-cyan-900">Edit homepage cards, FAQs, footer/legal links, cookie banner, and error pages from Website Content.</p>
+        </div>
+        <a href="{% url 'admin_tools:content_dashboard' %}" class="px-4 py-2 bg-cyan-600 text-white rounded text-sm font-medium hover:bg-cyan-700">Open Website Content</a>
+    </div>
+</div>
+
 <!-- Primary KPI cards -->
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
     <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
@@ -40,10 +50,9 @@
         <p class="text-3xl font-bold {% if quotes_open %}text-sky-600{% else %}text-slate-800{% endif %}">{{ quotes_open }}</p>
         <p class="text-xs text-slate-500 mt-1">£{{ quotes_pipeline_value|floatformat:0 }} pipeline · {{ quotes_conversion_30d }}% conv (30d)</p>
     </a>
-    <a href="{% url 'admin:support_supportticket_changelist' %}" class="bg-white rounded-xl border {% if open_tickets %}border-indigo-300{% else %}border-slate-200{% endif %} shadow-sm p-5 hover:shadow-md transition-shadow">
+    <a href="{% url 'admin_tools:tickets_list' %}" class="bg-white rounded-xl border {% if open_tickets %}border-indigo-300{% else %}border-slate-200{% endif %} shadow-sm p-5 hover:shadow-md transition-shadow">
         <p class="text-xs text-slate-500 font-medium uppercase tracking-wide mb-1">Open Support Tickets</p>
         <p class="text-3xl font-bold {% if open_tickets %}text-indigo-600{% else %}text-slate-800{% endif %}">{{ open_tickets }}</p>
-        <p class="text-xs text-slate-400 mt-1">Django admin fallback</p>
     </a>
     <a href="{% url 'admin_tools:integrations_overview' %}" class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 hover:shadow-md transition-shadow">
         <p class="text-xs text-slate-500 font-medium uppercase tracking-wide mb-1">Enabled Tasks</p>
@@ -79,7 +88,7 @@
     <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
         <div class="flex items-center justify-between mb-3">
             <h3 class="font-semibold text-slate-800 text-sm">Recent Support Tickets</h3>
-            <a href="{% url 'admin:support_supportticket_changelist' %}" class="text-xs text-indigo-600 hover:underline">View all in Django admin →</a>
+            <a href="{% url 'admin_tools:tickets_list' %}" class="text-xs text-indigo-600 hover:underline">View all →</a>
         </div>
         <ul class="space-y-2">
             {% for ticket in recent_tickets %}

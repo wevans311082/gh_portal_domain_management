@@ -14,12 +14,20 @@
 <script>
 (function () {
   var key = 'gh_cookie_consent_v1';
-  var existing = localStorage.getItem(key);
+  function readCookie(name) {
+    var value = '; ' + document.cookie;
+    var parts = value.split('; ' + name + '=');
+    if (parts.length === 2) return parts.pop().split(';').shift();
+    return '';
+  }
+  var forceShow = window.location.search.indexOf('show_cookie=1') !== -1;
+  var existing = readCookie(key);
   var banner = document.getElementById('cookie-banner');
   if (!banner) return;
-  if (!existing) banner.classList.remove('hidden');
+  if (!existing || forceShow) banner.classList.remove('hidden');
   function save(value) {
-    localStorage.setItem(key, value);
+    var maxAge = 60 * 60 * 24 * 365;
+    document.cookie = key + '=' + value + '; path=/; max-age=' + maxAge + '; samesite=lax';
     banner.classList.add('hidden');
   }
   var accept = document.getElementById('cookie-accept');

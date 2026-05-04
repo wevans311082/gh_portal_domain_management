@@ -1,0 +1,6 @@
+{% extends "base_admin.html" %}
+{% block title %}Domain · {{ SITE_NAME }}{% endblock %}
+{% block page_title %}{% if mode == 'create' %}Create Domain{% else %}Edit Domain{% endif %}{% endblock %}
+{% block content %}
+<form method="post" class="bg-white border rounded-xl p-6 max-w-5xl">{% csrf_token %}{{ form.as_p }}<button class="px-4 py-2 bg-sky-600 text-white rounded text-sm">Save</button>{% if obj %}<a href="{% url 'admin_tools:domains_list' %}" class="ml-3 text-sm text-slate-500">Back</a>{% endif %}</form>
+{% endblock %}

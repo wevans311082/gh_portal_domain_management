@@ -10,6 +10,11 @@ from apps.core.models import (
     SiteContentSettings,
 )
 from apps.products.models import Package
+from apps.domains.models import Domain
+from apps.services.models import Service
+from apps.support.models import SupportTicket
+from apps.payments.models import Payment
+from apps.website_templates.models import WebsiteTemplate
 
 
 class AdminUserCreateForm(forms.ModelForm):
@@ -118,4 +123,97 @@ class SiteContentSettingsForm(forms.ModelForm):
             "enable_cookie_banner",
             "cookie_banner_text",
             "cookie_policy_slug",
+        ]
+
+
+class DomainForm(forms.ModelForm):
+    class Meta:
+        model = Domain
+        fields = [
+            "user",
+            "name",
+            "tld",
+            "status",
+            "registrar_id",
+            "registered_at",
+            "expires_at",
+            "auto_renew",
+            "is_locked",
+            "dns_provider",
+            "cloudflare_zone_id",
+            "nameserver1",
+            "nameserver2",
+            "nameserver3",
+            "nameserver4",
+            "epp_code",
+        ]
+
+
+class ServiceForm(forms.ModelForm):
+    class Meta:
+        model = Service
+        fields = [
+            "user",
+            "package",
+            "status",
+            "domain_name",
+            "cpanel_username",
+            "cpanel_domain",
+            "cpanel_ip",
+            "cpanel_server",
+            "billing_period",
+            "next_due_date",
+            "notes",
+        ]
+
+
+class SupportTicketForm(forms.ModelForm):
+    class Meta:
+        model = SupportTicket
+        fields = [
+            "user",
+            "department",
+            "subject",
+            "status",
+            "priority",
+            "assigned_to",
+            "related_service",
+            "related_domain",
+        ]
+
+
+class PaymentForm(forms.ModelForm):
+    class Meta:
+        model = Payment
+        fields = [
+            "user",
+            "invoice",
+            "provider",
+            "status",
+            "amount",
+            "currency",
+            "external_id",
+            "provider_data",
+            "notes",
+            "refund_amount",
+            "refunded_at",
+        ]
+
+
+class WebsiteTemplateForm(forms.ModelForm):
+    class Meta:
+        model = WebsiteTemplate
+        fields = [
+            "name",
+            "slug",
+            "category",
+            "description",
+            "zip_filename",
+            "extracted_path",
+            "has_index",
+            "security_notes",
+            "jquery_version",
+            "bootstrap_version",
+            "is_sanitised",
+            "is_active",
         ]
