@@ -52,7 +52,7 @@ class ResellerClubClient:
     def __init__(self):
         self.reseller_id = get_runtime_setting("RESELLERCLUB_RESELLER_ID", "")
         self.api_key = get_runtime_setting("RESELLERCLUB_API_KEY", "")
-        self.base_url = get_runtime_setting("RESELLERCLUB_API_URL", "https://test.httpapi.com/api").rstrip("/")
+        self.base_url = get_runtime_setting("RESELLERCLUB_API_URL", "https://httpapi.com/api").rstrip("/")
         self.session = _build_session()
         # LogicBoxes API requires these on EVERY request as query/form params
         self._auth_params = {
@@ -348,6 +348,14 @@ class ResellerClubClient:
                     key_str = str(key or "").lower()
                     key_hinted = hinted or ("tld" in key_str) or ("extension" in key_str)
 
+                    if key_str in {"productkey", "product-key", "product_key"} and isinstance(value, str):
+                        product_value = str(value or "").strip().lower()
+                        if product_value.endswith("-domain"):
+                            tld = self._normalize_tld_value(product_value)
+                            if tld:
+                                seen.add(tld)
+                        continue
+
                     # Some endpoints expose product keys like "com-domain"
                     if key_str.endswith("-domain"):
                         tld = self._normalize_tld_value(key_str)
@@ -362,10 +370,14 @@ class ResellerClubClient:
                     walk(item, hinted)
                 return
 
-            if isinstance(node, str) and hinted:
-                tld = self._normalize_tld_value(node)
-                if tld:
-                    seen.add(tld)
+            if isinstance(node, str):
+                # Product catalog payloads often provide TLDs as values such as
+                # "com-domain" under keys like "productkey".
+                value = str(node or "").strip().lower()
+                if hinted or value.endswith("-domain"):
+                    tld = self._normalize_tld_value(value)
+                    if tld:
+                        seen.add(tld)
 
         walk(payload)
         return sorted(seen)

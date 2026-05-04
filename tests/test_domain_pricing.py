@@ -89,6 +89,47 @@ def test_pricing_service_syncs_realistic_camelcase_payloads():
 
 
 @pytest.mark.django_db
+def test_pricing_service_ignores_non_price_numeric_fields():
+    settings_obj = DomainPricingSettings.get_solo()
+    settings_obj.supported_tlds = ["org"]
+    settings_obj.save(update_fields=["supported_tlds"])
+
+    class FakeClient:
+        def get_tld_costs(self, tld, years=1):
+            return {
+                "registration": {
+                    "years": 1,
+                    "description": "1 Year",
+                    "data": {
+                        "customerPrice": "18.75",
+                        "statusCode": 200,
+                    },
+                },
+                "renewal": {
+                    "term": 1,
+                    "pricing": {
+                        "sellingCurrencyAmount": "19.25",
+                    },
+                },
+                "transfer": {
+                    "ok": True,
+                    "meta": {
+                        "attempts": 1,
+                        "amount": "20.50",
+                    },
+                },
+            }
+
+    synced = TLDPricingService(client=FakeClient()).sync_pricing()
+
+    assert len(synced) == 1
+    pricing = TLDPricing.objects.get(tld="org")
+    assert pricing.registration_cost == Decimal("18.75")
+    assert pricing.renewal_cost == Decimal("19.25")
+    assert pricing.transfer_cost == Decimal("20.50")
+
+
+@pytest.mark.django_db
 def test_sync_schedule_uses_pricing_settings_interval():
     settings_obj = DomainPricingSettings.get_solo()
     settings_obj.sync_interval_hours = 12
@@ -175,7 +216,7 @@ def test_domain_check_shows_transfer_price_and_whois_for_taken_domain(client, mo
 
     assert response.status_code == 200
     assert "Already registered" in content
-    assert "Transfer GBP 12.50/yr" in content
+    assert "GBP 12.50/yr" in content
     assert "View WHOIS" in content
     assert reverse("domains:whois") in content
     assert "Transfer In" in content

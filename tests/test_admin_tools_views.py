@@ -218,3 +218,41 @@ def test_staff_can_import_all_tlds_and_sync_inline(client, django_user_model, mo
     assert TLDPricing.objects.filter(tld="com").exists()
     assert TLDPricing.objects.filter(tld="net").exists()
     assert TLDPricing.objects.filter(tld="co.uk").exists()
+
+
+@pytest.mark.django_db
+def test_staff_sync_all_runs_inline_without_celery(client, django_user_model, monkeypatch):
+    staff_user = django_user_model.objects.create_user(
+        email="pricing-syncall-admin@example.com",
+        password="password123",
+        is_staff=True,
+    )
+    settings_obj = DomainPricingSettings.get_solo()
+    settings_obj.supported_tlds = ["com", "net"]
+    settings_obj.save(update_fields=["supported_tlds"])
+
+    class FakePricingService:
+        def sync_pricing(self, tlds=None, years=1):
+            created = []
+            for tld in (tlds or []):
+                obj, _ = TLDPricing.objects.update_or_create(
+                    tld=tld,
+                    defaults={
+                        "registration_cost": "9.00",
+                        "renewal_cost": "10.00",
+                        "transfer_cost": "11.00",
+                        "is_active": True,
+                    },
+                )
+                created.append(obj)
+            return created
+
+    monkeypatch.setattr("apps.domains.pricing.TLDPricingService", lambda: FakePricingService())
+    monkeypatch.setattr("apps.admin_tools.views.get_runtime_setting", lambda key, default="": default)
+
+    client.force_login(staff_user)
+    response = client.post(reverse("admin_tools:tld_pricing"), {"action": "sync_all"})
+
+    assert response.status_code == 200
+    assert TLDPricing.objects.filter(tld="com").exists()
+    assert TLDPricing.objects.filter(tld="net").exists()

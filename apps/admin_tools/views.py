@@ -422,7 +422,7 @@ def integration_detail(request, service):
 @staff_member_required
 def resellerclub_debug(request):
     """Low-level debug page to inspect full ResellerClub HTTP request/response details."""
-    base_url = get_runtime_setting("RESELLERCLUB_API_URL", "https://test.httpapi.com/api").rstrip("/")
+    base_url = get_runtime_setting("RESELLERCLUB_API_URL", "https://httpapi.com/api").rstrip("/")
     reseller_id = get_runtime_setting("RESELLERCLUB_RESELLER_ID", "")
     api_key = get_runtime_setting("RESELLERCLUB_API_KEY", "")
 
@@ -719,98 +719,77 @@ def tld_pricing(request):
             settings_obj.save(update_fields=["supported_tlds", "updated_at"])
             ensure_tld_pricing_sync_schedule(settings_obj)
 
-            if debug_mode:
-                from apps.domains.pricing import TLDPricingService
-                from django.utils import timezone
+            from apps.domains.pricing import TLDPricingService
+            from django.utils import timezone
 
-                settings_obj.last_sync_started_at = timezone.now()
+            settings_obj.last_sync_started_at = timezone.now()
+            settings_obj.last_sync_error = ""
+            settings_obj.save(update_fields=["last_sync_started_at", "last_sync_error", "updated_at"])
+            try:
+                synced = TLDPricingService().sync_pricing(tlds=imported_tlds)
+                settings_obj.last_sync_completed_at = timezone.now()
                 settings_obj.last_sync_error = ""
-                settings_obj.save(update_fields=["last_sync_started_at", "last_sync_error", "updated_at"])
-                try:
-                    synced = TLDPricingService().sync_pricing(tlds=imported_tlds)
-                    settings_obj.last_sync_completed_at = timezone.now()
-                    settings_obj.last_sync_error = ""
-                    settings_obj.save(update_fields=["last_sync_completed_at", "last_sync_error", "updated_at"])
-                    messages.success(
-                        request,
-                        f"Imported {len(imported_tlds)} TLDs and updated {len(synced)} pricing record(s) inline (debug mode).",
-                    )
-                except Exception as exc:
-                    settings_obj.last_sync_error = str(exc)
-                    settings_obj.save(update_fields=["last_sync_error", "updated_at"])
-                    messages.error(request, f"Imported TLD list but inline sync failed: {exc}")
-            else:
-                from apps.domains.tasks import sync_tld_pricing
-
-                sync_tld_pricing.delay(tlds=imported_tlds)
+                settings_obj.save(update_fields=["last_sync_completed_at", "last_sync_error", "updated_at"])
+                mode_note = " (debug mode)" if debug_mode else ""
                 messages.success(
                     request,
-                    f"Imported {len(imported_tlds)} TLDs and queued pricing sync.",
+                    f"Imported {len(imported_tlds)} TLDs and updated {len(synced)} pricing record(s) inline{mode_note}.",
                 )
-                return redirect(redirect_url)
+            except Exception as exc:
+                settings_obj.last_sync_error = str(exc)
+                settings_obj.save(update_fields=["last_sync_error", "updated_at"])
+                messages.error(request, f"Imported TLD list but inline sync failed: {exc}")
 
         if action == "sync_all":
             tlds = list(settings_obj.supported_tlds or [])
-            if debug_mode:
-                from apps.domains.pricing import TLDPricingService
-                from django.utils import timezone
+            from apps.domains.pricing import TLDPricingService
+            from django.utils import timezone
 
-                settings_obj.last_sync_started_at = timezone.now()
+            settings_obj.last_sync_started_at = timezone.now()
+            settings_obj.last_sync_error = ""
+            settings_obj.save(update_fields=["last_sync_started_at", "last_sync_error", "updated_at"])
+            try:
+                synced = TLDPricingService().sync_pricing(tlds=tlds)
+                settings_obj.last_sync_completed_at = timezone.now()
                 settings_obj.last_sync_error = ""
-                settings_obj.save(update_fields=["last_sync_started_at", "last_sync_error", "updated_at"])
-                try:
-                    synced = TLDPricingService().sync_pricing(tlds=tlds)
-                    settings_obj.last_sync_completed_at = timezone.now()
-                    settings_obj.last_sync_error = ""
-                    settings_obj.save(update_fields=["last_sync_completed_at", "last_sync_error", "updated_at"])
-                    messages.success(
-                        request,
-                        f"Ran pricing sync inline (debug mode). Updated {len(synced)} TLD record(s). "
-                        "Check the debug tray for request details.",
-                    )
-                except Exception as exc:
-                    settings_obj.last_sync_error = str(exc)
-                    settings_obj.save(update_fields=["last_sync_error", "updated_at"])
-                    messages.error(request, f"Inline pricing sync failed: {exc}")
-            else:
-                from apps.domains.tasks import sync_tld_pricing
-
-                sync_tld_pricing.delay(tlds=tlds)
-                messages.success(request, "Queued pricing sync for supported TLDs.")
-                return redirect(redirect_url)
+                settings_obj.save(update_fields=["last_sync_completed_at", "last_sync_error", "updated_at"])
+                mode_note = " (debug mode)" if debug_mode else ""
+                messages.success(
+                    request,
+                    f"Ran pricing sync inline{mode_note}. Updated {len(synced)} TLD record(s)."
+                    + (" Check the debug tray for request details." if debug_mode else ""),
+                )
+            except Exception as exc:
+                settings_obj.last_sync_error = str(exc)
+                settings_obj.save(update_fields=["last_sync_error", "updated_at"])
+                messages.error(request, f"Inline pricing sync failed: {exc}")
 
         if action == "sync_tld":
             tld = (request.POST.get("tld") or "").strip().lower()
             if not tld:
                 messages.error(request, "No TLD selected for sync.")
                 return redirect(redirect_url)
-            if debug_mode:
-                from apps.domains.pricing import TLDPricingService
-                from django.utils import timezone
+            from apps.domains.pricing import TLDPricingService
+            from django.utils import timezone
 
-                settings_obj.last_sync_started_at = timezone.now()
+            settings_obj.last_sync_started_at = timezone.now()
+            settings_obj.last_sync_error = ""
+            settings_obj.save(update_fields=["last_sync_started_at", "last_sync_error", "updated_at"])
+            try:
+                synced = TLDPricingService().sync_pricing(tlds=[tld])
+                settings_obj.last_sync_completed_at = timezone.now()
                 settings_obj.last_sync_error = ""
-                settings_obj.save(update_fields=["last_sync_started_at", "last_sync_error", "updated_at"])
-                try:
-                    synced = TLDPricingService().sync_pricing(tlds=[tld])
-                    settings_obj.last_sync_completed_at = timezone.now()
-                    settings_obj.last_sync_error = ""
-                    settings_obj.save(update_fields=["last_sync_completed_at", "last_sync_error", "updated_at"])
-                    messages.success(
-                        request,
-                        f"Ran pricing sync inline for .{tld} (debug mode). Updated {len(synced)} record(s). "
-                        "Check the debug tray.",
-                    )
-                except Exception as exc:
-                    settings_obj.last_sync_error = str(exc)
-                    settings_obj.save(update_fields=["last_sync_error", "updated_at"])
-                    messages.error(request, f"Inline pricing sync failed for .{tld}: {exc}")
-            else:
-                from apps.domains.tasks import sync_tld_pricing
-
-                sync_tld_pricing.delay(tlds=[tld])
-                messages.success(request, f"Queued pricing sync for .{tld}.")
-                return redirect(redirect_url)
+                settings_obj.save(update_fields=["last_sync_completed_at", "last_sync_error", "updated_at"])
+                mode_note = " (debug mode)" if debug_mode else ""
+                messages.success(
+                    request,
+                    f"Ran pricing sync inline for .{tld}{mode_note}. Updated {len(synced)} record(s)."
+                    + (" Check the debug tray." if debug_mode else ""),
+                )
+            except Exception as exc:
+                settings_obj.last_sync_error = str(exc)
+                settings_obj.save(update_fields=["last_sync_error", "updated_at"])
+                messages.error(request, f"Inline pricing sync failed for .{tld}: {exc}")
 
         if action == "save_tld":
             tld = (request.POST.get("tld") or "").strip().lower()
