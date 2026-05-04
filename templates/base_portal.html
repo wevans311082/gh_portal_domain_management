@@ -2,7 +2,24 @@
 {% load static %}
 
 {% block body %}
-<div class="portal-shell flex h-full" x-data="{ sidebarOpen: false }">
+<style>
+    .mobile-drawer-open {
+        transform: translateX(0);
+    }
+    .mobile-drawer-closed {
+        transform: translateX(-100%);
+    }
+    @media (min-width: 1024px) {
+        .mobile-drawer-open,
+        .mobile-drawer-closed {
+            transform: translateX(0);
+        }
+    }
+</style>
+<div class="portal-shell flex h-full"
+     x-data="{ sidebarOpen: false, pageTitle: '', init() { this.pageTitle = (this.$refs.pageTitleSource?.textContent || '').trim() || 'Dashboard'; } }">
+
+    <span x-ref="pageTitleSource" class="sr-only">{% block page_title %}{% endblock %}</span>
 
     <!-- ── Mobile backdrop overlay ─────────────────────────────────────── -->
     <div x-show="sidebarOpen"
@@ -20,7 +37,7 @@
     <aside class="fixed inset-y-0 left-0 z-40 w-72 bg-sky-800 text-white flex flex-col shadow-lg
                   transition-transform duration-300 ease-in-out
                   lg:relative lg:translate-x-0 lg:w-64 lg:flex-shrink-0 lg:inset-auto lg:z-auto lg:shadow-none"
-           :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'">
+            :class="sidebarOpen ? 'mobile-drawer-open' : 'mobile-drawer-closed'">
 
         <!-- Brand + close button -->
         <div class="px-5 py-5 border-b border-sky-700 flex items-center gap-3">
@@ -37,7 +54,8 @@
         </div>
 
         <!-- Main navigation -->
-        <nav class="flex-1 mt-2 px-2 space-y-0.5 overflow-y-auto">
+           <nav class="flex-1 mt-2 px-2 space-y-0.5 overflow-y-auto"
+               @click="if (window.innerWidth < 1024 && $event.target.closest('a')) sidebarOpen = false">
             <a href="{% url 'portal:dashboard' %}" @click="sidebarOpen = false"
                class="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-sky-100 hover:bg-sky-700 hover:text-white transition-colors">
                 <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
@@ -143,11 +161,18 @@
                 <button @click="sidebarOpen = true" class="lg:hidden text-sky-700 hover:text-sky-900 p-1 -ml-1" aria-label="Open menu">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
                 </button>
-                <h2 class="text-base font-semibold text-sky-900 flex-1 min-w-0 truncate">{% block page_title %}{% endblock %}</h2>
+                <h2 class="text-base font-semibold text-sky-900 flex-1 min-w-0 truncate" x-text="pageTitle"></h2>
                 <div class="flex items-center gap-2 text-sm text-sky-700 flex-shrink-0">
                     {% block header_actions %}{% endblock %}
                 </div>
             </div>
+            <nav class="lg:hidden border-t border-sky-100 px-4 py-2 text-xs text-slate-500" aria-label="Breadcrumb">
+                <ol class="flex items-center gap-1.5 overflow-x-auto whitespace-nowrap">
+                    <li><a href="{% url 'portal:dashboard' %}" class="font-medium text-sky-700">Portal</a></li>
+                    <li class="text-slate-300">/</li>
+                    <li class="text-slate-600" x-text="pageTitle"></li>
+                </ol>
+            </nav>
         </header>
 
         <!-- Page content -->
