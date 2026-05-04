@@ -1,0 +1,124 @@
+{% extends "base_admin.html" %}
+{% load core_tags %}
+
+{% block title %}Billing branding - {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Billing document branding{% endblock %}
+
+{% block content %}
+<form method="post" enctype="multipart/form-data" class="space-y-6">
+  {% csrf_token %}
+
+  <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+    <h2 class="font-semibold text-slate-900 mb-4">Identity</h2>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <label class="block">
+        <span class="text-xs uppercase font-semibold text-slate-500">Company name</span>
+        <input name="company_name" value="{{ branding.company_name }}" class="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm">
+      </label>
+      <label class="block">
+        <span class="text-xs uppercase font-semibold text-slate-500">Website URL</span>
+        <input name="website_url" value="{{ branding.website_url }}" class="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm">
+      </label>
+      <label class="block lg:col-span-2">
+        <span class="text-xs uppercase font-semibold text-slate-500">Registered address</span>
+        <textarea name="registered_address" rows="3" class="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm">{{ branding.registered_address }}</textarea>
+      </label>
+      <label class="block">
+        <span class="text-xs uppercase font-semibold text-slate-500">Company number</span>
+        <input name="company_number" value="{{ branding.company_number }}" class="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm">
+      </label>
+      <label class="block">
+        <span class="text-xs uppercase font-semibold text-slate-500">VAT number</span>
+        <input name="vat_number" value="{{ branding.vat_number }}" class="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm">
+      </label>
+      <label class="block">
+        <span class="text-xs uppercase font-semibold text-slate-500">Support email</span>
+        <input type="email" name="support_email" value="{{ branding.support_email }}" class="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm">
+      </label>
+      <label class="block">
+        <span class="text-xs uppercase font-semibold text-slate-500">Support phone</span>
+        <input name="support_phone" value="{{ branding.support_phone }}" class="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm">
+      </label>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+    <h2 class="font-semibold text-slate-900 mb-4">Look &amp; feel</h2>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <label class="block lg:col-span-2">
+        <span class="text-xs uppercase font-semibold text-slate-500">Logo</span>
+        {% if branding.logo %}
+          <div class="mt-1 flex items-center gap-3">
+            <img src="{{ branding.logo.url }}" alt="logo" class="h-12 bg-slate-50 rounded p-1 border">
+            <label class="text-xs text-slate-600 flex items-center gap-1">
+              <input type="checkbox" name="clear_logo" value="1"> Remove
+            </label>
+          </div>
+        {% endif %}
+        <input type="file" name="logo" accept="image/*" class="mt-2 text-sm">
+      </label>
+      <label class="block">
+        <span class="text-xs uppercase font-semibold text-slate-500">Accent colour</span>
+        <input type="color" name="accent_colour" value="{{ branding.accent_colour|default:'#0ea5e9' }}" class="mt-1 h-10 w-full border border-slate-300 rounded">
+      </label>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+    <h2 class="font-semibold text-slate-900 mb-4">Document text</h2>
+    <div class="grid grid-cols-1 gap-4">
+      <label class="block">
+        <span class="text-xs uppercase font-semibold text-slate-500">Header intro text</span>
+        <textarea name="header_text" rows="2" class="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm">{{ branding.header_text }}</textarea>
+      </label>
+      <label class="block">
+        <span class="text-xs uppercase font-semibold text-slate-500">Footer text</span>
+        <textarea name="footer_text" rows="2" class="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm">{{ branding.footer_text }}</textarea>
+      </label>
+      <label class="block">
+        <span class="text-xs uppercase font-semibold text-slate-500">Legal / payment terms</span>
+        <textarea name="legal_text" rows="4" class="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm">{{ branding.legal_text }}</textarea>
+      </label>
+      <label class="block">
+        <span class="text-xs uppercase font-semibold text-slate-500">Signature block</span>
+        <textarea name="signature_block" rows="3" class="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm">{{ branding.signature_block }}</textarea>
+      </label>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+    <h2 class="font-semibold text-slate-900 mb-4">Defaults &amp; numbering</h2>
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
+      <label class="block">
+        <span class="text-xs uppercase font-semibold text-slate-500">Currency</span>
+        <input name="default_currency" value="{{ branding.default_currency }}" maxlength="3" class="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm uppercase">
+      </label>
+      <label class="block">
+        <span class="text-xs uppercase font-semibold text-slate-500">Default VAT %</span>
+        <input name="default_vat_rate" type="number" step="0.01" value="{{ branding.default_vat_rate }}" class="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm">
+      </label>
+      <label class="block">
+        <span class="text-xs uppercase font-semibold text-slate-500">Invoice due (days)</span>
+        <input name="default_due_days" type="number" min="0" value="{{ branding.default_due_days }}" class="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm">
+      </label>
+      <label class="block">
+        <span class="text-xs uppercase font-semibold text-slate-500">Quote validity (days)</span>
+        <input name="default_quote_validity_days" type="number" min="0" value="{{ branding.default_quote_validity_days }}" class="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm">
+      </label>
+      <label class="block lg:col-span-2">
+        <span class="text-xs uppercase font-semibold text-slate-500">Invoice number format</span>
+        <input name="invoice_number_format" value="{{ branding.invoice_number_format }}" class="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm font-mono">
+        <span class="text-xs text-slate-500">Placeholders: <code>{yyyy}</code>, <code>{yy}</code>, <code>{mm}</code>, <code>{dd}</code>, <code>{seq}</code> or <code>{seq:05d}</code></span>
+      </label>
+      <label class="block lg:col-span-2">
+        <span class="text-xs uppercase font-semibold text-slate-500">Quote number format</span>
+        <input name="quote_number_format" value="{{ branding.quote_number_format }}" class="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm font-mono">
+      </label>
+    </div>
+  </div>
+
+  <div class="flex items-center justify-end gap-3">
+    <button type="submit" class="inline-flex items-center px-5 py-2 rounded bg-sky-600 hover:bg-sky-700 text-white text-sm font-semibold">Save branding</button>
+  </div>
+</form>
+{% endblock %}

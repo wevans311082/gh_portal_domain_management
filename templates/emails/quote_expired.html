@@ -1,0 +1,5 @@
+{% extends "emails/_document_preview.html" %}
+{% block intro %}
+<p>Hello {{ user.get_full_name|default:quote.display_recipient }},</p>
+<p>Quote <strong>#{{ quote_number }}</strong> has now expired. If you'd still like to proceed, please get in touch and we'll be happy to issue a fresh quote.</p>
+{% endblock %}

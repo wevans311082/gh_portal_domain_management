@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<style>
+  body { font-family: Helvetica, Arial, sans-serif; font-size: 8pt; color: #6b7280; margin: 0; padding: 4px 15mm; }
+  .bar { border-top: 1px solid {{ accent_colour|default:"#0ea5e9" }}; padding-top: 4px; display: flex; justify-content: space-between; }
+</style>
+<script>
+  // wkhtmltopdf provides page numbers via query string.
+  function subst() {
+    var vars = {};
+    var query = document.location.search.substring(1).split('&');
+    for (var i in query) { var z = query[i].split('=', 2); vars[z[0]] = unescape(z[1]); }
+    var els = document.getElementsByClassName('pagevar');
+    for (var j = 0; j < els.length; j++) {
+      var key = els[j].getAttribute('data-var');
+      if (vars[key]) els[j].textContent = vars[key];
+    }
+  }
+</script>
+</head>
+<body onload="subst()">
+<div class="bar">
+  <div>{{ branding.footer_text|default:company_name }}</div>
+  <div>Page <span class="pagevar" data-var="page"></span> of <span class="pagevar" data-var="topage"></span></div>
+</div>
+</body></html>

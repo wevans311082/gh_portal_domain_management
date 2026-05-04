@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block title %}Quote sent · {{ SITE_NAME }}{% endblock %}
+
+{% block body %}
+<div class="min-h-screen flex items-center justify-center px-4">
+  <div class="max-w-md w-full bg-white rounded-2xl shadow-sm border border-slate-200 p-8 text-center">
+    <div class="text-5xl mb-4">✓</div>
+    <h1 class="text-2xl font-bold text-slate-900">Thanks — your quote is on its way</h1>
+    <p class="mt-2 text-slate-600">Check your inbox for a PDF copy. You can review and accept it from the email or your account.</p>
+    <a href="{% url 'core:home' %}" class="mt-6 inline-block px-4 py-2 rounded bg-slate-700 text-white text-sm">Back to home</a>
+  </div>
+</div>
+{% endblock %}

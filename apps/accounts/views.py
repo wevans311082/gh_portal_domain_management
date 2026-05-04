@@ -43,6 +43,7 @@ def _login_rate_key(request) -> str:
 def register(request):
     if request.user.is_authenticated:
         return redirect("portal:dashboard")
+    quote_token = request.GET.get("quote_token") or request.POST.get("quote_token") or request.session.get("pending_quote_token")
     if request.method == "POST":
         form = RegistrationForm(request.POST)
         if form.is_valid():
@@ -50,10 +51,14 @@ def register(request):
             ClientProfile.objects.create(user=user)
             login(request, user, backend="apps.accounts.backends.EmailBackend")
             messages.success(request, "Account created successfully!")
+            if quote_token:
+                from django.urls import reverse
+                request.session.pop("pending_quote_token", None)
+                return redirect(reverse("billing_public:quote_public_accept_continue", args=[quote_token]))
             return redirect("portal:dashboard")
     else:
         form = RegistrationForm()
-    return render(request, "accounts/register.html", {"form": form})
+    return render(request, "accounts/register.html", {"form": form, "quote_token": quote_token})
 
 
 # ──────────────────────────────────────────────────────────────────────────────

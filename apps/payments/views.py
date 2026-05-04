@@ -136,11 +136,8 @@ def _handle_checkout_completed(session: dict, webhook_event: WebhookEvent):
             provider_data=session,
         )
 
-        invoice.status = Invoice.STATUS_PAID
-        invoice.amount_paid = invoice.total
-        invoice.paid_at = timezone.now()
-        invoice.save(update_fields=["status", "amount_paid", "paid_at"])
-        _queue_paid_domain_orders(invoice)
+        from apps.billing.services import mark_invoice_paid
+        mark_invoice_paid(invoice)
 
         logger.info(f"Invoice {invoice_id} marked as paid via Stripe checkout.")
     except Invoice.DoesNotExist:
@@ -172,10 +169,8 @@ def _handle_invoice_paid(stripe_invoice: dict, webhook_event: WebhookEvent):
     stripe_invoice_id = stripe_invoice.get("id")
     try:
         invoice = Invoice.objects.get(stripe_invoice_id=stripe_invoice_id)
-        invoice.status = Invoice.STATUS_PAID
-        invoice.paid_at = timezone.now()
-        invoice.save(update_fields=["status", "paid_at"])
-        _queue_paid_domain_orders(invoice)
+        from apps.billing.services import mark_invoice_paid
+        mark_invoice_paid(invoice)
         logger.info(f"Stripe invoice {stripe_invoice_id} marked paid.")
     except Invoice.DoesNotExist:
         logger.debug(f"No local invoice found for Stripe invoice {stripe_invoice_id}")

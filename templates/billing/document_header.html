@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<style>
+  body { font-family: Helvetica, Arial, sans-serif; font-size: 8pt; color: #6b7280; margin: 0; padding: 6px 15mm; }
+  .bar { border-bottom: 1px solid {{ accent_colour|default:"#0ea5e9" }}; padding-bottom: 4px; display: flex; justify-content: space-between; }
+</style></head>
+<body>
+<div class="bar">
+  <div>{{ company_name }}</div>
+  <div>{{ doc_kind|title }} {{ document.number }}</div>
+</div>
+</body></html>

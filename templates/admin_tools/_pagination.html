@@ -1,0 +1,13 @@
+{% if page_obj.has_other_pages %}
+<nav class="mt-4 flex items-center justify-between text-sm">
+  <div class="text-slate-500">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }} · {{ page_obj.paginator.count }} total</div>
+  <div class="flex gap-2">
+    {% if page_obj.has_previous %}
+      <a class="px-3 py-1 border rounded hover:bg-slate-50" href="?{% for key,value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}">Previous</a>
+    {% endif %}
+    {% if page_obj.has_next %}
+      <a class="px-3 py-1 border rounded hover:bg-slate-50" href="?{% for key,value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}">Next</a>
+    {% endif %}
+  </div>
+</nav>
+{% endif %}

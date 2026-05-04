@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Quote {{ quote.number }} · {{ branding.company_name|default:SITE_NAME }}{% endblock %}
+
+{% block body %}
+<div class="min-h-screen bg-slate-50">
+  <header class="bg-white border-b border-slate-200">
+    <div class="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
+      {% if branding.logo %}
+        <img src="{{ branding.logo.url }}" alt="{{ branding.company_name }}" class="h-9">
+      {% else %}
+        <span class="text-xl font-bold text-slate-900">{{ branding.company_name|default:SITE_NAME }}</span>
+      {% endif %}
+      <a href="{% url 'billing_public:quote_public_pdf' quote.public_token %}" class="px-3 py-2 rounded bg-slate-700 text-white text-sm">Download PDF</a>
+    </div>
+  </header>
+
+  <main class="max-w-4xl mx-auto px-4 py-10">
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
+      <div class="flex items-start justify-between mb-6">
+        <div>
+          <p class="text-xs uppercase font-semibold text-slate-500 tracking-wider">Quote</p>
+          <h1 class="text-3xl font-bold text-slate-900 mt-1">{{ quote.number }}</h1>
+        </div>
+        <div class="text-right">
+          <p class="text-xs uppercase font-semibold text-slate-500">Status</p>
+          <p class="text-sm font-semibold mt-1" style="color: {{ branding.accent_colour|default:'#0ea5e9' }}">
+            {{ quote.get_status_display }}{% if quote.is_expired %} (expired){% endif %}
+          </p>
+          {% if quote.valid_until %}<p class="text-xs text-slate-500 mt-1">Valid until {{ quote.valid_until|date:"d M Y" }}</p>{% endif %}
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm mb-8 pb-6 border-b border-slate-200">
+        <div>
+          <p class="text-xs uppercase font-semibold text-slate-500 mb-1">From</p>
+          <p class="font-semibold">{{ branding.company_name }}</p>
+          <p class="whitespace-pre-line text-slate-600">{{ branding.registered_address }}</p>
+          {% if branding.support_email %}<p class="text-slate-600">{{ branding.support_email }}</p>{% endif %}
+        </div>
+        <div>
+          <p class="text-xs uppercase font-semibold text-slate-500 mb-1">To</p>
+          <p class="font-semibold">{{ quote.display_recipient }}</p>
+          {% if quote.lead_company %}<p class="text-slate-600">{{ quote.lead_company }}</p>{% endif %}
+          {% if quote.lead_email %}<p class="text-slate-600">{{ quote.lead_email }}</p>{% endif %}
+          {% if quote.lead_phone %}<p class="text-slate-600">{{ quote.lead_phone }}</p>{% endif %}
+        </div>
+      </div>
+
+      <table class="w-full text-sm mb-6">
+        <thead>
+          <tr class="text-xs uppercase text-slate-500 border-b border-slate-200">
+            <th class="text-left py-2">Description</th>
+            <th class="text-right py-2 w-20">Qty</th>
+            <th class="text-right py-2 w-28">Unit</th>
+            <th class="text-right py-2 w-28">Total</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for line in quote.line_items.all %}
+          <tr>
+            <td class="py-2">{{ line.description }}</td>
+            <td class="py-2 text-right">{{ line.quantity }}</td>
+            <td class="py-2 text-right">{{ quote.currency }} {{ line.unit_price|floatformat:2 }}</td>
+            <td class="py-2 text-right font-semibold">{{ quote.currency }} {{ line.line_total|floatformat:2 }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <dl class="ml-auto max-w-xs text-sm space-y-1">
+        <div class="flex justify-between"><dt class="text-slate-500">Subtotal</dt><dd>{{ quote.currency }} {{ quote.subtotal|floatformat:2 }}</dd></div>
+        <div class="flex justify-between"><dt class="text-slate-500">VAT ({{ quote.vat_rate }}%)</dt><dd>{{ quote.currency }} {{ quote.vat_amount|floatformat:2 }}</dd></div>
+        <div class="flex justify-between text-base font-bold border-t border-slate-200 pt-2 mt-2"><dt>Total</dt><dd>{{ quote.currency }} {{ quote.total|floatformat:2 }}</dd></div>
+      </dl>
+
+      {% if quote.notes %}
+        <div class="mt-6 pt-6 border-t border-slate-200">
+          <p class="text-xs uppercase font-semibold text-slate-500 mb-1">Notes</p>
+          <p class="text-sm whitespace-pre-line text-slate-700">{{ quote.notes }}</p>
+        </div>
+      {% endif %}
+
+      {% if branding.legal_text %}
+        <p class="mt-6 text-xs text-slate-500 whitespace-pre-line">{{ branding.legal_text }}</p>
+      {% endif %}
+
+      <div class="mt-8 pt-6 border-t border-slate-200 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        {% if quote.is_acceptable %}
+          <p class="text-sm text-slate-600">Ready to proceed? Accept this quote and we'll generate your invoice.</p>
+          <form method="post" action="{% url 'billing_public:quote_public_accept' quote.public_token %}">
+            {% csrf_token %}
+            <button class="px-6 py-3 rounded font-semibold text-white" style="background-color: {{ branding.accent_colour|default:'#0ea5e9' }}">Accept quote</button>
+          </form>
+        {% elif quote.status == quote.STATUS_ACCEPTED or quote.status == quote.STATUS_CONVERTED %}
+          <p class="text-sm text-emerald-700 font-semibold">✓ This quote has been accepted.</p>
+        {% else %}
+          <p class="text-sm text-slate-500">This quote can no longer be accepted online. <a href="{% url 'core:contact' %}" class="text-sky-700 hover:underline">Contact us</a> if you'd like to discuss.</p>
+        {% endif %}
+      </div>
+    </div>
+  </main>
+</div>
+{% endblock %}

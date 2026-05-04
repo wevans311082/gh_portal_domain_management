@@ -1,10 +1,18 @@
 """Notification service for sending templated emails."""
 import logging
+import re
+from typing import Iterable, Optional, Sequence, Tuple
+
+from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
-from django.conf import settings
 
 logger = logging.getLogger(__name__)
+
+
+# Attachment shape: ``(filename, content_bytes, content_type)``.
+AttachmentTuple = Tuple[str, bytes, str]
+
 
 NOTIFICATION_TEMPLATES = {
     "welcome": {
@@ -22,6 +30,18 @@ NOTIFICATION_TEMPLATES = {
     "invoice_overdue": {
         "subject": "Invoice #{invoice_number} is overdue",
         "template": "emails/invoice_overdue.html",
+    },
+    "quote_sent": {
+        "subject": "Your quote #{quote_number} from {site_name}",
+        "template": "emails/quote_sent.html",
+    },
+    "quote_accepted": {
+        "subject": "Quote #{quote_number} accepted",
+        "template": "emails/quote_accepted.html",
+    },
+    "quote_expired": {
+        "subject": "Quote #{quote_number} has expired",
+        "template": "emails/quote_expired.html",
     },
     "payment_failed": {
         "subject": "Payment failed - Action required",
@@ -50,18 +70,31 @@ NOTIFICATION_TEMPLATES = {
 }
 
 
-def send_notification(template_name: str, user, context: dict = None):
-    """Send a templated notification email to a user."""
-    context = context or {}
-    context.setdefault("site_name", settings.SITE_NAME)
+def send_notification(
+    template_name: str,
+    user,
+    context: dict = None,
+    *,
+    attachments: Optional[Sequence[AttachmentTuple]] = None,
+    recipient_email: Optional[str] = None,
+    cc: Optional[Iterable[str]] = None,
+):
+    """Send a templated notification email to a user.
+
+    Optional kwargs:
+    - ``attachments``: iterable of ``(filename, bytes, content_type)`` tuples.
+    - ``recipient_email``: explicit recipient (used for anonymous quotes).
+    - ``cc``: optional iterable of CC addresses.
+    """
+    context = dict(context or {})
+    context.setdefault("site_name", getattr(settings, "SITE_NAME", "Grumpy Hosting"))
     context.setdefault("user", user)
 
     template_config = NOTIFICATION_TEMPLATES.get(template_name)
     if not template_config:
-        logger.warning(f"Unknown notification template: {template_name}")
+        logger.warning("Unknown notification template: %s", template_name)
         return
 
-    # Format subject safely - only replace keys that exist in context
     subject_template = template_config["subject"]
     try:
         subject = subject_template.format(**context)
@@ -69,38 +102,54 @@ def send_notification(template_name: str, user, context: dict = None):
         subject = subject_template
 
     template_path = template_config["template"]
+    recipient = recipient_email or getattr(user, "email", "") or ""
+
+    if not recipient:
+        logger.warning("send_notification: no recipient for %s", template_name)
+        return
 
     try:
         html_content = render_to_string(template_path, context)
-        # Simplified plain text - strip HTML tags
-        import re
         text_content = re.sub(r"<[^>]+>", "", html_content).strip()
 
         msg = EmailMultiAlternatives(
             subject=subject,
             body=text_content,
             from_email=settings.DEFAULT_FROM_EMAIL,
-            to=[user.email],
+            to=[recipient],
+            cc=list(cc) if cc else None,
         )
         msg.attach_alternative(html_content, "text/html")
+
+        for filename, content, content_type in attachments or []:
+            msg.attach(filename, content, content_type)
+
         msg.send()
 
-        from apps.audit.models import EmailLog
-        EmailLog.objects.create(
-            recipient=user.email,
-            subject=subject,
-            template=template_name,
-            status="sent",
-        )
+        try:
+            from apps.audit.models import EmailLog
 
-        logger.info(f"Sent {template_name} email to {user.email}")
-    except Exception as e:
-        logger.error(f"Failed to send {template_name} email to {user.email}: {e}")
-        from apps.audit.models import EmailLog
-        EmailLog.objects.create(
-            recipient=user.email,
-            subject=subject,
-            template=template_name,
-            status="failed",
-            error=str(e),
-        )
+            EmailLog.objects.create(
+                recipient=recipient,
+                subject=subject,
+                template=template_name,
+                status="sent",
+            )
+        except Exception:  # pragma: no cover - audit is best-effort
+            pass
+
+        logger.info("Sent %s email to %s", template_name, recipient)
+    except Exception as exc:
+        logger.error("Failed to send %s email to %s: %s", template_name, recipient, exc)
+        try:
+            from apps.audit.models import EmailLog
+
+            EmailLog.objects.create(
+                recipient=recipient,
+                subject=subject if "subject" in locals() else "",
+                template=template_name,
+                status="failed",
+                error=str(exc),
+            )
+        except Exception:  # pragma: no cover
+            pass

@@ -1,0 +1,186 @@
+{% extends "base_admin.html" %}
+{% load static %}
+
+{% block title %}{% if quote %}Quote {{ quote.number }}{% else %}New quote{% endif %} · {{ SITE_NAME }}{% endblock %}
+{% block page_title %}{% if quote %}Quote {{ quote.number }}{% else %}New quote{% endif %}{% endblock %}
+
+{% block extra_head %}
+<script src="{% static 'vendor/sortable-1.15.2.min.js' %}" defer></script>
+{% endblock %}
+
+{% block alpine_script %}
+<script defer src="{% static 'vendor/alpine-3.14.1.min.js' %}"></script>
+{% endblock %}
+
+{% block content %}
+{% if quote %}
+<div class="flex flex-wrap items-center gap-2 mb-4">
+  <a href="{% url 'admin_tools:quote_pdf' quote.pk %}?inline=1" target="_blank" class="px-3 py-1.5 rounded bg-slate-700 text-white text-xs">View PDF</a>
+  <a href="{% url 'admin_tools:quote_pdf' quote.pk %}" class="px-3 py-1.5 rounded bg-slate-700 text-white text-xs">Download PDF</a>
+  <form method="post" action="{% url 'admin_tools:quote_action' quote.pk 'send' %}" class="inline-flex">{% csrf_token %}
+    <button class="px-3 py-1.5 rounded bg-sky-600 text-white text-xs">Email to recipient</button>
+  </form>
+  {% if quote.user and quote.status != 'converted' %}
+    <form method="post" action="{% url 'admin_tools:quote_action' quote.pk 'convert' %}" class="inline-flex">{% csrf_token %}
+      <button class="px-3 py-1.5 rounded bg-emerald-600 text-white text-xs">Convert to invoice</button>
+    </form>
+  {% endif %}
+  <form method="post" action="{% url 'admin_tools:quote_action' quote.pk 'clone' %}" class="inline-flex">{% csrf_token %}
+    <button class="px-3 py-1.5 rounded bg-slate-500 text-white text-xs">Clone</button>
+  </form>
+  {% if quote.status != 'void' %}
+    <form method="post" action="{% url 'admin_tools:quote_action' quote.pk 'void' %}" class="inline-flex" onsubmit="return confirm('Void this quote?');">{% csrf_token %}
+      <button class="px-3 py-1.5 rounded bg-amber-600 text-white text-xs">Void</button>
+    </form>
+  {% endif %}
+  {% if quote.status == 'draft' %}
+    <form method="post" action="{% url 'admin_tools:quote_action' quote.pk 'delete' %}" class="inline-flex" onsubmit="return confirm('Delete this draft quote?');">{% csrf_token %}
+      <button class="px-3 py-1.5 rounded bg-rose-600 text-white text-xs">Delete</button>
+    </form>
+  {% endif %}
+  <span class="ml-auto text-xs text-slate-500">Public link: <code class="text-xs">/quote/{{ quote.public_token }}/</code></span>
+</div>
+{% endif %}
+
+<form method="post" action="{{ form_action }}" x-data="quoteForm()" x-init="init()" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+  {% csrf_token %}
+
+  <div class="lg:col-span-2 space-y-6">
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+      <h2 class="font-semibold text-slate-900 mb-3">Line items</h2>
+      <table class="w-full text-sm">
+        <thead class="text-xs uppercase text-slate-500">
+          <tr>
+            <th class="w-6"></th>
+            <th class="text-left py-2">Description</th>
+            <th class="text-right py-2 w-20">Qty</th>
+            <th class="text-right py-2 w-28">Unit price</th>
+            <th class="text-right py-2 w-28">Line</th>
+            <th class="w-8"></th>
+          </tr>
+        </thead>
+        <tbody x-ref="lines" class="divide-y divide-slate-100">
+          <template x-for="(line, idx) in lines" :key="line.uid">
+            <tr class="line-row">
+              <td class="text-center text-slate-300 cursor-move handle">⋮⋮</td>
+              <td class="py-1.5"><input type="text" name="line_description[]" x-model="line.description" required class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"></td>
+              <td class="py-1.5"><input type="number" step="0.01" min="0" name="line_quantity[]" x-model.number="line.quantity" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm text-right"></td>
+              <td class="py-1.5"><input type="number" step="0.01" min="0" name="line_unit_price[]" x-model.number="line.unit_price" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm text-right"></td>
+              <td class="py-1.5 text-right font-semibold" x-text="formatMoney(line.quantity * line.unit_price)"></td>
+              <td class="text-right"><button type="button" @click="removeLine(idx)" class="text-rose-600 text-xs">×</button></td>
+              <input type="hidden" name="line_position[]" :value="idx">
+            </tr>
+          </template>
+        </tbody>
+      </table>
+      <button type="button" @click="addLine()" class="mt-3 px-3 py-1.5 rounded bg-slate-100 hover:bg-slate-200 text-sm">+ Add line</button>
+    </div>
+
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-3">
+      <label class="block">
+        <span class="text-xs uppercase font-semibold text-slate-500">Customer-visible notes</span>
+        <textarea name="notes" rows="3" class="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm">{% if quote %}{{ quote.notes }}{% endif %}</textarea>
+      </label>
+      <label class="block">
+        <span class="text-xs uppercase font-semibold text-slate-500">Internal notes (staff only)</span>
+        <textarea name="internal_notes" rows="2" class="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm">{% if quote %}{{ quote.internal_notes }}{% endif %}</textarea>
+      </label>
+    </div>
+  </div>
+
+  <aside class="space-y-6">
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-3">
+      <h2 class="font-semibold text-slate-900">Recipient</h2>
+      <label class="block">
+        <span class="text-xs uppercase font-semibold text-slate-500">Linked customer (optional)</span>
+        {% if quote and quote.user %}
+          <div class="text-sm font-medium">{{ quote.user.email }}</div>
+          <input type="hidden" name="user_id" value="{{ quote.user_id }}">
+        {% else %}
+          <select name="user_id" class="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm">
+            <option value="">— None (lead only) —</option>
+            {% for u in users %}<option value="{{ u.pk }}">{{ u.email }}</option>{% endfor %}
+          </select>
+        {% endif %}
+      </label>
+      <label class="block">
+        <span class="text-xs uppercase font-semibold text-slate-500">Lead name</span>
+        <input name="lead_name" value="{% if quote %}{{ quote.lead_name }}{% endif %}" class="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm">
+      </label>
+      <label class="block">
+        <span class="text-xs uppercase font-semibold text-slate-500">Lead email</span>
+        <input type="email" name="lead_email" value="{% if quote %}{{ quote.lead_email }}{% endif %}" class="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm">
+      </label>
+      <label class="block">
+        <span class="text-xs uppercase font-semibold text-slate-500">Company</span>
+        <input name="lead_company" value="{% if quote %}{{ quote.lead_company }}{% endif %}" class="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm">
+      </label>
+      <label class="block">
+        <span class="text-xs uppercase font-semibold text-slate-500">Phone</span>
+        <input name="lead_phone" value="{% if quote %}{{ quote.lead_phone }}{% endif %}" class="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm">
+      </label>
+    </div>
+
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-3">
+      <h2 class="font-semibold text-slate-900">Settings</h2>
+      <label class="block">
+        <span class="text-xs uppercase font-semibold text-slate-500">Status</span>
+        <select name="status" class="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm">
+          {% for value, label in status_choices %}
+            <option value="{{ value }}" {% if quote and quote.status == value %}selected{% elif not quote and value == 'draft' %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <div class="grid grid-cols-2 gap-2">
+        <label class="block">
+          <span class="text-xs uppercase font-semibold text-slate-500">Currency</span>
+          <input name="currency" maxlength="3" value="{% if quote %}{{ quote.currency }}{% else %}{{ branding.default_currency }}{% endif %}" class="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm uppercase">
+        </label>
+        <label class="block">
+          <span class="text-xs uppercase font-semibold text-slate-500">VAT %</span>
+          <input name="vat_rate" type="number" step="0.01" min="0" x-model.number="vatRate" value="{% if quote %}{{ quote.vat_rate }}{% else %}{{ branding.default_vat_rate }}{% endif %}" class="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm">
+        </label>
+      </div>
+      <label class="block">
+        <span class="text-xs uppercase font-semibold text-slate-500">Valid until</span>
+        <input type="date" name="valid_until" value="{% if quote and quote.valid_until %}{{ quote.valid_until|date:'Y-m-d' }}{% endif %}" class="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm">
+      </label>
+    </div>
+
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+      <h2 class="font-semibold text-slate-900 mb-3">Totals</h2>
+      <dl class="text-sm space-y-1">
+        <div class="flex justify-between"><dt class="text-slate-500">Subtotal</dt><dd x-text="formatMoney(subtotal())"></dd></div>
+        <div class="flex justify-between"><dt class="text-slate-500">VAT</dt><dd x-text="formatMoney(vatAmount())"></dd></div>
+        <div class="flex justify-between text-base font-bold border-t pt-2 mt-2"><dt>Total</dt><dd x-text="formatMoney(total())"></dd></div>
+      </dl>
+    </div>
+
+    <button type="submit" class="w-full px-4 py-2 rounded bg-sky-600 hover:bg-sky-700 text-white font-semibold">{% if quote %}Save changes{% else %}Create quote{% endif %}</button>
+  </aside>
+</form>
+
+<script>
+function quoteForm() {
+  return {
+    lines: {% if line_items %}[
+      {% for li in line_items %}{ uid: 'l{{ forloop.counter }}', description: "{{ li.description|escapejs }}", quantity: {{ li.quantity }}, unit_price: {{ li.unit_price }} }{% if not forloop.last %},{% endif %}
+      {% endfor %}
+    ]{% else %}[ { uid: 'l1', description: '', quantity: 1, unit_price: 0 } ]{% endif %},
+    vatRate: {% if quote %}{{ quote.vat_rate }}{% else %}{{ branding.default_vat_rate }}{% endif %},
+    init() {
+      const tbody = this.$refs.lines;
+      if (window.Sortable && tbody) {
+        Sortable.create(tbody, { handle: '.handle', animation: 150 });
+      }
+    },
+    addLine() { this.lines.push({ uid: 'l' + Date.now() + Math.random(), description: '', quantity: 1, unit_price: 0 }); },
+    removeLine(idx) { this.lines.splice(idx, 1); if (!this.lines.length) this.addLine(); },
+    subtotal() { return this.lines.reduce((s, l) => s + (parseFloat(l.quantity) || 0) * (parseFloat(l.unit_price) || 0), 0); },
+    vatAmount() { return this.subtotal() * ((parseFloat(this.vatRate) || 0) / 100); },
+    total() { return this.subtotal() + this.vatAmount(); },
+    formatMoney(v) { return (v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); },
+  };
+}
+</script>
+{% endblock %}

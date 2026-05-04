@@ -1,0 +1,5 @@
+{% extends "emails/_document_preview.html" %}
+{% block intro %}
+<p>Quote <strong>#{{ quote_number }}</strong> has been accepted by {{ quote.display_recipient }}.</p>
+<p>An invoice will follow shortly.</p>
+{% endblock %}

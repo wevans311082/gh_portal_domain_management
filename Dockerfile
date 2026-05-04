@@ -3,12 +3,28 @@ FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-RUN apt-get update && apt-get install -y \
+# Install wkhtmltopdf via the patched-Qt .deb (preserves header/footer support).
+# Plain `apt install wkhtmltopdf` ships an unpatched build that drops --header-html/--footer-html.
+RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
     libffi-dev \
     libssl-dev \
-    && rm -rf /var/lib/apt/lists/*
+    wget \
+    ca-certificates \
+    fontconfig \
+    fonts-liberation \
+    fonts-dejavu \
+    libjpeg62-turbo \
+    libxrender1 \
+    libxext6 \
+    libx11-6 \
+    xfonts-75dpi \
+    xfonts-base \
+  && wget -q https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6.1-3/wkhtmltox_0.12.6.1-3.bookworm_amd64.deb \
+  && (dpkg -i wkhtmltox_0.12.6.1-3.bookworm_amd64.deb || apt-get install -y -f) \
+  && rm wkhtmltox_0.12.6.1-3.bookworm_amd64.deb \
+  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 

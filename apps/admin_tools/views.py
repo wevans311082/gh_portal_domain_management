@@ -104,6 +104,22 @@ def dashboard(request):
         "recent_tickets": recent_tickets,
         "recent_audit": recent_audit,
     }
+
+    # Quote pipeline widget
+    from apps.billing.models import Quote
+    open_quote_statuses = [Quote.STATUS_SENT, Quote.STATUS_VIEWED]
+    context["quotes_open"] = Quote.objects.filter(status__in=open_quote_statuses).count()
+    context["quotes_pipeline_value"] = (
+        Quote.objects.filter(status__in=open_quote_statuses).aggregate(t=Sum("total"))["t"] or 0
+    )
+    context["quotes_accepted_30d"] = Quote.objects.filter(
+        status__in=[Quote.STATUS_ACCEPTED, Quote.STATUS_CONVERTED],
+        updated_at__gte=last_30,
+    ).count()
+    sent_30d = Quote.objects.filter(created_at__gte=last_30).exclude(status=Quote.STATUS_DRAFT).count()
+    context["quotes_conversion_30d"] = (
+        round(100.0 * context["quotes_accepted_30d"] / sent_30d, 1) if sent_30d else 0.0
+    )
     context.update(_build_task_summary())
     return render(request, "admin_tools/dashboard.html", context)
 

@@ -395,26 +395,22 @@ def process_auto_renewals(days_ahead: int = 7):
         renewal_years = 1
         renewal_price = (pricing.renewal_price * Decimal(str(renewal_years))).quantize(Decimal("0.01"))
 
-        # Build invoice number inline (mirrors the view helper)
-        invoice_number = f"AR-{tz.now():%Y%m%d%H%M%S%f}-{domain.user_id}"
+        # Build invoice via the canonical billing service so numbering,
+        # branding, and audit stay consistent with manual renewals.
+        from apps.billing.services import create_invoice
 
-        invoice = Invoice.objects.create(
+        invoice = create_invoice(
             user=domain.user,
-            number=invoice_number,
-            status=Invoice.STATUS_PAID,  # auto-renew — treat as already authorised
+            line_items=[{
+                "description": f"Auto-renewal: {domain.name} (1 year)",
+                "quantity": 1,
+                "unit_price": renewal_price,
+            }],
+            source_kind=Invoice.SOURCE_AUTO_RENEWAL,
             vat_rate=Decimal("0.00"),
             due_date=today,
-            billing_name=domain.user.full_name if hasattr(domain.user, "full_name") else "",
-            billing_address="",
-            paid_at=tz.now(),
+            status=Invoice.STATUS_PAID,
         )
-        InvoiceLineItem.objects.create(
-            invoice=invoice,
-            description=f"Auto-renewal: {domain.name} (1 year)",
-            quantity=1,
-            unit_price=renewal_price,
-        )
-        invoice.calculate_totals()
 
         renewal = DomainRenewal.objects.create(
             domain=domain,

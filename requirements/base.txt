@@ -21,3 +21,6 @@ qrcode==7.4.2
 django-model-utils==4.4.0
 django-extensions==3.2.3
 factory-boy==3.3.0
+pdfkit==1.0.0
+# weasyprint kept as a fallback PDF engine; install only if you cannot run wkhtmltopdf.
+# weasyprint==62.3

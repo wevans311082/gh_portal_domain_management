@@ -161,7 +161,7 @@ def test_checkout_completed_queues_paid_domain_orders(django_user_model, monkeyp
         def delay(self, order_id):
             queued.append(order_id)
 
-    monkeypatch.setattr("apps.payments.views.register_domain_order", FakeTask())
+    monkeypatch.setattr("apps.domains.tasks.register_domain_order", FakeTask())
 
     _handle_checkout_completed(
         {

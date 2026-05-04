@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Build a quote · {{ branding.company_name|default:SITE_NAME }}{% endblock %}
+
+{% block extra_head %}
+<script src="{% static 'vendor/sortable-1.15.2.min.js' %}" defer></script>
+<style>
+  [x-cloak] { display: none !important; }
+  .qb-card { transition: transform .12s ease, box-shadow .12s ease; }
+  .qb-card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(2,132,199,.12); }
+  .qb-cart-row { background: #fff; }
+  .sortable-ghost { opacity: .35; }
+</style>
+{% endblock %}
+
+{% block alpine_script %}
+<script defer src="{% static 'vendor/alpine-3.14.1.min.js' %}"></script>
+{% endblock %}
+
+{% block body %}
+<div x-data="quoteBuilder()" x-init="init()" x-cloak class="min-h-screen">
+  <header class="bg-white border-b border-slate-200">
+    <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+      <a href="/" class="flex items-center gap-3">
+        {% if branding.logo %}
+          <img src="{{ branding.logo.url }}" alt="{{ branding.company_name }}" class="h-9">
+        {% else %}
+          <span class="text-xl font-bold text-slate-900">{{ branding.company_name|default:SITE_NAME }}</span>
+        {% endif %}
+      </a>
+      <a href="{% url 'core:home' %}" class="text-sm text-slate-500 hover:text-slate-900">← Back to site</a>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 py-10">
+    <div class="mb-8">
+      <h1 class="text-3xl md:text-4xl font-bold text-slate-900">Build your quote</h1>
+      <p class="mt-2 text-slate-600">Drag the services you want into your basket on the right. We'll email you a PDF quote in seconds.</p>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+      <!-- Catalogue -->
+      <section class="lg:col-span-2 space-y-8">
+        <template x-for="group in catalogue" :key="group.category">
+          <div>
+            <h2 class="text-sm uppercase font-bold tracking-wider text-slate-500 mb-3" x-text="group.category"></h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <template x-for="item in group.items" :key="item.id">
+                <div class="qb-card bg-white border border-slate-200 rounded-xl p-5 cursor-pointer flex flex-col"
+                     :data-item="JSON.stringify(item)"
+                     @click="addItem(item)">
+                  <h3 class="font-semibold text-slate-900" x-text="item.name"></h3>
+                  <p class="mt-1 text-sm text-slate-600 flex-1" x-text="item.blurb"></p>
+                  <div class="mt-3 flex items-end justify-between">
+                    <div>
+                      <div class="text-2xl font-bold text-sky-700">
+                        <span x-text="formatMoney(item.price_monthly)"></span>
+                        <span class="text-xs font-normal text-slate-500">/ mo</span>
+                      </div>
+                      <div class="text-xs text-slate-500" x-show="item.setup_fee > 0">
+                        + <span x-text="formatMoney(item.setup_fee)"></span> setup
+                      </div>
+                    </div>
+                    <button type="button" class="px-3 py-1.5 rounded bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold">+ Add</button>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
+
+        <template x-if="!catalogue.length">
+          <div class="bg-white rounded-xl border border-dashed border-slate-300 p-10 text-center text-slate-500">
+            No services available right now. Please <a href="{% url 'core:contact' %}" class="text-sky-700 hover:underline">contact us</a> for a custom quote.
+          </div>
+        </template>
+      </section>
+
+      <!-- Cart -->
+      <aside class="lg:sticky lg:top-6 self-start space-y-4">
+        <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+          <h2 class="font-bold text-slate-900 mb-3 flex items-center justify-between">
+            Your quote
+            <span class="text-xs font-normal text-slate-500" x-text="cart.length + ' item' + (cart.length === 1 ? '' : 's')"></span>
+          </h2>
+
+          <div x-ref="cart" class="space-y-2 min-h-[80px]">
+            <template x-for="(line, idx) in cart" :key="line.uid">
+              <div class="qb-cart-row flex items-center gap-2 border border-slate-200 rounded-lg p-2 cart-row" :data-uid="line.uid">
+                <span class="cursor-move text-slate-300 select-none handle">⋮⋮</span>
+                <div class="flex-1 min-w-0">
+                  <div class="text-sm font-medium truncate" x-text="line.description"></div>
+                  <div class="text-xs text-slate-500">
+                    <span x-text="formatMoney(line.unit_price)"></span> × 
+                    <input type="number" min="1" step="1" x-model.number="line.quantity"
+                           class="w-12 border border-slate-200 rounded px-1 text-xs">
+                  </div>
+                </div>
+                <div class="text-sm font-semibold" x-text="formatMoney(line.unit_price * line.quantity)"></div>
+                <button type="button" @click="removeItem(idx)" class="text-rose-500 hover:text-rose-700 text-xs">×</button>
+              </div>
+            </template>
+          </div>
+
+          <template x-if="!cart.length">
+            <p class="text-sm text-slate-500 italic mt-2">Click or drag a service to start your quote.</p>
+          </template>
+
+          <dl class="text-sm space-y-1 mt-4 pt-4 border-t border-slate-200">
+            <div class="flex justify-between"><dt class="text-slate-500">Subtotal</dt><dd x-text="formatMoney(subtotal())"></dd></div>
+            <div class="flex justify-between"><dt class="text-slate-500">VAT ({{ branding.default_vat_rate }}%)</dt><dd x-text="formatMoney(vatAmount())"></dd></div>
+            <div class="flex justify-between text-base font-bold border-t pt-2 mt-2"><dt>Estimated total</dt><dd x-text="formatMoney(total())"></dd></div>
+          </dl>
+        </div>
+
+        <!-- Lead form -->
+        <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-3">
+          <h2 class="font-bold text-slate-900">Your details</h2>
+          <input type="text" x-model="lead.name" placeholder="Full name *" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+          <input type="email" x-model="lead.email" placeholder="Email *" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+          <input type="text" x-model="lead.company" placeholder="Company (optional)" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+          <input type="text" x-model="lead.phone" placeholder="Phone (optional)" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+          <textarea x-model="lead.notes" rows="3" placeholder="Anything else we should know? (optional)" class="w-full border border-slate-300 rounded px-3 py-2 text-sm"></textarea>
+          <!-- honeypot -->
+          <input type="text" x-model="hp" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-10000px;width:1px;height:1px;opacity:0">
+
+          <button type="button"
+                  @click="submitQuote()"
+                  :disabled="submitting || !cart.length || !lead.name || !lead.email"
+                  :class="(submitting || !cart.length || !lead.name || !lead.email) ? 'bg-slate-300 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700'"
+                  class="w-full px-4 py-3 rounded text-white font-semibold transition">
+            <span x-show="!submitting">Get my quote</span>
+            <span x-show="submitting">Preparing your quote…</span>
+          </button>
+          <p x-show="error" x-text="error" class="text-xs text-rose-600"></p>
+          <p class="text-xs text-slate-400">By requesting a quote you agree to our terms. We'll email a PDF copy.</p>
+        </div>
+      </aside>
+    </div>
+  </main>
+</div>
+
+<script id="quote-catalogue" type="application/json">{{ catalogue_json|safe }}</script>
+<script>
+function quoteBuilder() {
+  return {
+    catalogue: JSON.parse(document.getElementById('quote-catalogue').textContent || '[]'),
+    cart: [],
+    lead: { name: '', email: '', company: '', phone: '', notes: '' },
+    hp: '',
+    submitting: false,
+    error: '',
+    vatRate: {{ branding.default_vat_rate }},
+
+    init() {
+      const cartEl = this.$refs.cart;
+      if (window.Sortable && cartEl) {
+        Sortable.create(cartEl, {
+          handle: '.handle',
+          animation: 150,
+          onEnd: (evt) => {
+            const node = this.cart.splice(evt.oldIndex, 1)[0];
+            this.cart.splice(evt.newIndex, 0, node);
+          },
+        });
+      }
+    },
+    addItem(item) {
+      const existing = this.cart.find(l => l.product_id === item.id);
+      if (existing) {
+        existing.quantity += 1;
+        return;
+      }
+      this.cart.push({
+        uid: 'l' + Date.now() + Math.random(),
+        product_id: item.id,
+        description: item.name + ' (monthly)',
+        quantity: 1,
+        unit_price: item.price_monthly,
+      });
+      if (item.setup_fee > 0) {
+        this.cart.push({
+          uid: 'l' + Date.now() + Math.random() + '-s',
+          product_id: item.id,
+          description: item.name + ' — setup fee',
+          quantity: 1,
+          unit_price: item.setup_fee,
+        });
+      }
+    },
+    removeItem(idx) { this.cart.splice(idx, 1); },
+    subtotal() { return this.cart.reduce((s, l) => s + (l.quantity * l.unit_price), 0); },
+    vatAmount() { return this.subtotal() * (this.vatRate / 100); },
+    total() { return this.subtotal() + this.vatAmount(); },
+    formatMoney(v) {
+      return '{{ branding.default_currency }} ' + (v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    },
+
+    async submitQuote() {
+      this.error = '';
+      if (!this.cart.length) { this.error = 'Add at least one item.'; return; }
+      if (!this.lead.name || !this.lead.email) { this.error = 'Name and email are required.'; return; }
+      this.submitting = true;
+      try {
+        const csrf = document.cookie.split(';').map(s => s.trim()).find(s => s.startsWith('csrftoken='));
+        const headers = { 'Content-Type': 'application/json' };
+        if (csrf) headers['X-CSRFToken'] = csrf.split('=')[1];
+        const res = await fetch('{% url "billing_public:quote_submit" %}', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            lead: this.lead,
+            hp: this.hp,
+            items: this.cart.map(l => ({
+              description: l.description,
+              quantity: l.quantity,
+              unit_price: l.unit_price,
+            })),
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          this.error = data.error || 'Something went wrong. Please try again.';
+          this.submitting = false;
+          return;
+        }
+        window.location.href = data.redirect;
+      } catch (e) {
+        this.error = 'Network error. Please try again.';
+        this.submitting = false;
+      }
+    },
+  };
+}
+</script>
+{% endblock %}

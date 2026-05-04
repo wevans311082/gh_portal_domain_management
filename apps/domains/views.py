@@ -13,6 +13,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
 from apps.billing.models import Invoice, InvoiceLineItem
+from apps.billing.services import create_invoice
 from apps.domains.forms import DomainContactForm, DomainRegistrationForm
 from apps.domains.models import Domain, DomainContact, DomainOrder, DomainPricingSettings, DomainRenewal, TLDPricing
 from apps.domains.pricing import TLDPricingService
@@ -483,22 +484,17 @@ def domain_register(request):
                 profile = request.user.client_profile
                 billing_address = "\n".join(filter(None, [profile.address_line1, profile.address_line2, profile.city, profile.county, profile.postcode, profile.country]))
 
-            invoice = Invoice.objects.create(
+            invoice = create_invoice(
                 user=request.user,
-                number=_build_invoice_number(request.user.id),
-                status=Invoice.STATUS_UNPAID,
+                line_items=[{
+                    "description": f"Domain registration: {domain_name.lower()} ({registration_years} year(s))",
+                    "quantity": 1,
+                    "unit_price": total_price,
+                }],
+                source_kind=Invoice.SOURCE_DOMAIN_REGISTRATION,
                 vat_rate=Decimal("0.00"),
                 due_date=timezone.now().date(),
-                billing_name=billing_name,
-                billing_address=billing_address,
             )
-            InvoiceLineItem.objects.create(
-                invoice=invoice,
-                description=f"Domain registration: {domain_name.lower()} ({registration_years} year(s))",
-                quantity=1,
-                unit_price=total_price,
-            )
-            invoice.calculate_totals()
             order = DomainOrder.objects.create(
                 user=request.user,
                 invoice=invoice,
@@ -598,22 +594,17 @@ def domain_renew(request, pk):
                 profile.city, profile.county, profile.postcode, profile.country,
             ]))
 
-        invoice = Invoice.objects.create(
+        invoice = create_invoice(
             user=request.user,
-            number=_build_invoice_number(request.user.id),
-            status=Invoice.STATUS_UNPAID,
+            line_items=[{
+                "description": f"Domain renewal: {domain.name} ({years} year(s))",
+                "quantity": 1,
+                "unit_price": renewal_price,
+            }],
+            source_kind=Invoice.SOURCE_DOMAIN_RENEWAL,
             vat_rate=Decimal("0.00"),
             due_date=timezone.now().date(),
-            billing_name=billing_name,
-            billing_address=billing_address,
         )
-        InvoiceLineItem.objects.create(
-            invoice=invoice,
-            description=f"Domain renewal: {domain.name} ({years} year(s))",
-            quantity=1,
-            unit_price=renewal_price,
-        )
-        invoice.calculate_totals()
 
         renewal = DomainRenewal.objects.create(
             domain=domain,

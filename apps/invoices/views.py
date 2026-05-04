@@ -31,25 +31,17 @@ def invoice_detail(request, pk):
 
 @login_required
 def invoice_pdf(request, pk):
-    """Download invoice as PDF using WeasyPrint."""
+    """Download invoice as PDF via the canonical billing PDF service."""
     invoice = get_object_or_404(Invoice, pk=pk, user=request.user)
 
-    try:
-        from weasyprint import HTML
-        html_string = render_to_string("invoices/pdf.html", {
-            "invoice": invoice,
-            "request": request,
-        })
-        html = HTML(string=html_string, base_url=request.build_absolute_uri())
-        pdf_bytes = html.write_pdf()
+    from apps.billing.services import render_invoice_pdf
 
-        response = HttpResponse(pdf_bytes, content_type="application/pdf")
-        response["Content-Disposition"] = f'attachment; filename="invoice-{invoice.number}.pdf"'
-        return response
-    except ImportError:
-        logger.warning("WeasyPrint not available, returning HTML invoice")
-        html_string = render_to_string("invoices/pdf.html", {
-            "invoice": invoice,
-            "request": request,
-        })
-        return HttpResponse(html_string, content_type="text/html")
+    pdf_bytes, content_type, ext = render_invoice_pdf(
+        invoice, base_url=request.build_absolute_uri()
+    )
+    disposition = "attachment" if request.GET.get("inline") != "1" else "inline"
+    response = HttpResponse(pdf_bytes, content_type=content_type)
+    response["Content-Disposition"] = (
+        f'{disposition}; filename="invoice-{invoice.number}.{ext}"'
+    )
+    return response

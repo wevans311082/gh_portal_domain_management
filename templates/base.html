@@ -12,7 +12,9 @@
     <script src="{% static 'js/tailwind-config.js' %}"></script>
     <script src="{% static 'vendor/tailwindcss-cdn.js' %}"></script>
     <!-- Alpine.js CSP build -->
+    {% block alpine_script %}
     <script defer src="{% static 'vendor/alpine-csp-3.14.1.min.js' %}"></script>
+    {% endblock %}
     <link rel="stylesheet" href="{% static 'css/app.css' %}">
     {% block extra_head %}{% endblock %}
 </head>

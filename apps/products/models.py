@@ -21,6 +21,19 @@ class Package(TimeStampedModel):
     sort_order = models.PositiveIntegerField(default=0)
     stripe_price_monthly_id = models.CharField(max_length=255, blank=True)
     stripe_price_annually_id = models.CharField(max_length=255, blank=True)
+    is_quotable = models.BooleanField(
+        default=False,
+        help_text="Show this package in the public 'Build a quote' catalogue.",
+    )
+    quote_blurb = models.TextField(
+        blank=True,
+        help_text="Short marketing description shown on the public quote builder card.",
+    )
+    quote_category = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text="Free-text category label for grouping in the public quote builder (e.g. Hosting, Email, Security).",
+    )
 
     class Meta:
         ordering = ["sort_order", "price_monthly"]

@@ -35,6 +35,11 @@
         <p class="text-xs text-slate-500 font-medium uppercase tracking-wide mb-1">Unpaid Invoices</p>
         <p class="text-3xl font-bold {% if unpaid_invoices %}text-red-600{% else %}text-slate-800{% endif %}">{{ unpaid_invoices }}</p>
     </a>
+    <a href="{% url 'admin_tools:quote_list' %}" class="bg-white rounded-xl border {% if quotes_open %}border-sky-300{% else %}border-slate-200{% endif %} shadow-sm p-5 hover:shadow-md transition-shadow">
+        <p class="text-xs text-slate-500 font-medium uppercase tracking-wide mb-1">Open Quotes</p>
+        <p class="text-3xl font-bold {% if quotes_open %}text-sky-600{% else %}text-slate-800{% endif %}">{{ quotes_open }}</p>
+        <p class="text-xs text-slate-500 mt-1">£{{ quotes_pipeline_value|floatformat:0 }} pipeline · {{ quotes_conversion_30d }}% conv (30d)</p>
+    </a>
     <a href="{% url 'admin:support_supportticket_changelist' %}" class="bg-white rounded-xl border {% if open_tickets %}border-indigo-300{% else %}border-slate-200{% endif %} shadow-sm p-5 hover:shadow-md transition-shadow">
         <p class="text-xs text-slate-500 font-medium uppercase tracking-wide mb-1">Open Support Tickets</p>
         <p class="text-3xl font-bold {% if open_tickets %}text-indigo-600{% else %}text-slate-800{% endif %}">{{ open_tickets }}</p>

@@ -1,0 +1,12 @@
+{% extends "emails/_document_preview.html" %}
+{% block intro %}
+<p>Hello {{ user.get_full_name|default:quote.display_recipient }},</p>
+<p>Please find your quote <strong>#{{ quote_number }}</strong> attached. A preview is shown below.</p>
+{% if custom_message %}<p>{{ custom_message|linebreaksbr }}</p>{% endif %}
+{% if quote.valid_until %}<p>This quote is valid until <strong>{{ quote.valid_until|date:"d M Y" }}</strong>.</p>{% endif %}
+{% if quote.public_token %}
+<p style="margin:18px 0;">
+  <a href="{{ portal_base_url|default:'' }}/quote/{{ quote.public_token }}/" style="background:{{ accent_colour|default:'#0ea5e9' }};color:#fff;padding:10px 18px;text-decoration:none;border-radius:4px;font-weight:bold;">Review &amp; accept online</a>
+</p>
+{% endif %}
+{% endblock %}
