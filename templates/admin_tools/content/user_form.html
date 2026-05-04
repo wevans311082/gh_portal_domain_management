@@ -5,6 +5,7 @@
 {% if mode == 'edit' and obj %}
 <div class="mb-4 flex flex-wrap items-center gap-2">
   <a href="{% url 'admin_tools:user_mfa_manage' obj.pk %}" class="px-3 py-1.5 rounded border border-slate-300 text-sm text-slate-700 hover:bg-slate-50">Manage MFA</a>
+  <a href="{% url 'admin_tools:cart_builder' %}?user_id={{ obj.pk }}" class="px-3 py-1.5 rounded border border-emerald-300 text-sm text-emerald-700 hover:bg-emerald-50">Cart Builder for this customer</a>
   {% if obj.pk != request.user.pk %}
   <form method="post" action="{% url 'admin_tools:user_su_start' obj.pk %}" class="inline">{% csrf_token %}
     <button class="px-3 py-1.5 rounded border border-amber-300 text-sm text-amber-700 hover:bg-amber-50" onclick="return confirm('Impersonate this user in customer portal?')">SU as user</button>

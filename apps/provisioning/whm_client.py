@@ -197,6 +197,16 @@ class WHMClient:
         data = self._cpanel_call(cpanel_username, "DiskUsage", "get_quota")
         return data.get("data", {})
 
+    def create_cpanel_session(self, cpanel_username: str) -> str:
+        """Create a WHM-authenticated cPanel session and return the login URL."""
+        data = self._call("create_user_session", {"user": cpanel_username, "service": "cpaneld"})
+        # WHM returns: {"result": {"url": "https://...", "token": "..."}}
+        result = data.get("result") or data
+        url = result.get("url", "")
+        if not url:
+            raise WHMClientError("WHM did not return a session URL.")
+        return url
+
 
 def generate_cpanel_username(domain: str) -> str:
     """Generate a valid 8-char cPanel username from a domain name."""

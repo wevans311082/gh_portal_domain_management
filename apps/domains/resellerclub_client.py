@@ -576,6 +576,33 @@ class ResellerClubClient:
         }
         return self._post("domains/renew", data)
 
+    def transfer_domain(
+        self,
+        domain_name: str,
+        customer_id: str,
+        reg_contact_id: str,
+        admin_contact_id: str,
+        tech_contact_id: str,
+        billing_contact_id: str,
+        nameservers: list,
+        auth_code: str = "",
+        auto_renew: bool = True,
+    ) -> dict:
+        """Transfer a domain name into the registrar account."""
+        data = {
+            "domain-name": domain_name,
+            "customer-id": customer_id,
+            "reg-contact-id": reg_contact_id,
+            "admin-contact-id": admin_contact_id,
+            "tech-contact-id": tech_contact_id,
+            "billing-contact-id": billing_contact_id,
+            "ns": nameservers,
+            "auto-renew": auto_renew,
+        }
+        if auth_code:
+            data["auth-code"] = auth_code
+        return self._post("domains/transfer", data)
+
     def get_order_details(self, order_id: str) -> dict:
         """Get details for a domain order."""
         return self._get("domains/details", {"order-id": order_id, "options": "All"})

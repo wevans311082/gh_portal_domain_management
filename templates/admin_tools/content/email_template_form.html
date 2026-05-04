@@ -1,0 +1,26 @@
+{% extends "base_admin.html" %}
+{% block title %}Edit Email Template: {{ template_name }} · {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Email Template: {{ template_name }}{% endblock %}
+{% block content %}
+{% if builtin %}
+<div class="mb-4 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800">
+  <strong>Built-in subject:</strong> {{ builtin.subject }}<br>
+  <strong>Built-in file:</strong> <code class="font-mono text-xs">{{ builtin.template }}</code><br>
+  Your override replaces the built-in template when active.
+</div>
+{% endif %}
+<form method="post" class="space-y-4 max-w-4xl">
+  {% csrf_token %}
+  {% for field in form %}
+  <div>
+    <label class="block text-sm font-medium text-slate-700 mb-1">{{ field.label }}</label>
+    {{ field }}
+    {% for error in field.errors %}<p class="text-xs text-red-600 mt-1">{{ error }}</p>{% endfor %}
+  </div>
+  {% endfor %}
+  <div class="flex gap-4 pt-2">
+    <button type="submit" class="px-4 py-2 rounded bg-sky-600 text-white text-sm font-medium hover:bg-sky-700">Save</button>
+    <a href="{% url 'admin_tools:email_template_list' %}" class="text-sm text-slate-500 self-center">Cancel</a>
+  </div>
+</form>
+{% endblock %}

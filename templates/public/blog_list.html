@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Blog · {{ SITE_NAME }}{% endblock %}
+{% block body %}
+<section class="py-16 bg-slate-50 min-h-screen">
+  <div class="max-w-5xl mx-auto px-4">
+    <h1 class="text-3xl font-bold text-slate-900 mb-8">Blog</h1>
+    <div class="space-y-6">
+      {% for post in posts %}
+      <article class="bg-white rounded-xl border border-slate-200 p-6 hover:shadow-sm transition-shadow">
+        <h2 class="text-xl font-semibold text-slate-900 mb-2">
+          <a href="{% url 'core:blog_detail' slug=post.slug %}" class="hover:text-sky-600">{{ post.title }}</a>
+        </h2>
+        {% if post.excerpt %}
+        <p class="text-slate-600 text-sm mb-3">{{ post.excerpt }}</p>
+        {% endif %}
+        <div class="flex items-center gap-4 text-xs text-slate-400">
+          {% if post.published_at %}<span>{{ post.published_at|date:"j F Y" }}</span>{% endif %}
+          {% if post.author %}<span>by {{ post.author.get_full_name|default:post.author.email }}</span>{% endif %}
+        </div>
+      </article>
+      {% empty %}
+      <div class="bg-white rounded-xl border border-slate-200 p-12 text-center">
+        <p class="text-slate-500">No posts published yet. Check back soon.</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endblock %}

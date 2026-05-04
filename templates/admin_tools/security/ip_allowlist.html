@@ -1,0 +1,42 @@
+{% extends "base_admin.html" %}
+{% block title %}IP Allowlist · {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Staff IP Allowlist{% endblock %}
+{% block content %}
+<div class="mb-4 flex items-center justify-between">
+  <p class="text-sm text-slate-500">When entries exist, only listed IPs may access staff areas.</p>
+  <a href="{% url 'admin_tools:ip_allowlist_create' %}" class="px-4 py-2 rounded bg-sky-600 text-white text-sm font-medium hover:bg-sky-700">+ Add IP</a>
+</div>
+<div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+  <table class="min-w-full text-sm">
+    <thead class="bg-slate-50 text-slate-500 text-xs uppercase">
+      <tr>
+        <th class="px-4 py-3 text-left">IP Address</th>
+        <th class="px-4 py-3 text-left">Label</th>
+        <th class="px-4 py-3 text-left">Active</th>
+        <th class="px-4 py-3 text-left">Added by</th>
+        <th class="px-4 py-3 text-left">Added</th>
+        <th class="px-4 py-3"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-100">
+      {% for entry in entries %}
+      <tr>
+        <td class="px-4 py-3 font-mono">{{ entry.ip_address }}</td>
+        <td class="px-4 py-3">{{ entry.label|default:"—" }}</td>
+        <td class="px-4 py-3">{% if entry.is_active %}<span class="text-green-600">Yes</span>{% else %}<span class="text-slate-400">No</span>{% endif %}</td>
+        <td class="px-4 py-3">{{ entry.added_by.email|default:"—" }}</td>
+        <td class="px-4 py-3 text-slate-400">{{ entry.created_at|date:"d M Y" }}</td>
+        <td class="px-4 py-3 text-right">
+          <form method="post" action="{% url 'admin_tools:ip_allowlist_delete' entry.pk %}" onsubmit="return confirm('Remove this IP?')">
+            {% csrf_token %}
+            <button class="text-red-500 text-xs hover:underline">Remove</button>
+          </form>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">No entries — all IPs are allowed.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

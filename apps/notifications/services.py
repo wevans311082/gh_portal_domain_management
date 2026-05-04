@@ -86,6 +86,17 @@ def send_notification(
     - ``recipient_email``: explicit recipient (used for anonymous quotes).
     - ``cc``: optional iterable of CC addresses.
     """
+    # Check user notification preference (skip only when user object exists and preference is explicitly disabled)
+    if user is not None and hasattr(user, "pk") and user.pk:
+        try:
+            from apps.notifications.models import NotificationPreference
+            pref = NotificationPreference.objects.filter(user=user, template_name=template_name).first()
+            if pref is not None and not pref.enabled:
+                logger.info("Notification %s suppressed by preference for user %s", template_name, user.pk)
+                return
+        except Exception:  # pragma: no cover - DB may not be ready in tests
+            pass
+
     context = dict(context or {})
     context.setdefault("site_name", getattr(settings, "SITE_NAME", "Grumpy Hosting"))
     context.setdefault("user", user)
@@ -96,12 +107,21 @@ def send_notification(
         return
 
     subject_template = template_config["subject"]
-    try:
-        subject = subject_template.format(**context)
-    except (KeyError, AttributeError):
-        subject = subject_template
-
     template_path = template_config["template"]
+
+    # Check for DB override (active NotificationTemplate row)
+    db_template = None
+    try:
+        from apps.notifications.models import NotificationTemplate as NotificationTemplateModel
+        db_template = NotificationTemplateModel.objects.filter(name=template_name, is_active=True).first()
+    except Exception:  # pragma: no cover - DB may not be ready
+        pass
+
+    try:
+        subject = (db_template.subject if db_template else subject_template).format(**context)
+    except (KeyError, AttributeError):
+        subject = db_template.subject if db_template else subject_template
+
     recipient = recipient_email or getattr(user, "email", "") or ""
 
     if not recipient:
@@ -109,8 +129,14 @@ def send_notification(
         return
 
     try:
-        html_content = render_to_string(template_path, context)
-        text_content = re.sub(r"<[^>]+>", "", html_content).strip()
+        if db_template:
+            from django.template import Context, Template
+            t = Template(db_template.html_content)
+            html_content = t.render(Context(context))
+            text_content = db_template.text_content or re.sub(r"<[^>]+>", "", html_content).strip()
+        else:
+            html_content = render_to_string(template_path, context)
+            text_content = re.sub(r"<[^>]+>", "", html_content).strip()
 
         msg = EmailMultiAlternatives(
             subject=subject,

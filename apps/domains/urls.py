@@ -9,8 +9,12 @@ urlpatterns = [
     path("whois/", views.domain_whois, name="whois"),
     path("register/", views.domain_register, name="register"),
     path("my-domains/", views.my_domains, name="my_domains"),
+    path("my-domains/bulk-renew/", views.domain_bulk_add_to_cart, name="bulk_add_to_cart"),
     path("<int:pk>/", views.domain_detail, name="detail"),
     path("<int:pk>/toggle-autorenew/", views.domain_toggle_autorenew, name="toggle_autorenew"),
+    path("<int:pk>/toggle-lock/", views.domain_toggle_lock, name="toggle_lock"),
+    path("<int:pk>/get-auth-code/", views.domain_get_auth_code, name="get_auth_code"),
+    path("<int:pk>/nameservers/", views.domain_update_nameservers, name="update_nameservers"),
     path("<int:pk>/renew/", views.domain_renew, name="renew"),
     # Domain contacts
     path("contacts/", views.contact_list, name="contact_list"),

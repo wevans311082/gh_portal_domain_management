@@ -3,6 +3,40 @@ from apps.core.models import TimeStampedModel
 from apps.accounts.models import User
 
 
+class StripeCustomer(TimeStampedModel):
+    """Maps a portal user to a Stripe Customer ID for saved payment methods."""
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="stripe_customer")
+    stripe_customer_id = models.CharField(max_length=255, unique=True)
+
+    def __str__(self):
+        return f"{self.user} → {self.stripe_customer_id}"
+
+
+class SavedPaymentMethod(TimeStampedModel):
+    """A card saved via Stripe SetupIntent, linked to a portal user."""
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="saved_payment_methods")
+    stripe_pm_id = models.CharField(max_length=255, unique=True)
+    last4 = models.CharField(max_length=4)
+    brand = models.CharField(max_length=20)
+    exp_month = models.PositiveSmallIntegerField()
+    exp_year = models.PositiveSmallIntegerField()
+    is_default = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.brand} •••• {self.last4} (exp {self.exp_month}/{self.exp_year})"
+
+    def save(self, *args, **kwargs):
+        # Ensure only one default per user
+        if self.is_default:
+            SavedPaymentMethod.objects.filter(user=self.user, is_default=True).exclude(pk=self.pk).update(is_default=False)
+        super().save(*args, **kwargs)
+
+
 class Payment(TimeStampedModel):
     STATUS_PENDING = "pending"
     STATUS_COMPLETED = "completed"

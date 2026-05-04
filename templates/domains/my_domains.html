@@ -6,65 +6,117 @@
 {% block content %}
 <div class="flex justify-between items-center mb-6">
     <p class="text-gray-600">{{ domains|length }} domain{% if domains|length != 1 %}s{% endif %} registered</p>
-    <a href="{% url 'domains:search' %}" class="bg-sky-600 text-white px-4 py-2 rounded hover:bg-sky-700">
-        + Register Domain
-    </a>
+    <div class="flex gap-2">
+        <a href="{% url 'portal:shop' %}" class="bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700 text-sm">
+            Shop / Renew / Transfer
+        </a>
+        <a href="{% url 'domains:search' %}" class="bg-sky-600 text-white px-4 py-2 rounded hover:bg-sky-700 text-sm">
+            + Register Domain
+        </a>
+    </div>
 </div>
 
 {% if domains %}
-<div class="bg-white rounded-lg shadow overflow-hidden">
-    <table class="w-full text-sm">
-        <thead class="bg-gray-50 border-b">
-            <tr>
-                <th class="px-4 py-3 text-left font-semibold text-gray-700">Domain</th>
-                <th class="px-4 py-3 text-left font-semibold text-gray-700">Status</th>
-                <th class="px-4 py-3 text-left font-semibold text-gray-700">Expires</th>
-                <th class="px-4 py-3 text-left font-semibold text-gray-700">Auto-Renew</th>
-                <th class="px-4 py-3 text-left font-semibold text-gray-700">DNS</th>
-                <th class="px-4 py-3 text-left font-semibold text-gray-700">Registrant</th>
-                <th class="px-4 py-3"></th>
-            </tr>
-        </thead>
-        <tbody class="divide-y">
-            {% for domain in domains %}
-            <tr class="hover:bg-gray-50">
-                <td class="px-4 py-3 font-medium">{{ domain.name }}</td>
-                <td class="px-4 py-3">
-                    <span class="px-2 py-0.5 rounded-full text-xs font-medium
-                        {% if domain.status == 'active' %}bg-green-100 text-green-800
-                        {% elif domain.status == 'expired' %}bg-red-100 text-red-800
-                        {% elif domain.status == 'suspended' %}bg-yellow-100 text-yellow-800
-                        {% else %}bg-gray-100 text-gray-700{% endif %}">
-                        {{ domain.get_status_display }}
-                    </span>
-                </td>
-                <td class="px-4 py-3 text-gray-600">{{ domain.expires_at|default:"—" }}</td>
-                <td class="px-4 py-3">
-                    {% if domain.auto_renew %}
-                    <span class="text-green-600">✓ On</span>
-                    {% else %}
-                    <span class="text-sky-300">Off</span>
-                    {% endif %}
-                </td>
-                <td class="px-4 py-3 text-gray-600 capitalize">{{ domain.dns_provider }}</td>
-                <td class="px-4 py-3">
-                    <span class="px-2 py-0.5 rounded-full text-xs font-medium
-                        {% if domain.registrant_validation_status == 'validated' %}bg-emerald-100 text-emerald-700
-                        {% elif domain.registrant_validation_status == 'pending' %}bg-amber-100 text-amber-700
-                        {% elif domain.registrant_validation_status == 'rejected' %}bg-red-100 text-red-700
-                        {% else %}bg-slate-100 text-slate-700{% endif %}">
-                        {{ domain.registrant_validation_status|title }}
-                    </span>
-                </td>
-                <td class="px-4 py-3 text-right">
-                    <a href="{% url 'domains:detail' pk=domain.pk %}"
-                       class="text-sky-600 hover:underline text-sm">Manage</a>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
+<form method="post" action="{% url 'domains:bulk_add_to_cart' %}" id="bulk-renew-form">
+    {% csrf_token %}
+    <input type="hidden" name="renewal_years" value="1">
+
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50 border-b">
+                <tr>
+                    <th class="px-4 py-3 w-8">
+                        <input type="checkbox" id="select-all-domains" title="Select all renewable domains"
+                               class="rounded border-gray-300">
+                    </th>
+                    <th class="px-4 py-3 text-left font-semibold text-gray-700">Domain</th>
+                    <th class="px-4 py-3 text-left font-semibold text-gray-700">Status</th>
+                    <th class="px-4 py-3 text-left font-semibold text-gray-700">Expires</th>
+                    <th class="px-4 py-3 text-left font-semibold text-gray-700">Auto-Renew</th>
+                    <th class="px-4 py-3 text-left font-semibold text-gray-700">DNS</th>
+                    <th class="px-4 py-3 text-left font-semibold text-gray-700">Registrant</th>
+                    <th class="px-4 py-3"></th>
+                </tr>
+            </thead>
+            <tbody class="divide-y">
+                {% for domain in domains %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-3">
+                        {% if domain.status == 'active' or domain.status == 'expired' %}
+                        <input type="checkbox" name="domain_id" value="{{ domain.pk }}"
+                               class="domain-checkbox rounded border-gray-300">
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 font-medium">{{ domain.name }}</td>
+                    <td class="px-4 py-3">
+                        <span class="px-2 py-0.5 rounded-full text-xs font-medium
+                            {% if domain.status == 'active' %}bg-green-100 text-green-800
+                            {% elif domain.status == 'expired' %}bg-red-100 text-red-800
+                            {% elif domain.status == 'suspended' %}bg-yellow-100 text-yellow-800
+                            {% else %}bg-gray-100 text-gray-700{% endif %}">
+                            {{ domain.get_status_display }}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3 text-gray-600">{{ domain.expires_at|default:"—" }}</td>
+                    <td class="px-4 py-3">
+                        {% if domain.auto_renew %}
+                        <span class="text-green-600">✓ On</span>
+                        {% else %}
+                        <span class="text-sky-300">Off</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-gray-600 capitalize">{{ domain.dns_provider }}</td>
+                    <td class="px-4 py-3">
+                        <span class="px-2 py-0.5 rounded-full text-xs font-medium
+                            {% if domain.registrant_validation_status == 'validated' %}bg-emerald-100 text-emerald-700
+                            {% elif domain.registrant_validation_status == 'pending' %}bg-amber-100 text-amber-700
+                            {% elif domain.registrant_validation_status == 'rejected' %}bg-red-100 text-red-700
+                            {% else %}bg-slate-100 text-slate-700{% endif %}">
+                            {{ domain.registrant_validation_status|title }}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3 text-right">
+                        <a href="{% url 'domains:detail' pk=domain.pk %}"
+                           class="text-sky-600 hover:underline text-sm">Manage</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Bulk action bar -->
+    <div id="bulk-action-bar" class="hidden mt-4 flex items-center gap-4 bg-sky-50 border border-sky-200 rounded-lg p-4">
+        <span class="text-sm text-sky-800"><span id="selected-count">0</span> domain(s) selected</span>
+        <button type="submit"
+                class="bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700 text-sm">
+            + Add Selected to Cart (1 year renewal each)
+        </button>
+    </div>
+</form>
+
+<script>
+(function() {
+    const selectAll = document.getElementById('select-all-domains');
+    const checkboxes = document.querySelectorAll('.domain-checkbox');
+    const bar = document.getElementById('bulk-action-bar');
+    const countSpan = document.getElementById('selected-count');
+
+    function updateBar() {
+        const checked = document.querySelectorAll('.domain-checkbox:checked').length;
+        countSpan.textContent = checked;
+        bar.classList.toggle('hidden', checked === 0);
+    }
+
+    selectAll.addEventListener('change', function() {
+        checkboxes.forEach(cb => { cb.checked = this.checked; });
+        updateBar();
+    });
+
+    checkboxes.forEach(cb => cb.addEventListener('change', updateBar));
+})();
+</script>
+
 {% else %}
 <div class="bg-white rounded-lg shadow p-12 text-center">
     <div class="text-5xl mb-4">🌐</div>

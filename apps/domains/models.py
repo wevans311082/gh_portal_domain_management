@@ -300,3 +300,54 @@ class DomainRenewal(TimeStampedModel):
 
     def __str__(self):
         return f"Renewal: {self.domain.name} ({self.status})"
+
+
+class DomainTransfer(TimeStampedModel):
+    STATUS_PENDING_PAYMENT = "pending_payment"
+    STATUS_PAID = "paid"
+    STATUS_PROCESSING = "processing"
+    STATUS_COMPLETED = "completed"
+    STATUS_FAILED = "failed"
+    STATUS_CANCELLED = "cancelled"
+
+    STATUS_CHOICES = [
+        (STATUS_PENDING_PAYMENT, "Pending payment"),
+        (STATUS_PAID, "Paid"),
+        (STATUS_PROCESSING, "Processing"),
+        (STATUS_COMPLETED, "Completed"),
+        (STATUS_FAILED, "Failed"),
+        (STATUS_CANCELLED, "Cancelled"),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.PROTECT, related_name="domain_transfers")
+    invoice = models.ForeignKey(
+        "billing.Invoice",
+        on_delete=models.PROTECT,
+        related_name="domain_transfers",
+        null=True,
+        blank=True,
+    )
+    domain = models.OneToOneField(Domain, on_delete=models.SET_NULL, related_name="transfer", null=True, blank=True)
+    domain_name = models.CharField(max_length=255, unique=True)
+    tld = models.CharField(max_length=50)
+    auth_code = models.CharField(max_length=255, blank=True)
+    quoted_price = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
+    total_price = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING_PAYMENT)
+    auto_renew = models.BooleanField(default=True)
+    dns_provider = models.CharField(max_length=20, choices=Domain.DNS_CHOICES, default=Domain.DNS_PROVIDER_CPANEL)
+    registration_contact = models.ForeignKey(DomainContact, on_delete=models.PROTECT, related_name="registration_transfers")
+    admin_contact = models.ForeignKey(DomainContact, on_delete=models.PROTECT, related_name="admin_transfers")
+    tech_contact = models.ForeignKey(DomainContact, on_delete=models.PROTECT, related_name="tech_transfers")
+    billing_contact = models.ForeignKey(DomainContact, on_delete=models.PROTECT, related_name="billing_transfers")
+    registrar_order_id = models.CharField(max_length=255, blank=True)
+    last_error = models.TextField(blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Domain transfer"
+        verbose_name_plural = "Domain transfers"
+
+    def __str__(self):
+        return f"Transfer: {self.domain_name} ({self.status})"

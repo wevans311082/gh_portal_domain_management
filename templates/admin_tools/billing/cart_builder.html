@@ -1,0 +1,178 @@
+{% extends "base_admin.html" %}
+
+{% block title %}Cart Builder · billing · {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Cart Builder{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+  <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+    <form method="get" class="flex flex-wrap items-end gap-3">
+      <label class="block min-w-[24rem]">
+        <span class="text-xs uppercase font-semibold text-slate-500">Customer</span>
+        <select name="user_id" class="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm">
+          <option value="">Choose customer…</option>
+          {% for u in users %}
+          <option value="{{ u.pk }}" {% if selected_user and selected_user.pk == u.pk %}selected{% endif %}>{{ u.email }} — {{ u.full_name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <button class="px-4 py-2 rounded bg-slate-800 text-white text-sm">Load cart</button>
+      {% if selected_user %}
+      <div class="ml-auto text-sm text-slate-500">Building cart for <span class="font-semibold text-slate-900">{{ selected_user.email }}</span></div>
+      {% endif %}
+    </form>
+  </div>
+
+  {% if selected_user %}
+  <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+    <section class="xl:col-span-2 space-y-6">
+      <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+        <h2 class="font-semibold text-slate-900 mb-4">Hosting and Services</h2>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {% for package in packages %}
+          <article class="rounded-xl border border-slate-200 p-4 bg-slate-50">
+            <h3 class="font-semibold text-slate-900">{{ package.name }}</h3>
+            <p class="text-sm text-slate-500 mt-1">£{{ package.price_monthly }} monthly · £{{ package.price_annually }} annual</p>
+            <form method="post" action="{% url 'admin_tools:cart_builder_add_hosting' %}" class="mt-4 space-y-3">
+              {% csrf_token %}
+              <input type="hidden" name="user_id" value="{{ selected_user.pk }}">
+              <input type="hidden" name="package_id" value="{{ package.id }}">
+              <select name="billing_period" class="w-full rounded border border-slate-300 px-3 py-2 text-sm">
+                <option value="monthly">Monthly</option>
+                <option value="annually">Annually</option>
+              </select>
+              <input type="text" name="domain_name" placeholder="example.com (optional)" class="w-full rounded border border-slate-300 px-3 py-2 text-sm">
+              <button class="w-full rounded bg-slate-900 text-white px-4 py-2 text-sm font-semibold">Add hosting</button>
+            </form>
+          </article>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+          <h2 class="font-semibold text-slate-900 mb-4">Domain Registration</h2>
+          <form method="post" action="{% url 'admin_tools:cart_builder_add_domain' %}" class="space-y-3">
+            {% csrf_token %}
+            <input type="hidden" name="user_id" value="{{ selected_user.pk }}">
+            <input type="text" name="domain_name" placeholder="example.co.uk" class="w-full rounded border border-slate-300 px-3 py-2 text-sm" required>
+            <select name="registration_years" class="w-full rounded border border-slate-300 px-3 py-2 text-sm">
+              <option value="1">1 year</option>
+              <option value="2">2 years</option>
+              <option value="3">3 years</option>
+              <option value="5">5 years</option>
+              <option value="10">10 years</option>
+            </select>
+            <select name="domain_contact_id" class="w-full rounded border border-slate-300 px-3 py-2 text-sm">
+              {% for contact in contacts %}
+              <option value="{{ contact.id }}">{{ contact.label }}</option>
+              {% empty %}
+              <option value="">A default contact will be created automatically</option>
+              {% endfor %}
+            </select>
+            <select name="dns_provider" class="w-full rounded border border-slate-300 px-3 py-2 text-sm">
+              <option value="cpanel">cPanel</option>
+              <option value="cloudflare">Cloudflare</option>
+              <option value="registrar">Registrar</option>
+              <option value="external">External</option>
+            </select>
+            <label class="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" name="privacy_enabled" checked> Domain privacy</label>
+            <label class="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" name="auto_renew" checked> Auto-renew</label>
+            <button class="w-full rounded bg-sky-600 text-white px-4 py-2 text-sm font-semibold">Add registration</button>
+          </form>
+        </div>
+
+        <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+          <h2 class="font-semibold text-slate-900 mb-4">Domain Renewal</h2>
+          <form method="post" action="{% url 'admin_tools:cart_builder_add_renewal' %}" class="space-y-3">
+            {% csrf_token %}
+            <input type="hidden" name="user_id" value="{{ selected_user.pk }}">
+            <select name="domain_id" class="w-full rounded border border-slate-300 px-3 py-2 text-sm" required>
+              <option value="">Choose domain…</option>
+              {% for domain in domains %}
+              <option value="{{ domain.id }}">{{ domain.name }}</option>
+              {% endfor %}
+            </select>
+            <select name="renewal_years" class="w-full rounded border border-slate-300 px-3 py-2 text-sm">
+              <option value="1">1 year</option>
+              <option value="2">2 years</option>
+              <option value="3">3 years</option>
+              <option value="5">5 years</option>
+              <option value="10">10 years</option>
+            </select>
+            <button class="w-full rounded bg-violet-600 text-white px-4 py-2 text-sm font-semibold">Add renewal</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+        <h2 class="font-semibold text-slate-900 mb-4">Domain Transfer</h2>
+        <form method="post" action="{% url 'admin_tools:cart_builder_add_transfer' %}" class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          {% csrf_token %}
+          <input type="hidden" name="user_id" value="{{ selected_user.pk }}">
+          <input type="text" name="domain_name" placeholder="external-example.com" class="w-full rounded border border-slate-300 px-3 py-2 text-sm lg:col-span-2" required>
+          <input type="text" name="auth_code" placeholder="EPP/auth code" class="w-full rounded border border-slate-300 px-3 py-2 text-sm">
+          <select name="domain_contact_id" class="w-full rounded border border-slate-300 px-3 py-2 text-sm">
+            {% for contact in contacts %}
+            <option value="{{ contact.id }}">{{ contact.label }}</option>
+            {% empty %}
+            <option value="">A default contact will be created automatically</option>
+            {% endfor %}
+          </select>
+          <select name="dns_provider" class="w-full rounded border border-slate-300 px-3 py-2 text-sm">
+            <option value="cpanel">cPanel</option>
+            <option value="cloudflare">Cloudflare</option>
+            <option value="registrar">Registrar</option>
+            <option value="external">External</option>
+          </select>
+          <label class="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" name="auto_renew" checked> Auto-renew</label>
+          <button class="w-full rounded bg-emerald-600 text-white px-4 py-2 text-sm font-semibold lg:col-span-2">Add transfer</button>
+        </form>
+      </div>
+    </section>
+
+    <aside class="space-y-6">
+      <div class="bg-slate-900 text-white rounded-2xl p-6 shadow-sm">
+        <p class="text-xs uppercase tracking-[0.2em] text-sky-300 mb-2">Staff cart</p>
+        <h3 class="text-2xl font-semibold">{{ cart.items.count }} item{{ cart.items.count|pluralize }}</h3>
+        <p class="text-slate-300 mt-2">Subtotal £{{ cart.subtotal }}</p>
+        <div class="mt-5 space-y-3">
+          <form method="post" action="{% url 'admin_tools:cart_builder_checkout_invoice' %}">
+            {% csrf_token %}
+            <input type="hidden" name="user_id" value="{{ selected_user.pk }}">
+            <button class="block w-full rounded-lg bg-sky-500 text-white text-center px-4 py-2.5 text-sm font-semibold hover:bg-sky-400">Create invoice</button>
+          </form>
+          <form method="post" action="{% url 'admin_tools:cart_builder_checkout_quote' %}">
+            {% csrf_token %}
+            <input type="hidden" name="user_id" value="{{ selected_user.pk }}">
+            <button class="block w-full rounded-lg border border-sky-300 text-sky-100 text-center px-4 py-2.5 text-sm font-semibold hover:bg-sky-800">Create quote</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+        <h2 class="font-semibold text-slate-900 mb-4">Current items</h2>
+        {% if cart_items %}
+        <div class="space-y-3">
+          {% for item in cart_items %}
+          <div class="rounded-lg border border-slate-200 p-3">
+            <p class="text-xs uppercase text-slate-400">{{ item.get_item_type_display }}</p>
+            <p class="font-medium text-slate-900 mt-1">{{ item.description }}</p>
+            <p class="text-sm text-slate-500 mt-1">£{{ item.line_total }}</p>
+            <form method="post" action="{% url 'admin_tools:cart_builder_remove_item' pk=item.pk %}" class="mt-2">
+              {% csrf_token %}
+              <input type="hidden" name="user_id" value="{{ selected_user.pk }}">
+              <button class="text-xs text-rose-600 hover:underline">Remove</button>
+            </form>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-sm text-slate-500">The staff cart is empty.</p>
+        {% endif %}
+      </div>
+    </aside>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

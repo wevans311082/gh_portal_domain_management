@@ -1,4 +1,5 @@
 import logging
+from django.http import HttpResponseForbidden
 from django.utils.deprecation import MiddlewareMixin
 from .models import AuditLog
 
@@ -67,3 +68,31 @@ class AuditLogMiddleware:
             logger.exception("AuditLogMiddleware: failed to write audit record")
 
         return response
+
+
+class IPAllowlistMiddleware:
+    """Block staff/superuser requests from IPs not in the allowlist.
+
+    Only active when at least one IPAllowlistEntry with is_active=True exists.
+    Non-staff users are never blocked.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        user = getattr(request, "user", None)
+        if user and user.is_authenticated and (user.is_staff or user.is_superuser):
+            from .models import IPAllowlistEntry
+            active_entries = IPAllowlistEntry.objects.filter(is_active=True)
+            if active_entries.exists():
+                client_ip = _get_client_ip(request)
+                allowed_ips = set(active_entries.values_list("ip_address", flat=True))
+                if client_ip not in allowed_ips:
+                    logger.warning(
+                        "IPAllowlistMiddleware: blocked staff user %s from IP %s",
+                        user.email,
+                        client_ip,
+                    )
+                    return HttpResponseForbidden("Access denied: IP not in allowlist.")
+        return self.get_response(request)

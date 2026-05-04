@@ -21,7 +21,10 @@
     </label>
     <button class="px-4 py-2 rounded bg-slate-800 text-white text-sm">Filter</button>
   </form>
-  <a href="{% url 'admin_tools:quote_create' %}" class="inline-flex items-center px-4 py-2 rounded bg-sky-600 hover:bg-sky-700 text-white text-sm font-semibold">New quote</a>
+  <div class="flex items-center gap-2">
+    <a href="{% url 'admin_tools:cart_builder' %}" class="inline-flex items-center px-4 py-2 rounded bg-slate-700 hover:bg-slate-800 text-white text-sm font-semibold">Cart builder</a>
+    <a href="{% url 'admin_tools:quote_create' %}" class="inline-flex items-center px-4 py-2 rounded bg-sky-600 hover:bg-sky-700 text-white text-sm font-semibold">New quote</a>
+  </div>
 </div>
 
 <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">

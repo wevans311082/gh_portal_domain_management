@@ -6,11 +6,13 @@ from apps.accounts.models import User
 from apps.companies.models import BusinessProfile
 from apps.companies.services import CompaniesHouseService
 from apps.core.models import (
+    BlogPost,
     ErrorPageContent,
     HomeFAQ,
     HomeServiceCard,
     LegalPage,
     SiteContentSettings,
+    Testimonial,
 )
 from apps.products.models import Package
 from apps.domains.models import Domain
@@ -402,3 +404,65 @@ class WebsiteTemplateForm(forms.ModelForm):
             "is_sanitised",
             "is_active",
         ]
+
+
+class BlogPostForm(forms.ModelForm):
+    class Meta:
+        model = BlogPost
+        fields = [
+            "title",
+            "slug",
+            "excerpt",
+            "body",
+            "status",
+            "author",
+            "published_at",
+            "meta_description",
+            "featured_image_url",
+        ]
+        widgets = {
+            "excerpt": forms.Textarea(attrs={"rows": 3}),
+            "body": forms.Textarea(attrs={"rows": 20}),
+            "published_at": forms.DateTimeInput(attrs={"type": "datetime-local"}),
+        }
+
+
+class TestimonialForm(forms.ModelForm):
+    class Meta:
+        model = Testimonial
+        fields = ["name", "company", "body", "rating", "avatar_url", "sort_order", "is_active"]
+        widgets = {"body": forms.Textarea(attrs={"rows": 4})}
+
+
+class NotificationTemplateForm(forms.ModelForm):
+    class Meta:
+        from apps.notifications.models import NotificationTemplate
+        model = NotificationTemplate
+        fields = ["name", "subject", "html_content", "text_content", "is_active"]
+        widgets = {
+            "html_content": forms.Textarea(attrs={"rows": 20, "class": "font-mono text-xs"}),
+            "text_content": forms.Textarea(attrs={"rows": 10, "class": "font-mono text-xs"}),
+        }
+
+
+class PromoCodeForm(forms.ModelForm):
+    class Meta:
+        from apps.core.models import PromoCode
+        model = PromoCode
+        fields = ["code", "discount_type", "discount_value", "max_uses", "valid_from", "valid_until", "is_active", "description"]
+        widgets = {
+            "valid_from": forms.DateTimeInput(attrs={"type": "datetime-local"}),
+            "valid_until": forms.DateTimeInput(attrs={"type": "datetime-local"}),
+        }
+
+
+class AnnouncementBannerForm(forms.ModelForm):
+    class Meta:
+        from apps.core.models import AnnouncementBanner
+        model = AnnouncementBanner
+        fields = ["message", "level", "is_active", "valid_from", "valid_until", "show_to_staff_only", "url", "url_label"]
+        widgets = {
+            "message": forms.Textarea(attrs={"rows": 3}),
+            "valid_from": forms.DateTimeInput(attrs={"type": "datetime-local"}),
+            "valid_until": forms.DateTimeInput(attrs={"type": "datetime-local"}),
+        }

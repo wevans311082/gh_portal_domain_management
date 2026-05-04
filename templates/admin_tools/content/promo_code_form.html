@@ -1,0 +1,20 @@
+{% extends "base_admin.html" %}
+{% block title %}{% if mode == 'create' %}New Promo Code{% else %}Edit Promo Code{% endif %} · {{ SITE_NAME }}{% endblock %}
+{% block page_title %}{% if mode == 'create' %}New Promo Code{% else %}Edit: {{ object.code }}{% endif %}{% endblock %}
+{% block content %}
+<form method="post" class="bg-white rounded-xl border border-slate-200 p-6 max-w-xl space-y-4">
+  {% csrf_token %}
+  {% for field in form %}
+  <div>
+    <label class="block text-sm font-medium text-slate-700 mb-1">{{ field.label }}</label>
+    {{ field }}
+    {% if field.help_text %}<p class="text-xs text-slate-400 mt-1">{{ field.help_text }}</p>{% endif %}
+    {% for error in field.errors %}<p class="text-xs text-red-600 mt-1">{{ error }}</p>{% endfor %}
+  </div>
+  {% endfor %}
+  <div class="flex gap-4 pt-2">
+    <button type="submit" class="px-4 py-2 rounded bg-sky-600 text-white text-sm font-medium hover:bg-sky-700">Save</button>
+    <a href="{% url 'admin_tools:promo_code_list' %}" class="text-sm text-slate-500 self-center">Cancel</a>
+  </div>
+</form>
+{% endblock %}

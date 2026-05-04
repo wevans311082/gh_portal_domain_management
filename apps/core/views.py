@@ -206,6 +206,20 @@ def legal_page(request, slug):
     return render(request, "public/legal_page.html", {"page": page})
 
 
+def blog_list(request):
+    from apps.core.models import BlogPost
+
+    posts = BlogPost.objects.filter(status=BlogPost.STATUS_PUBLISHED).order_by("-published_at")
+    return render(request, "public/blog_list.html", {"posts": posts})
+
+
+def blog_detail(request, slug):
+    from apps.core.models import BlogPost
+
+    post = get_object_or_404(BlogPost, slug=slug, status=BlogPost.STATUS_PUBLISHED)
+    return render(request, "public/blog_detail.html", {"post": post})
+
+
 def handler404(request, exception):
     from apps.core.models import ErrorPageContent
 

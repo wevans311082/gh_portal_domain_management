@@ -20,3 +20,15 @@ def site_settings(request):
         "CONTENT_SETTINGS": content_settings,
         "FOOTER_LEGAL_LINKS": legal_links,
     }
+
+
+def announcement_banners(request):
+    """Inject active announcement banners into all template contexts."""
+    try:
+        from apps.core.models import AnnouncementBanner
+        banners = [b for b in AnnouncementBanner.objects.filter(is_active=True) if b.is_visible()]
+        if request.user.is_authenticated and not request.user.is_staff:
+            banners = [b for b in banners if not b.show_to_staff_only]
+        return {"ANNOUNCEMENT_BANNERS": banners}
+    except Exception:
+        return {"ANNOUNCEMENT_BANNERS": []}

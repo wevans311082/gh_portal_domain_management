@@ -9,7 +9,7 @@ from django_celery_beat.models import IntervalSchedule, PeriodicTask
 from apps.cloudflare_integration.models import CloudflareZone
 from apps.cloudflare_integration.services import CloudflareService
 from apps.dns.models import DNSRecord, DNSZone
-from apps.domains.models import Domain, DomainOrder, DomainPricingSettings, DomainRenewal
+from apps.domains.models import Domain, DomainOrder, DomainPricingSettings, DomainRenewal, DomainTransfer
 from apps.domains.pricing import TLDPricingService
 from apps.domains.resellerclub_client import ResellerClubClient
 from apps.domains.services import DomainContactService
@@ -344,6 +344,96 @@ def execute_domain_renewal(renewal_id: int):
 
 
 @shared_task
+def execute_domain_transfer(transfer_id: int):
+    """Execute a paid domain transfer via the registrar."""
+    try:
+        transfer = DomainTransfer.objects.select_related(
+            "invoice",
+            "registration_contact",
+            "admin_contact",
+            "tech_contact",
+            "billing_contact",
+            "domain",
+        ).get(pk=transfer_id)
+    except DomainTransfer.DoesNotExist:
+        logger.error("execute_domain_transfer: DomainTransfer %s not found", transfer_id)
+        return
+
+    if transfer.status == DomainTransfer.STATUS_COMPLETED:
+        logger.info("execute_domain_transfer: transfer %s already completed, skipping", transfer_id)
+        return
+
+    if not settings.RESELLERCLUB_CUSTOMER_ID:
+        transfer.status = DomainTransfer.STATUS_FAILED
+        transfer.last_error = "RESELLERCLUB_CUSTOMER_ID is not configured."
+        transfer.save(update_fields=["status", "last_error"])
+        return
+
+    registrar_client = ResellerClubClient()
+    contact_service = DomainContactService(client=registrar_client)
+    nameservers = list(settings.WHM_NAMESERVERS)
+    if not nameservers:
+        transfer.status = DomainTransfer.STATUS_FAILED
+        transfer.last_error = "WHM_NAMESERVERS must be configured before transferring domains."
+        transfer.save(update_fields=["status", "last_error"])
+        return
+
+    transfer.status = DomainTransfer.STATUS_PROCESSING
+    transfer.last_error = ""
+    transfer.save(update_fields=["status", "last_error"])
+
+    try:
+        registration_contact_id = contact_service.sync_remote_contact(transfer.registration_contact, settings.RESELLERCLUB_CUSTOMER_ID)
+        admin_contact_id = contact_service.sync_remote_contact(transfer.admin_contact, settings.RESELLERCLUB_CUSTOMER_ID)
+        tech_contact_id = contact_service.sync_remote_contact(transfer.tech_contact, settings.RESELLERCLUB_CUSTOMER_ID)
+        billing_contact_id = contact_service.sync_remote_contact(transfer.billing_contact, settings.RESELLERCLUB_CUSTOMER_ID)
+
+        transfer_response = registrar_client.transfer_domain(
+            domain_name=transfer.domain_name,
+            customer_id=settings.RESELLERCLUB_CUSTOMER_ID,
+            reg_contact_id=registration_contact_id,
+            admin_contact_id=admin_contact_id,
+            tech_contact_id=tech_contact_id,
+            billing_contact_id=billing_contact_id,
+            nameservers=nameservers,
+            auth_code=transfer.auth_code,
+            auto_renew=transfer.auto_renew,
+        )
+        registrar_order_id = str(
+            transfer_response.get("entityid")
+            or transfer_response.get("orderid")
+            or transfer_response.get("order-id")
+            or ""
+        )
+
+        domain, _ = Domain.objects.update_or_create(
+            name=transfer.domain_name,
+            defaults={
+                "user": transfer.user,
+                "tld": transfer.tld,
+                "status": Domain.STATUS_PENDING,
+                "registrar_id": registrar_order_id,
+                "auto_renew": transfer.auto_renew,
+                "dns_provider": transfer.dns_provider,
+                "nameserver1": nameservers[0] if nameservers else "",
+                "nameserver2": nameservers[1] if len(nameservers) > 1 else "",
+            },
+        )
+        transfer.domain = domain
+        transfer.registrar_order_id = registrar_order_id
+        transfer.status = DomainTransfer.STATUS_COMPLETED
+        transfer.completed_at = timezone.now()
+        transfer.save(update_fields=["domain", "registrar_order_id", "status", "completed_at", "updated_at"])
+        logger.info("Transferred domain %s into local account", transfer.domain_name)
+        return domain.id
+    except Exception as exc:
+        transfer.status = DomainTransfer.STATUS_FAILED
+        transfer.last_error = str(exc)
+        transfer.save(update_fields=["status", "last_error", "updated_at"])
+        logger.exception("Domain transfer failed for %s", transfer.domain_name)
+
+
+@shared_task
 def process_auto_renewals(days_ahead: int = 7):
     """
     Beat task: find active domains with auto_renew=True expiring within *days_ahead*
@@ -427,3 +517,79 @@ def process_auto_renewals(days_ahead: int = 7):
 
     logger.info("process_auto_renewals: queued %s renewal(s)", queued)
     return queued
+
+
+# ---------------------------------------------------------------------------
+# Phase 9: Registrar balance monitor
+# ---------------------------------------------------------------------------
+
+REGISTRAR_BALANCE_TASK_NAME = "Monitor registrar balance"
+REGISTRAR_BALANCE_TASK_PATH = "apps.domains.tasks.monitor_registrar_balance"
+
+
+def ensure_registrar_balance_schedule():
+    """Register a daily beat task to check registrar account balance (idempotent)."""
+    schedule, _ = IntervalSchedule.objects.get_or_create(
+        every=24,
+        period=IntervalSchedule.HOURS,
+    )
+    task, created = PeriodicTask.objects.update_or_create(
+        name=REGISTRAR_BALANCE_TASK_NAME,
+        defaults={
+            "task": REGISTRAR_BALANCE_TASK_PATH,
+            "interval": schedule,
+            "enabled": True,
+        },
+    )
+    action = "Created" if created else "Updated"
+    logger.info("%s beat task: %s", action, REGISTRAR_BALANCE_TASK_NAME)
+    return task
+
+
+@shared_task(name="domains.monitor_registrar_balance")
+def monitor_registrar_balance():
+    """
+    Beat task: check ResellerClub account balance and alert staff if it falls
+    below the threshold set in ``REGISTRAR_LOW_BALANCE_THRESHOLD`` (default 50.00).
+    """
+    from decimal import Decimal
+    from apps.core.runtime_settings import get_runtime_setting
+    from apps.notifications.services import send_notification
+
+    threshold = Decimal(str(get_runtime_setting("REGISTRAR_LOW_BALANCE_THRESHOLD", "50.00")))
+    client = ResellerClubClient()
+
+    try:
+        result = client._get("accounts/details/", params={"no-of-records": 1, "page-no": 1})
+        balance_raw = result.get("sellingcurrencybalance") or result.get("currentaccountbalance") or ""
+        balance = Decimal(str(balance_raw)) if balance_raw else None
+    except Exception as exc:
+        logger.error("monitor_registrar_balance: failed to fetch balance: %s", exc)
+        return {"error": str(exc)}
+
+    if balance is None:
+        logger.warning("monitor_registrar_balance: could not parse balance from response")
+        return {"balance": None}
+
+    logger.info("monitor_registrar_balance: balance=%.2f threshold=%.2f", balance, threshold)
+
+    if balance < threshold:
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        staff_emails = list(User.objects.filter(is_staff=True, is_active=True).values_list("email", flat=True))
+        for email in staff_emails:
+            try:
+                send_notification(
+                    template_name="registrar_low_balance",
+                    recipient_email=email,
+                    context={"balance": balance, "threshold": threshold},
+                )
+            except Exception as exc:
+                logger.warning("monitor_registrar_balance: notification failed for %s: %s", email, exc)
+        logger.warning(
+            "monitor_registrar_balance: LOW BALANCE alert — balance=%.2f < threshold=%.2f",
+            balance,
+            threshold,
+        )
+
+    return {"balance": float(balance), "threshold": float(threshold), "alert_sent": balance < threshold}

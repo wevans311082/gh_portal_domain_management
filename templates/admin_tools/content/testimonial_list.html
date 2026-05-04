@@ -1,0 +1,40 @@
+{% extends "base_admin.html" %}
+{% block title %}Testimonials · {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Testimonials{% endblock %}
+{% block content %}
+<div class="mb-4"><a href="{% url 'admin_tools:testimonial_create' %}" class="px-4 py-2 rounded bg-sky-600 text-white text-sm">+ New Testimonial</a></div>
+<div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+<table class="w-full text-sm">
+  <thead class="bg-slate-50 border-b border-slate-200">
+    <tr>
+      <th class="px-4 py-3 text-left font-semibold text-slate-700">Name</th>
+      <th class="px-4 py-3 text-left font-semibold text-slate-700">Company</th>
+      <th class="px-4 py-3 text-left font-semibold text-slate-700">Rating</th>
+      <th class="px-4 py-3 text-left font-semibold text-slate-700">Order</th>
+      <th class="px-4 py-3 text-left font-semibold text-slate-700">Active</th>
+      <th class="px-4 py-3 text-right"></th>
+    </tr>
+  </thead>
+  <tbody class="divide-y divide-slate-100">
+    {% for t in testimonials %}
+    <tr class="hover:bg-slate-50">
+      <td class="px-4 py-3 font-medium">{{ t.name }}</td>
+      <td class="px-4 py-3 text-slate-500">{{ t.company|default:"—" }}</td>
+      <td class="px-4 py-3">{{ t.rating }}/5</td>
+      <td class="px-4 py-3 text-slate-500">{{ t.sort_order }}</td>
+      <td class="px-4 py-3">{% if t.is_active %}<span class="text-green-600">Yes</span>{% else %}<span class="text-slate-400">No</span>{% endif %}</td>
+      <td class="px-4 py-3 text-right">
+        <a href="{% url 'admin_tools:testimonial_edit' t.pk %}" class="text-sky-700 text-xs mr-3">Edit</a>
+        <form method="post" action="{% url 'admin_tools:testimonial_delete' t.pk %}" class="inline">
+          {% csrf_token %}
+          <button class="text-rose-600 text-xs" onclick="return confirm('Delete testimonial?')">Delete</button>
+        </form>
+      </td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="6" class="px-4 py-8 text-center text-slate-500">No testimonials yet.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

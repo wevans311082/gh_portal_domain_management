@@ -24,6 +24,13 @@ class Service(TimeStampedModel):
     ]
 
     user = models.ForeignKey(User, on_delete=models.PROTECT, related_name="services")
+    invoice = models.ForeignKey(
+        "billing.Invoice",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="services",
+    )
     package = models.ForeignKey(Package, on_delete=models.PROTECT, related_name="services")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
     domain_name = models.CharField(max_length=255, blank=True)

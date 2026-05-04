@@ -198,7 +198,7 @@ def _queue_paid_domain_orders(invoice: Invoice) -> None:
     checkout, auto-renewal, manual admin "mark paid") fires the same
     follow-ups.
     """
-    from apps.domains.models import DomainOrder, DomainRenewal
+    from apps.domains.models import DomainOrder, DomainRenewal, DomainTransfer
     from apps.domains import tasks as domain_tasks
 
     pending_orders = DomainOrder.objects.filter(
@@ -218,6 +218,28 @@ def _queue_paid_domain_orders(invoice: Invoice) -> None:
         renewal.status = DomainRenewal.STATUS_PAID
         renewal.save(update_fields=["status"])
         domain_tasks.execute_domain_renewal.delay(renewal.id)
+
+    pending_transfers = DomainTransfer.objects.filter(
+        invoice=invoice,
+        status=DomainTransfer.STATUS_PENDING_PAYMENT,
+    )
+    for transfer in pending_transfers:
+        transfer.status = DomainTransfer.STATUS_PAID
+        transfer.save(update_fields=["status"])
+        domain_tasks.execute_domain_transfer.delay(transfer.id)
+
+
+def _queue_paid_services(invoice: Invoice) -> None:
+    """Trigger downstream hosting provisioning when an invoice is paid."""
+    from apps.provisioning.tasks import create_provisioning_job
+    from apps.services.models import Service
+
+    pending_services = Service.objects.filter(
+        invoice=invoice,
+        status=Service.STATUS_PENDING,
+    ).select_related("package", "user")
+    for service in pending_services:
+        create_provisioning_job(service)
 
 
 @transaction.atomic
@@ -240,6 +262,7 @@ def mark_invoice_paid(
     invoice.save(update_fields=["status", "amount_paid", "paid_at"])
 
     _queue_paid_domain_orders(invoice)
+    _queue_paid_services(invoice)
 
     if send_email:
         try:
@@ -374,6 +397,10 @@ def convert_quote_to_invoice(
         created_by_staff=by_user if by_user and by_user.is_staff else None,
         send_email=send_email,
     )
+
+    from apps.portal.cart_service import materialize_quote_cart_to_invoice
+
+    invoice = materialize_quote_cart_to_invoice(quote, invoice)
 
     quote.converted_invoice = invoice
     quote.status = Quote.STATUS_CONVERTED

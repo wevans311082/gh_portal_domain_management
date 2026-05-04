@@ -8,6 +8,8 @@ from apps.admin_tools.models import IntegrationSetting
 from apps.billing.models import Invoice
 from apps.companies.models import BusinessProfile
 from apps.domains.models import DomainPricingSettings, TLDPricing
+from apps.portal.models import PortalCart
+from apps.products.models import Package
 
 
 @pytest.mark.django_db
@@ -258,6 +260,45 @@ def test_staff_sync_all_runs_inline_without_celery(client, django_user_model, mo
     assert response.status_code == 200
     assert TLDPricing.objects.filter(tld="com").exists()
     assert TLDPricing.objects.filter(tld="net").exists()
+
+
+@pytest.mark.django_db
+def test_staff_cart_builder_creates_invoice_for_selected_customer(client, django_user_model, monkeypatch):
+    staff_user = django_user_model.objects.create_user(
+        email="cart-builder-admin@example.com",
+        password="password123",
+        is_staff=True,
+    )
+    customer = django_user_model.objects.create_user(email="cart-customer@example.com", password="password123")
+    package = Package.objects.create(
+        name="Builder Hosting",
+        slug="builder-hosting",
+        price_monthly="12.00",
+        price_annually="120.00",
+        whm_package_name="builder_pkg",
+    )
+
+    monkeypatch.setattr("apps.billing.services.email_document", lambda *args, **kwargs: None)
+
+    client.force_login(staff_user)
+    response = client.post(
+        reverse("admin_tools:cart_builder_add_hosting"),
+        {
+            "user_id": customer.pk,
+            "package_id": package.pk,
+            "billing_period": "monthly",
+            "domain_name": "builder.example.com",
+        },
+    )
+    assert response.status_code == 302
+
+    response = client.post(reverse("admin_tools:cart_builder_checkout_invoice"), {"user_id": customer.pk})
+    assert response.status_code == 302
+
+    invoice = Invoice.objects.get(user=customer)
+    cart = PortalCart.objects.get(invoice=invoice)
+    assert invoice.created_by_staff == staff_user
+    assert cart.created_by_staff == staff_user
 
 
 @pytest.mark.django_db

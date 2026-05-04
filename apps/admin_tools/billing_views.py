@@ -28,6 +28,7 @@ from apps.billing.models import (
     Quote,
     QuoteLineItem,
 )
+from apps.domains.models import Domain, TLDPricing
 from apps.billing.services import (
     LineItemSpec,
     convert_quote_to_invoice,
@@ -39,6 +40,17 @@ from apps.billing.services import (
     render_invoice_pdf,
     render_quote_pdf,
 )
+from apps.portal.cart_service import (
+    add_domain_registration_item,
+    add_domain_renewal_item,
+    add_domain_transfer_item,
+    add_hosting_item,
+    create_invoice_from_cart,
+    create_quote_from_cart,
+    get_active_cart,
+    remove_cart_item,
+)
+from apps.products.models import Package
 
 
 # ---------------------------------------------------------------------------
@@ -86,6 +98,13 @@ def _parse_line_items(post) -> List[LineItemSpec]:
 def _resolve_user(post):
     """Resolve the User for an invoice from a posted user_id."""
     user_id = post.get("user_id")
+    if not user_id:
+        return None
+    return User.objects.filter(pk=user_id).first()
+
+
+def _resolve_builder_user(request):
+    user_id = request.GET.get("user_id") or request.POST.get("user_id")
     if not user_id:
         return None
     return User.objects.filter(pk=user_id).first()
@@ -602,3 +621,156 @@ def quote_pdf(request, pk):
         f'{disposition}; filename="quote-{quote.number}.{ext}"'
     )
     return response
+
+
+@staff_member_required
+def cart_builder(request):
+    users = User.objects.order_by("email")[:500]
+    selected_user = _resolve_builder_user(request)
+    cart = None
+    if selected_user:
+        cart = get_active_cart(selected_user, created_by_staff=request.user)
+
+    context = {
+        "users": users,
+        "selected_user": selected_user,
+        "cart": cart,
+        "cart_items": cart.items.all() if cart else [],
+        "packages": Package.objects.filter(is_active=True).prefetch_related("features").order_by("card_sort_order", "sort_order", "price_monthly"),
+        "featured_tlds": TLDPricing.objects.filter(is_active=True).order_by("registration_price", "tld")[:8],
+        "contacts": selected_user.domain_contacts.order_by("-is_default", "label") if selected_user else [],
+        "domains": selected_user.domains.order_by("name") if selected_user else [],
+    }
+    return render(request, "admin_tools/billing/cart_builder.html", context)
+
+
+@staff_member_required
+@require_POST
+def cart_builder_add_hosting(request):
+    user = _resolve_builder_user(request)
+    if not user:
+        messages.error(request, "Choose a customer first.")
+        return redirect("admin_tools:cart_builder")
+    try:
+        add_hosting_item(
+            user=user,
+            package_id=int(request.POST.get("package_id", "0")),
+            billing_period=(request.POST.get("billing_period") or "monthly").strip(),
+            domain_name=(request.POST.get("domain_name") or "").strip(),
+            created_by_staff=request.user,
+        )
+        messages.success(request, "Hosting plan added to the staff cart.")
+    except Exception as exc:
+        messages.error(request, str(exc))
+    return redirect(f"{reverse('admin_tools:cart_builder')}?user_id={user.pk}")
+
+
+@staff_member_required
+@require_POST
+def cart_builder_add_domain(request):
+    user = _resolve_builder_user(request)
+    if not user:
+        messages.error(request, "Choose a customer first.")
+        return redirect("admin_tools:cart_builder")
+    try:
+        add_domain_registration_item(
+            user=user,
+            domain_name=request.POST.get("domain_name") or "",
+            registration_years=int(request.POST.get("registration_years") or 1),
+            domain_contact_id=int(request.POST.get("domain_contact_id")) if request.POST.get("domain_contact_id") else None,
+            privacy_enabled=request.POST.get("privacy_enabled") == "on",
+            auto_renew=request.POST.get("auto_renew") == "on",
+            dns_provider=(request.POST.get("dns_provider") or Domain.DNS_PROVIDER_CPANEL).strip(),
+            created_by_staff=request.user,
+        )
+        messages.success(request, "Domain registration added to the staff cart.")
+    except Exception as exc:
+        messages.error(request, str(exc))
+    return redirect(f"{reverse('admin_tools:cart_builder')}?user_id={user.pk}")
+
+
+@staff_member_required
+@require_POST
+def cart_builder_add_renewal(request):
+    user = _resolve_builder_user(request)
+    if not user:
+        messages.error(request, "Choose a customer first.")
+        return redirect("admin_tools:cart_builder")
+    try:
+        add_domain_renewal_item(
+            user=user,
+            domain_id=int(request.POST.get("domain_id") or 0),
+            renewal_years=int(request.POST.get("renewal_years") or 1),
+            created_by_staff=request.user,
+        )
+        messages.success(request, "Domain renewal added to the staff cart.")
+    except Exception as exc:
+        messages.error(request, str(exc))
+    return redirect(f"{reverse('admin_tools:cart_builder')}?user_id={user.pk}")
+
+
+@staff_member_required
+@require_POST
+def cart_builder_add_transfer(request):
+    user = _resolve_builder_user(request)
+    if not user:
+        messages.error(request, "Choose a customer first.")
+        return redirect("admin_tools:cart_builder")
+    try:
+        add_domain_transfer_item(
+            user=user,
+            domain_name=request.POST.get("domain_name") or "",
+            auth_code=request.POST.get("auth_code") or "",
+            domain_contact_id=int(request.POST.get("domain_contact_id")) if request.POST.get("domain_contact_id") else None,
+            auto_renew=request.POST.get("auto_renew") == "on",
+            dns_provider=(request.POST.get("dns_provider") or Domain.DNS_PROVIDER_CPANEL).strip(),
+            created_by_staff=request.user,
+        )
+        messages.success(request, "Domain transfer added to the staff cart.")
+    except Exception as exc:
+        messages.error(request, str(exc))
+    return redirect(f"{reverse('admin_tools:cart_builder')}?user_id={user.pk}")
+
+
+@staff_member_required
+@require_POST
+def cart_builder_remove_item(request, pk):
+    user = _resolve_builder_user(request)
+    if not user:
+        messages.error(request, "Choose a customer first.")
+        return redirect("admin_tools:cart_builder")
+    remove_cart_item(user=user, item_id=pk, created_by_staff=request.user)
+    messages.success(request, "Item removed from the staff cart.")
+    return redirect(f"{reverse('admin_tools:cart_builder')}?user_id={user.pk}")
+
+
+@staff_member_required
+@require_POST
+def cart_builder_checkout_invoice(request):
+    user = _resolve_builder_user(request)
+    if not user:
+        messages.error(request, "Choose a customer first.")
+        return redirect("admin_tools:cart_builder")
+    try:
+        invoice = create_invoice_from_cart(get_active_cart(user, created_by_staff=request.user), send_email=False)
+    except Exception as exc:
+        messages.error(request, str(exc))
+        return redirect(f"{reverse('admin_tools:cart_builder')}?user_id={user.pk}")
+    messages.success(request, f"Invoice {invoice.number} created from the staff cart.")
+    return redirect("admin_tools:invoice_edit", pk=invoice.pk)
+
+
+@staff_member_required
+@require_POST
+def cart_builder_checkout_quote(request):
+    user = _resolve_builder_user(request)
+    if not user:
+        messages.error(request, "Choose a customer first.")
+        return redirect("admin_tools:cart_builder")
+    try:
+        quote = create_quote_from_cart(get_active_cart(user, created_by_staff=request.user))
+    except Exception as exc:
+        messages.error(request, str(exc))
+        return redirect(f"{reverse('admin_tools:cart_builder')}?user_id={user.pk}")
+    messages.success(request, f"Quote {quote.number} created from the staff cart.")
+    return redirect("admin_tools:quote_edit", pk=quote.pk)

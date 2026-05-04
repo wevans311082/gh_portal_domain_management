@@ -3,6 +3,7 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.http import JsonResponse
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
+from django import forms
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
@@ -13,14 +14,20 @@ from apps.accounts.mfa import active_backup_code_count, regenerate_backup_codes
 from apps.admin_tools.forms import (
     AdminUserCreateForm,
     AdminUserUpdateForm,
+    AnnouncementBannerForm,
+    BlogPostForm,
     ErrorPageContentForm,
     HomeFAQForm,
     HomeServiceCardForm,
     LegalPageForm,
+    NotificationTemplateForm,
     PackageCardForm,
+    PromoCodeForm,
     SiteContentSettingsForm,
+    TestimonialForm,
 )
-from apps.core.models import ErrorPageContent, HomeFAQ, HomeServiceCard, LegalPage, SiteContentSettings
+from apps.core.models import BlogPost, ErrorPageContent, HomeFAQ, HomeServiceCard, LegalPage, SiteContentSettings, Testimonial, PromoCode, AnnouncementBanner
+from apps.notifications.models import NotificationTemplate
 from apps.products.models import Package, PackageFeature
 from apps.companies.services import CompaniesHouseService
 
@@ -465,3 +472,294 @@ def error_page_delete(request, pk):
     page.delete()
     messages.success(request, "Error page content deleted.")
     return redirect("admin_tools:error_page_list")
+
+
+# ---------------------------------------------------------------------------
+# Phase 5 CMS: Blog posts
+# ---------------------------------------------------------------------------
+
+@staff_member_required
+def blog_post_list(request):
+    posts = BlogPost.objects.order_by("-created_at")
+    return render(request, "admin_tools/content/blog_post_list.html", {"posts": posts})
+
+
+@staff_member_required
+def blog_post_create(request):
+    if request.method == "POST":
+        form = BlogPostForm(request.POST)
+        if form.is_valid():
+            post = form.save(commit=False)
+            if not post.author_id:
+                post.author = request.user
+            post.save()
+            messages.success(request, f'Blog post "{post.title}" created.')
+            return redirect("admin_tools:blog_post_list")
+    else:
+        form = BlogPostForm(initial={"author": request.user})
+    return render(request, "admin_tools/content/blog_post_form.html", {"form": form, "mode": "create"})
+
+
+@staff_member_required
+def blog_post_edit(request, pk):
+    post = get_object_or_404(BlogPost, pk=pk)
+    if request.method == "POST":
+        form = BlogPostForm(request.POST, instance=post)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f'Blog post "{post.title}" saved.')
+            return redirect("admin_tools:blog_post_list")
+    else:
+        form = BlogPostForm(instance=post)
+    return render(request, "admin_tools/content/blog_post_form.html", {"form": form, "mode": "edit", "obj": post})
+
+
+@staff_member_required
+@require_POST
+def blog_post_delete(request, pk):
+    post = get_object_or_404(BlogPost, pk=pk)
+    title = post.title
+    post.delete()
+    messages.success(request, f'Blog post "{title}" deleted.')
+    return redirect("admin_tools:blog_post_list")
+
+
+# ---------------------------------------------------------------------------
+# Phase 5 CMS: Testimonials
+# ---------------------------------------------------------------------------
+
+@staff_member_required
+def testimonial_list(request):
+    testimonials = Testimonial.objects.order_by("sort_order", "-created_at")
+    return render(request, "admin_tools/content/testimonial_list.html", {"testimonials": testimonials})
+
+
+@staff_member_required
+def testimonial_create(request):
+    if request.method == "POST":
+        form = TestimonialForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Testimonial created.")
+            return redirect("admin_tools:testimonial_list")
+    else:
+        form = TestimonialForm()
+    return render(request, "admin_tools/content/testimonial_form.html", {"form": form, "mode": "create"})
+
+
+@staff_member_required
+def testimonial_edit(request, pk):
+    testimonial = get_object_or_404(Testimonial, pk=pk)
+    if request.method == "POST":
+        form = TestimonialForm(request.POST, instance=testimonial)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Testimonial saved.")
+            return redirect("admin_tools:testimonial_list")
+    else:
+        form = TestimonialForm(instance=testimonial)
+    return render(request, "admin_tools/content/testimonial_form.html", {"form": form, "mode": "edit", "obj": testimonial})
+
+
+@staff_member_required
+@require_POST
+def testimonial_delete(request, pk):
+    testimonial = get_object_or_404(Testimonial, pk=pk)
+    testimonial.delete()
+    messages.success(request, "Testimonial deleted.")
+    return redirect("admin_tools:testimonial_list")
+
+
+# ---------------------------------------------------------------------------
+# Email template CRUD
+# ---------------------------------------------------------------------------
+
+@staff_member_required
+def email_template_list(request):
+    from apps.notifications.services import NOTIFICATION_TEMPLATES
+    db_templates = {t.name: t for t in NotificationTemplate.objects.all()}
+    templates = []
+    for name in sorted(NOTIFICATION_TEMPLATES.keys()):
+        db_tpl = db_templates.get(name)
+        templates.append({
+            "name": name,
+            "db_template": db_tpl,
+            "overridden": db_tpl is not None and db_tpl.is_active,
+        })
+    # Include any custom DB-only templates not in NOTIFICATION_TEMPLATES
+    for name, db_tpl in db_templates.items():
+        if name not in NOTIFICATION_TEMPLATES:
+            templates.append({"name": name, "db_template": db_tpl, "overridden": True})
+    return render(request, "admin_tools/content/email_template_list.html", {"templates": templates})
+
+
+@staff_member_required
+def email_template_edit(request, name):
+    from apps.notifications.services import NOTIFICATION_TEMPLATES
+    tpl = NotificationTemplate.objects.filter(name=name).first()
+    builtin = NOTIFICATION_TEMPLATES.get(name, {})
+    if request.method == "POST":
+        form = NotificationTemplateForm(request.POST, instance=tpl)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f"Email template '{name}' saved.")
+            return redirect("admin_tools:email_template_list")
+    else:
+        if tpl is None:
+            initial = {
+                "name": name,
+                "subject": builtin.get("subject", ""),
+                "html_content": "",
+                "text_content": "",
+                "is_active": True,
+            }
+            form = NotificationTemplateForm(initial=initial)
+        else:
+            form = NotificationTemplateForm(instance=tpl)
+    return render(request, "admin_tools/content/email_template_form.html", {
+        "form": form,
+        "template_name": name,
+        "builtin": builtin,
+    })
+
+
+@staff_member_required
+@require_POST
+def email_template_delete(request, name):
+    tpl = get_object_or_404(NotificationTemplate, name=name)
+    tpl.delete()
+    messages.success(request, f"Email template override for '{name}' removed (builtin restored).")
+    return redirect("admin_tools:email_template_list")
+
+
+# ---------------------------------------------------------------------------
+# Phase 7: Promo codes
+# ---------------------------------------------------------------------------
+
+@staff_member_required
+def promo_code_list(request):
+    codes = PromoCode.objects.all()
+    return render(request, "admin_tools/content/promo_code_list.html", {"codes": codes})
+
+
+@staff_member_required
+def promo_code_create(request):
+    if request.method == "POST":
+        form = PromoCodeForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Promo code created.")
+            return redirect("admin_tools:promo_code_list")
+    else:
+        form = PromoCodeForm()
+    return render(request, "admin_tools/content/promo_code_form.html", {"form": form, "mode": "create"})
+
+
+@staff_member_required
+def promo_code_edit(request, pk):
+    code = get_object_or_404(PromoCode, pk=pk)
+    if request.method == "POST":
+        form = PromoCodeForm(request.POST, instance=code)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Promo code updated.")
+            return redirect("admin_tools:promo_code_list")
+    else:
+        form = PromoCodeForm(instance=code)
+    return render(request, "admin_tools/content/promo_code_form.html", {"form": form, "mode": "edit", "object": code})
+
+
+@staff_member_required
+@require_POST
+def promo_code_delete(request, pk):
+    code = get_object_or_404(PromoCode, pk=pk)
+    code.delete()
+    messages.success(request, "Promo code deleted.")
+    return redirect("admin_tools:promo_code_list")
+
+
+# ---------------------------------------------------------------------------
+# Phase 7: Announcement banners
+# ---------------------------------------------------------------------------
+
+@staff_member_required
+def banner_list(request):
+    banners = AnnouncementBanner.objects.all()
+    return render(request, "admin_tools/content/banner_list.html", {"banners": banners})
+
+
+@staff_member_required
+def banner_create(request):
+    if request.method == "POST":
+        form = AnnouncementBannerForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Banner created.")
+            return redirect("admin_tools:banner_list")
+    else:
+        form = AnnouncementBannerForm()
+    return render(request, "admin_tools/content/banner_form.html", {"form": form, "mode": "create"})
+
+
+@staff_member_required
+def banner_edit(request, pk):
+    banner = get_object_or_404(AnnouncementBanner, pk=pk)
+    if request.method == "POST":
+        form = AnnouncementBannerForm(request.POST, instance=banner)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Banner updated.")
+            return redirect("admin_tools:banner_list")
+    else:
+        form = AnnouncementBannerForm(instance=banner)
+    return render(request, "admin_tools/content/banner_form.html", {"form": form, "mode": "edit", "object": banner})
+
+
+@staff_member_required
+@require_POST
+def banner_delete(request, pk):
+    banner = get_object_or_404(AnnouncementBanner, pk=pk)
+    banner.delete()
+    messages.success(request, "Banner deleted.")
+    return redirect("admin_tools:banner_list")
+
+
+# ---------------------------------------------------------------------------
+# Phase 8: IP allowlist management
+# ---------------------------------------------------------------------------
+
+@staff_member_required
+def ip_allowlist(request):
+    from apps.audit.models import IPAllowlistEntry
+    entries = IPAllowlistEntry.objects.all()
+    return render(request, "admin_tools/security/ip_allowlist.html", {"entries": entries})
+
+
+@staff_member_required
+def ip_allowlist_create(request):
+    from apps.audit.models import IPAllowlistEntry
+
+    class _Form(forms.ModelForm):
+        class Meta:
+            model = IPAllowlistEntry
+            fields = ["ip_address", "label", "is_active"]
+
+    form = _Form(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        entry = form.save(commit=False)
+        entry.added_by = request.user
+        entry.save()
+        messages.success(request, f"IP {entry.ip_address} added to allowlist.")
+        return redirect("admin_tools:ip_allowlist")
+    return render(request, "admin_tools/security/ip_allowlist_form.html", {"form": form, "mode": "create"})
+
+
+@staff_member_required
+@require_POST
+def ip_allowlist_delete(request, pk):
+    from apps.audit.models import IPAllowlistEntry
+    entry = get_object_or_404(IPAllowlistEntry, pk=pk)
+    ip = entry.ip_address
+    entry.delete()
+    messages.success(request, f"IP {ip} removed from allowlist.")
+    return redirect("admin_tools:ip_allowlist")

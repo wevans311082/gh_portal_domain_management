@@ -1,0 +1,77 @@
+{% extends "base_admin.html" %}
+
+{% block title %}Audit Log — {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Audit Log{% endblock %}
+
+{% block content %}
+<form method="get" class="bg-white rounded-xl border border-slate-200 shadow-sm p-4 mb-5 flex gap-3 flex-wrap items-end">
+    <div>
+        <label class="block text-xs text-slate-500 mb-1">Search Action</label>
+        <input type="text" name="q" value="{{ query }}" placeholder="e.g. login, create_invoice…"
+               class="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+    </div>
+    <div>
+        <label class="block text-xs text-slate-500 mb-1">Action</label>
+        <select name="action" class="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+            <option value="">All actions</option>
+            {% for a in distinct_actions %}
+            <option value="{{ a }}" {% if action == a %}selected{% endif %}>{{ a }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div>
+        <label class="block text-xs text-slate-500 mb-1">Model</label>
+        <input type="text" name="model" value="{{ model }}" placeholder="e.g. Invoice, Domain…"
+               class="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+    </div>
+    <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700">Filter</button>
+    {% if query or action or model %}<a href="{% url 'admin_tools:audit_log' %}" class="border border-slate-200 text-slate-600 px-4 py-2 rounded-lg text-sm hover:bg-slate-50">Clear</a>{% endif %}
+</form>
+
+<div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+    <table class="w-full text-sm">
+        <thead class="bg-slate-50 border-b border-slate-200">
+            <tr>
+                <th class="px-4 py-3 text-left font-semibold text-slate-700">Time</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-700">User</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-700">Action</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-700">Model</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-700">Object ID</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-700">IP</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+            {% for entry in page_obj %}
+            <tr class="hover:bg-slate-50">
+                <td class="px-4 py-3 text-slate-500 text-xs font-mono whitespace-nowrap">{{ entry.created_at|date:"Y-m-d H:i:s" }}</td>
+                <td class="px-4 py-3 text-slate-700 text-xs">
+                    {% if entry.user %}
+                    <a href="{% url 'admin_tools:user_edit' pk=entry.user.pk %}" class="text-indigo-600 hover:underline">{{ entry.user.email }}</a>
+                    {% else %}—{% endif %}
+                </td>
+                <td class="px-4 py-3 font-mono text-xs text-slate-700">{{ entry.action }}</td>
+                <td class="px-4 py-3 text-xs text-slate-500">{{ entry.model_name|default:"" }}</td>
+                <td class="px-4 py-3 text-xs text-slate-500 font-mono">{{ entry.object_id|default:"" }}</td>
+                <td class="px-4 py-3 text-xs text-slate-400 font-mono">{{ entry.ip_address|default:"" }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" class="px-4 py-8 text-center text-slate-400">No audit log entries found.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if page_obj.has_other_pages %}
+<div class="mt-4 flex justify-center gap-2">
+    {% if page_obj.has_previous %}
+    <a href="?page={{ page_obj.previous_page_number }}&q={{ query }}&action={{ action }}&model={{ model }}"
+       class="px-3 py-1 border rounded text-sm hover:bg-gray-50">← Prev</a>
+    {% endif %}
+    <span class="px-3 py-1 text-sm text-slate-600">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}
+    <a href="?page={{ page_obj.next_page_number }}&q={{ query }}&action={{ action }}&model={{ model }}"
+       class="px-3 py-1 border rounded text-sm hover:bg-gray-50">Next →</a>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

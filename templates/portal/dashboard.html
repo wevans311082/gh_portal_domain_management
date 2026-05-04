@@ -67,14 +67,25 @@
     <div class="bg-amber-50 border border-amber-200 rounded-xl p-4">
         <h3 class="font-semibold text-amber-900 mb-2">Domain renewals need attention</h3>
         <p class="text-sm text-amber-800 mb-3">{{ expiring_7_days_count }} expiring in 7 days and {{ expiring_30_days_count }} expiring in 30 days.</p>
-        <ul class="space-y-1">
+        <ul class="space-y-1 mb-3">
             {% for domain in expiring_domains|slice:":4" %}
-            <li class="text-sm text-amber-800">
-                <a href="{% url 'domains:detail' pk=domain.pk %}" class="hover:underline font-medium">{{ domain.name }}</a>
-                expires {{ domain.expires_at|date:"Y-m-d" }}
+            <li class="text-sm text-amber-800 flex items-center justify-between gap-2">
+                <span>
+                    <a href="{% url 'domains:detail' pk=domain.pk %}" class="hover:underline font-medium">{{ domain.name }}</a>
+                    expires {{ domain.expires_at|date:"Y-m-d" }}
+                </span>
+                <form method="post" action="{% url 'portal:cart_add_renewal' %}" class="inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="domain_id" value="{{ domain.pk }}">
+                    <input type="hidden" name="renewal_years" value="1">
+                    <button type="submit" class="text-xs bg-amber-700 text-white px-2 py-1 rounded hover:bg-amber-800 whitespace-nowrap">
+                        + Add to cart
+                    </button>
+                </form>
             </li>
             {% endfor %}
         </ul>
+        <a href="{% url 'portal:shop' %}" class="inline-flex text-xs font-semibold bg-amber-700 text-white px-3 py-1.5 rounded hover:bg-amber-800">View all renewals</a>
     </div>
     {% endif %}
     {% if overdue_invoices_count %}
@@ -115,6 +126,12 @@
         <div class="space-y-2">
             <a href="{% url 'domains:search' %}" class="block w-full text-center bg-sky-600 text-white py-2 px-4 rounded-lg hover:bg-sky-700">
                 Search and Register Domain
+            </a>
+            <a href="{% url 'portal:shop' %}" class="block w-full text-center bg-emerald-600 text-white py-2 px-4 rounded-lg hover:bg-emerald-700">
+                Shop Hosting and Domains
+            </a>
+            <a href="{% url 'portal:cart' %}" class="block w-full text-center bg-violet-600 text-white py-2 px-4 rounded-lg hover:bg-violet-700">
+                View Cart / Checkout
             </a>
             <a href="{% url 'portal:my_services' %}" class="block w-full text-center bg-slate-700 text-white py-2 px-4 rounded-lg hover:bg-slate-800">
                 Manage Services

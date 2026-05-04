@@ -33,6 +33,14 @@ urlpatterns = [
     path("billing/quotes/<int:pk>/", billing_views.quote_edit, name="quote_edit"),
     path("billing/quotes/<int:pk>/pdf/", billing_views.quote_pdf, name="quote_pdf"),
     path("billing/quotes/<int:pk>/<str:action>/", billing_views.quote_action, name="quote_action"),
+    path("billing/cart/", billing_views.cart_builder, name="cart_builder"),
+    path("billing/cart/add-hosting/", billing_views.cart_builder_add_hosting, name="cart_builder_add_hosting"),
+    path("billing/cart/add-domain/", billing_views.cart_builder_add_domain, name="cart_builder_add_domain"),
+    path("billing/cart/add-renewal/", billing_views.cart_builder_add_renewal, name="cart_builder_add_renewal"),
+    path("billing/cart/add-transfer/", billing_views.cart_builder_add_transfer, name="cart_builder_add_transfer"),
+    path("billing/cart/<int:pk>/remove/", billing_views.cart_builder_remove_item, name="cart_builder_remove_item"),
+    path("billing/cart/checkout/invoice/", billing_views.cart_builder_checkout_invoice, name="cart_builder_checkout_invoice"),
+    path("billing/cart/checkout/quote/", billing_views.cart_builder_checkout_quote, name="cart_builder_checkout_quote"),
     path("domains/pricing/", views.tld_pricing, name="tld_pricing"),
     path("domains/", operations_views.domains_list, name="domains_list"),
     path("domains/new/", operations_views.domains_create, name="domains_create"),
@@ -96,4 +104,38 @@ urlpatterns = [
     path("content/errors/new/", content_views.error_page_create, name="error_page_create"),
     path("content/errors/<int:pk>/", content_views.error_page_edit, name="error_page_edit"),
     path("content/errors/<int:pk>/delete/", content_views.error_page_delete, name="error_page_delete"),
+    # Phase 5: Blog posts
+    path("content/blog/", content_views.blog_post_list, name="blog_post_list"),
+    path("content/blog/new/", content_views.blog_post_create, name="blog_post_create"),
+    path("content/blog/<int:pk>/", content_views.blog_post_edit, name="blog_post_edit"),
+    path("content/blog/<int:pk>/delete/", content_views.blog_post_delete, name="blog_post_delete"),
+    # Phase 5: Testimonials
+    path("content/testimonials/", content_views.testimonial_list, name="testimonial_list"),
+    path("content/testimonials/new/", content_views.testimonial_create, name="testimonial_create"),
+    path("content/testimonials/<int:pk>/", content_views.testimonial_edit, name="testimonial_edit"),
+    path("content/testimonials/<int:pk>/delete/", content_views.testimonial_delete, name="testimonial_delete"),
+    # Phase 5: Email template editor
+    path("content/email-templates/", content_views.email_template_list, name="email_template_list"),
+    path("content/email-templates/<str:name>/", content_views.email_template_edit, name="email_template_edit"),
+    path("content/email-templates/<str:name>/delete/", content_views.email_template_delete, name="email_template_delete"),
+    # Phase 4: Observability
+    path("logs/email/", views.email_log, name="email_log"),
+    path("logs/webhooks/", views.webhook_log, name="webhook_log"),
+    path("logs/audit/", views.audit_log, name="audit_log"),
+    # Phase 5: Feature flags
+    path("feature-flags/", views.feature_flags, name="feature_flags"),
+    # Phase 7: Promo codes
+    path("marketing/promo-codes/", content_views.promo_code_list, name="promo_code_list"),
+    path("marketing/promo-codes/new/", content_views.promo_code_create, name="promo_code_create"),
+    path("marketing/promo-codes/<int:pk>/", content_views.promo_code_edit, name="promo_code_edit"),
+    path("marketing/promo-codes/<int:pk>/delete/", content_views.promo_code_delete, name="promo_code_delete"),
+    # Phase 7: Announcement banners
+    path("marketing/banners/", content_views.banner_list, name="banner_list"),
+    path("marketing/banners/new/", content_views.banner_create, name="banner_create"),
+    path("marketing/banners/<int:pk>/", content_views.banner_edit, name="banner_edit"),
+    path("marketing/banners/<int:pk>/delete/", content_views.banner_delete, name="banner_delete"),
+    # Phase 8: IP allowlist
+    path("security/ip-allowlist/", content_views.ip_allowlist, name="ip_allowlist"),
+    path("security/ip-allowlist/new/", content_views.ip_allowlist_create, name="ip_allowlist_create"),
+    path("security/ip-allowlist/<int:pk>/delete/", content_views.ip_allowlist_delete, name="ip_allowlist_delete"),
 ]

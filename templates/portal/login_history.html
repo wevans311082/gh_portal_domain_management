@@ -1,0 +1,30 @@
+{% extends "base_portal.html" %}
+{% block title %}Login History · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<div class="max-w-3xl mx-auto py-8 space-y-4">
+  <h1 class="text-xl font-semibold text-slate-800">Login History</h1>
+  <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+    <table class="min-w-full text-sm">
+      <thead class="bg-slate-50 text-slate-500 text-xs uppercase">
+        <tr>
+          <th class="px-4 py-3 text-left">Event</th>
+          <th class="px-4 py-3 text-left">IP Address</th>
+          <th class="px-4 py-3 text-left">Date &amp; Time</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
+        {% for log in logs %}
+        <tr>
+          <td class="px-4 py-3">{{ log.action }}</td>
+          <td class="px-4 py-3 font-mono text-xs">{{ log.ip_address|default:"—" }}</td>
+          <td class="px-4 py-3 text-slate-500">{{ log.created_at|date:"d M Y H:i" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="3" class="px-4 py-6 text-center text-slate-400">No login events recorded.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="text-xs text-slate-400">Showing last 50 events.</p>
+</div>
+{% endblock %}

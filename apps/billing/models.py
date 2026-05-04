@@ -126,6 +126,11 @@ class Invoice(TimeStampedModel):
     amount_paid = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     due_date = models.DateField(null=True, blank=True)
     paid_at = models.DateTimeField(null=True, blank=True)
+    last_dunning_sent_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Timestamp of the most recent overdue reminder email sent for this invoice.",
+    )
     notes = models.TextField(blank=True)
     billing_name = models.CharField(max_length=255, blank=True)
     billing_address = models.TextField(blank=True)

@@ -1,0 +1,107 @@
+{% extends "base_portal.html" %}
+
+{% block title %}Account Statement - {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Account Statement{% endblock %}
+
+{% block content %}
+<!-- Filters -->
+<form method="get" class="bg-white rounded-lg shadow p-4 mb-6 flex flex-wrap gap-4 items-end">
+    <div>
+        <label class="block text-xs text-gray-500 mb-1">From</label>
+        <input type="date" name="date_from" value="{{ date_from }}"
+               class="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500">
+    </div>
+    <div>
+        <label class="block text-xs text-gray-500 mb-1">To</label>
+        <input type="date" name="date_to" value="{{ date_to }}"
+               class="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500">
+    </div>
+    <button type="submit" class="bg-sky-600 text-white px-4 py-2 rounded hover:bg-sky-700 text-sm">Filter</button>
+    <a href="?date_from={{ date_from }}&date_to={{ date_to }}&export=csv"
+       class="border border-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-50 text-sm">
+        ↓ Export CSV
+    </a>
+</form>
+
+<!-- Summary -->
+{% if totals.total_invoiced %}
+<div class="grid grid-cols-3 gap-4 mb-6">
+    <div class="bg-white rounded-lg shadow p-4 text-center">
+        <div class="text-xs text-gray-500 mb-1">Total Invoiced</div>
+        <div class="text-xl font-bold text-gray-900">£{{ totals.total_invoiced|floatformat:2 }}</div>
+    </div>
+    <div class="bg-white rounded-lg shadow p-4 text-center">
+        <div class="text-xs text-gray-500 mb-1">Total Paid</div>
+        <div class="text-xl font-bold text-green-700">£{{ totals.total_paid|floatformat:2|default:"0.00" }}</div>
+    </div>
+    <div class="bg-white rounded-lg shadow p-4 text-center">
+        <div class="text-xs text-gray-500 mb-1">Outstanding</div>
+        <div class="text-xl font-bold text-red-600">
+            £{% widthratio totals.total_invoiced 1 1 as dummy %}{{ totals.total_invoiced|default:0|add:0 }}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Invoice list -->
+<div class="bg-white rounded-lg shadow overflow-hidden">
+    <table class="w-full text-sm">
+        <thead class="bg-gray-50 border-b">
+            <tr>
+                <th class="px-4 py-3 text-left font-semibold text-gray-700">Invoice #</th>
+                <th class="px-4 py-3 text-left font-semibold text-gray-700">Date</th>
+                <th class="px-4 py-3 text-left font-semibold text-gray-700">Due</th>
+                <th class="px-4 py-3 text-left font-semibold text-gray-700">Status</th>
+                <th class="px-4 py-3 text-right font-semibold text-gray-700">Total</th>
+                <th class="px-4 py-3 text-right font-semibold text-gray-700">Outstanding</th>
+                <th class="px-4 py-3"></th>
+            </tr>
+        </thead>
+        <tbody class="divide-y">
+            {% for invoice in page_obj %}
+            <tr class="hover:bg-gray-50">
+                <td class="px-4 py-3 font-mono text-sm">{{ invoice.number }}</td>
+                <td class="px-4 py-3 text-gray-600">{{ invoice.issue_date }}</td>
+                <td class="px-4 py-3 text-gray-600">{{ invoice.due_date|default:"—" }}</td>
+                <td class="px-4 py-3">
+                    <span class="px-2 py-0.5 rounded-full text-xs font-medium
+                        {% if invoice.status == 'paid' %}bg-green-100 text-green-800
+                        {% elif invoice.status == 'overdue' %}bg-red-100 text-red-800
+                        {% elif invoice.status == 'unpaid' %}bg-amber-100 text-amber-700
+                        {% else %}bg-gray-100 text-gray-700{% endif %}">
+                        {{ invoice.get_status_display }}
+                    </span>
+                </td>
+                <td class="px-4 py-3 text-right font-medium">£{{ invoice.total|floatformat:2 }}</td>
+                <td class="px-4 py-3 text-right
+                    {% if invoice.amount_outstanding > 0 %}text-red-600 font-medium{% else %}text-gray-400{% endif %}">
+                    £{{ invoice.amount_outstanding|floatformat:2 }}
+                </td>
+                <td class="px-4 py-3 text-right">
+                    <a href="{% url 'invoices:detail' pk=invoice.pk %}"
+                       class="text-sky-600 hover:underline text-sm">View</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="7" class="px-4 py-8 text-center text-gray-400">No invoices found for the selected period.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if page_obj.has_other_pages %}
+<div class="mt-4 flex justify-center gap-2">
+    {% if page_obj.has_previous %}
+    <a href="?page={{ page_obj.previous_page_number }}&date_from={{ date_from }}&date_to={{ date_to }}"
+       class="px-3 py-1 border rounded text-sm hover:bg-gray-50">← Prev</a>
+    {% endif %}
+    <span class="px-3 py-1 text-sm text-gray-600">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}
+    <a href="?page={{ page_obj.next_page_number }}&date_from={{ date_from }}&date_to={{ date_to }}"
+       class="px-3 py-1 border rounded text-sm hover:bg-gray-50">Next →</a>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

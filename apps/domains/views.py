@@ -725,3 +725,165 @@ def contact_set_default(request, pk):
     messages.success(request, f'"{contact.label}" is now your default contact.')
     return redirect("domains:contact_list")
 
+
+# ---------------------------------------------------------------------------
+# Domain self-service: lock/unlock, EPP auth code, nameservers
+# ---------------------------------------------------------------------------
+
+
+@login_required
+@require_POST
+def domain_toggle_lock(request, pk):
+    """Toggle the registrar transfer lock on/off for a domain."""
+    domain = get_object_or_404(Domain, pk=pk, user=request.user)
+
+    if domain.status != Domain.STATUS_ACTIVE:
+        messages.error(request, "Only active domains can have their lock changed.")
+        return redirect("domains:detail", pk=pk)
+
+    if not domain.registrar_id:
+        messages.error(request, "This domain does not have a registrar ID — lock cannot be changed.")
+        return redirect("domains:detail", pk=pk)
+
+    client = ResellerClubClient()
+    try:
+        if domain.is_locked:
+            client.unlock_domain(domain.registrar_id)
+            domain.is_locked = False
+            msg = f"Transfer lock disabled for {domain.name}. The domain can now be transferred out."
+        else:
+            client.lock_domain(domain.registrar_id)
+            domain.is_locked = True
+            msg = f"Transfer lock enabled for {domain.name}."
+        domain.save(update_fields=["is_locked", "updated_at"])
+        messages.success(request, msg)
+    except ResellerClubError as exc:
+        messages.error(request, f"Could not update lock status: {exc}")
+
+    return redirect("domains:detail", pk=pk)
+
+
+@login_required
+@require_POST
+def domain_get_auth_code(request, pk):
+    """Fetch and display the EPP auth code for outbound transfer.
+
+    Rate-limited: one request per domain per hour via Django cache.
+    """
+    domain = get_object_or_404(Domain, pk=pk, user=request.user)
+
+    if domain.status not in (Domain.STATUS_ACTIVE,):
+        messages.error(request, "Auth codes are only available for active domains.")
+        return redirect("domains:detail", pk=pk)
+
+    if not domain.registrar_id:
+        messages.error(request, "This domain has no registrar ID — auth code unavailable.")
+        return redirect("domains:detail", pk=pk)
+
+    rate_key = f"auth_code_request:{request.user.pk}:{domain.pk}"
+    if cache.get(rate_key):
+        messages.warning(request, "Please wait before requesting another auth code for this domain.")
+        return redirect("domains:detail", pk=pk)
+
+    cache.set(rate_key, True, timeout=3600)
+
+    client = ResellerClubClient()
+    try:
+        data = client.get_auth_code(domain.registrar_id)
+        # LogicBoxes returns {"auth-code": "..."} or {"epp-code": "..."}
+        code = data.get("auth-code") or data.get("epp-code") or data.get("token") or ""
+        if code:
+            domain.epp_code = str(code)
+            domain.save(update_fields=["epp_code", "updated_at"])
+            messages.success(request, f"Auth code retrieved successfully for {domain.name}.")
+        else:
+            messages.warning(request, "Auth code retrieved but was empty. Contact support if this persists.")
+    except ResellerClubError as exc:
+        cache.delete(rate_key)  # let them retry on API error
+        messages.error(request, f"Could not retrieve auth code: {exc}")
+
+    return redirect("domains:detail", pk=pk)
+
+
+@login_required
+@require_POST
+def domain_update_nameservers(request, pk):
+    """Update nameservers for a domain via the registrar API."""
+    domain = get_object_or_404(Domain, pk=pk, user=request.user)
+
+    if domain.status != Domain.STATUS_ACTIVE:
+        messages.error(request, "Nameservers can only be changed for active domains.")
+        return redirect("domains:detail", pk=pk)
+
+    if not domain.registrar_id:
+        messages.error(request, "This domain has no registrar ID — nameservers cannot be changed.")
+        return redirect("domains:detail", pk=pk)
+
+    ns_list = []
+    for field in ("nameserver1", "nameserver2", "nameserver3", "nameserver4"):
+        val = (request.POST.get(field) or "").strip().lower()
+        if val:
+            ns_list.append(val)
+
+    if len(ns_list) < 2:
+        messages.error(request, "At least two nameservers are required.")
+        return redirect("domains:detail", pk=pk)
+
+    client = ResellerClubClient()
+    try:
+        client.modify_nameservers(domain.registrar_id, ns_list)
+        # Persist locally
+        domain.nameserver1 = ns_list[0] if len(ns_list) > 0 else ""
+        domain.nameserver2 = ns_list[1] if len(ns_list) > 1 else ""
+        domain.nameserver3 = ns_list[2] if len(ns_list) > 2 else ""
+        domain.nameserver4 = ns_list[3] if len(ns_list) > 3 else ""
+        domain.save(update_fields=["nameserver1", "nameserver2", "nameserver3", "nameserver4", "updated_at"])
+        messages.success(request, f"Nameservers updated for {domain.name}.")
+    except ResellerClubError as exc:
+        messages.error(request, f"Could not update nameservers: {exc}")
+
+    return redirect("domains:detail", pk=pk)
+
+
+# ---------------------------------------------------------------------------
+# Bulk domain renewal via cart
+# ---------------------------------------------------------------------------
+
+
+@login_required
+@require_POST
+def domain_bulk_add_to_cart(request):
+    """Add multiple domains to the renewal cart in one POST.
+
+    Expects repeated ``domain_id`` values and a single ``renewal_years`` value.
+    """
+    from apps.portal.cart_service import add_domain_renewal_item, get_active_cart
+
+    domain_ids = request.POST.getlist("domain_id")
+    years = max(1, min(int(request.POST.get("renewal_years", 1)), 10))
+
+    if not domain_ids:
+        messages.error(request, "No domains selected.")
+        return redirect("domains:my_domains")
+
+    domains = Domain.objects.filter(
+        pk__in=domain_ids,
+        user=request.user,
+        status__in=[Domain.STATUS_ACTIVE, Domain.STATUS_EXPIRED],
+    )
+
+    added = 0
+    for domain in domains:
+        try:
+            add_domain_renewal_item(user=request.user, domain_id=domain.pk, renewal_years=years)
+            added += 1
+        except Exception as exc:
+            logger.warning("Bulk cart add failed for domain %s: %s", domain.pk, exc)
+
+    if added:
+        messages.success(request, f"{added} domain(s) added to your cart for renewal.")
+    else:
+        messages.error(request, "No domains could be added to the cart.")
+
+    return redirect("portal:cart")
+

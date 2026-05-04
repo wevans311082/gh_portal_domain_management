@@ -1,0 +1,44 @@
+{% extends "base_portal.html" %}
+{% block title %}Saved Cards · {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Saved Payment Methods{% endblock %}
+{% block content %}
+<div class="max-w-2xl space-y-4">
+  {% if cards %}
+  <div class="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
+    {% for card in cards %}
+    <div class="flex items-center justify-between px-5 py-4">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-7 bg-slate-100 rounded flex items-center justify-center text-xs font-semibold text-slate-600 uppercase">{{ card.brand|slice:":4" }}</div>
+        <div>
+          <p class="text-sm font-medium text-slate-800">•••• •••• •••• {{ card.last4 }}</p>
+          <p class="text-xs text-slate-400">Expires {{ card.exp_month }}/{{ card.exp_year }}</p>
+        </div>
+        {% if card.is_default %}
+        <span class="px-2 py-0.5 rounded-full text-xs bg-sky-100 text-sky-700 font-medium">Default</span>
+        {% endif %}
+      </div>
+      <div class="flex items-center gap-3">
+        {% if not card.is_default %}
+        <form method="post" action="{% url 'payments:set_default_card' pk=card.pk %}">
+          {% csrf_token %}
+          <button type="submit" class="text-xs text-slate-500 hover:underline">Set Default</button>
+        </form>
+        {% endif %}
+        <form method="post" action="{% url 'payments:delete_card' pk=card.pk %}" onsubmit="return confirm('Remove this card?')">
+          {% csrf_token %}
+          <button type="submit" class="text-xs text-red-500 hover:underline">Remove</button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="bg-white rounded-xl border border-slate-200 p-10 text-center">
+    <p class="text-slate-500 text-sm">No saved cards. Add one to enable fast checkout.</p>
+  </div>
+  {% endif %}
+  <div>
+    <a href="{% url 'payments:add_card' %}" class="inline-block px-5 py-2 rounded-lg bg-sky-600 text-white text-sm font-medium hover:bg-sky-700">Add Card</a>
+  </div>
+</div>
+{% endblock %}

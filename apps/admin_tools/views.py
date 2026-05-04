@@ -1230,3 +1230,128 @@ def companies_house_config(request):
 def setup(request):
     return redirect(reverse("admin_tools:wizard_index"))
 
+
+# ---------------------------------------------------------------------------
+# Phase 4 Observability: Email log, Webhook log, Audit log
+# ---------------------------------------------------------------------------
+
+
+@staff_member_required
+def email_log(request):
+    """View all outgoing email attempts (EmailLog)."""
+    qs = EmailLog.objects.order_by("-created_at")
+
+    query = (request.GET.get("q") or "").strip()
+    status = (request.GET.get("status") or "").strip()
+
+    if query:
+        qs = qs.filter(recipient__icontains=query)
+    if status:
+        qs = qs.filter(status=status)
+
+    paginator = Paginator(qs, 50)
+    page_obj = paginator.get_page(request.GET.get("page"))
+
+    return render(request, "admin_tools/email_log.html", {
+        "page_obj": page_obj,
+        "query": query,
+        "status": status,
+    })
+
+
+@staff_member_required
+def webhook_log(request):
+    """View incoming webhook events (WebhookEvent)."""
+    from apps.payments.models import WebhookEvent
+    qs = WebhookEvent.objects.order_by("-created_at")
+
+    provider = (request.GET.get("provider") or "").strip()
+    event_type = (request.GET.get("event_type") or "").strip()
+    unprocessed_only = request.GET.get("unprocessed") == "1"
+
+    if provider:
+        qs = qs.filter(provider__icontains=provider)
+    if event_type:
+        qs = qs.filter(event_type__icontains=event_type)
+    if unprocessed_only:
+        qs = qs.filter(processed=False)
+
+    paginator = Paginator(qs, 50)
+    page_obj = paginator.get_page(request.GET.get("page"))
+
+    return render(request, "admin_tools/webhook_log.html", {
+        "page_obj": page_obj,
+        "provider": provider,
+        "event_type": event_type,
+        "unprocessed_only": unprocessed_only,
+    })
+
+
+@staff_member_required
+def audit_log(request):
+    """View the AuditLog with search/filter."""
+    qs = AuditLog.objects.select_related("user").order_by("-created_at")
+
+    query = (request.GET.get("q") or "").strip()
+    action = (request.GET.get("action") or "").strip()
+    model = (request.GET.get("model") or "").strip()
+
+    if query:
+        qs = qs.filter(action__icontains=query)
+    if action:
+        qs = qs.filter(action=action)
+    if model:
+        qs = qs.filter(model_name__icontains=model)
+
+    paginator = Paginator(qs, 50)
+    page_obj = paginator.get_page(request.GET.get("page"))
+
+    distinct_actions = AuditLog.objects.values_list("action", flat=True).distinct().order_by("action")
+
+    return render(request, "admin_tools/audit_log.html", {
+        "page_obj": page_obj,
+        "query": query,
+        "action": action,
+        "model": model,
+        "distinct_actions": distinct_actions,
+    })
+
+
+@staff_member_required
+def feature_flags(request):
+    """Toggle boolean feature flags (IntegrationSetting rows with FEATURE_ prefix)."""
+    from apps.admin_tools.models import IntegrationSetting
+
+    KNOWN_FLAGS = [
+        ("FEATURE_DOMAIN_TRANSFERS", "Domain transfers", "Allow clients to initiate inbound domain transfers."),
+        ("FEATURE_BULK_DOMAIN_RENEW", "Bulk domain renew", "Show bulk renew UI on My Domains."),
+        ("FEATURE_ACCOUNT_STATEMENT", "Account statement", "Show account statement page for clients."),
+        ("FEATURE_NOTIFICATION_PREFS", "Notification preferences", "Allow clients to manage their notification opt-outs."),
+        ("FEATURE_BLOG", "Public blog", "Show the blog on the public site."),
+        ("FEATURE_TESTIMONIALS", "Testimonials", "Show testimonials on the public site."),
+    ]
+
+    if request.method == "POST":
+        for key, _label, _desc in KNOWN_FLAGS:
+            value = "true" if request.POST.get(key) == "1" else "false"
+            IntegrationSetting.objects.update_or_create(
+                key=key,
+                defaults={"value": value, "is_secret": False},
+            )
+        from django.contrib import messages
+        messages.success(request, "Feature flags updated.")
+        return redirect("admin_tools:feature_flags")
+
+    db_values = {s.key: s.value for s in IntegrationSetting.objects.filter(key__startswith="FEATURE_")}
+    flags = [
+        {
+            "key": key,
+            "label": label,
+            "description": desc,
+            "enabled": db_values.get(key, "false").lower() == "true",
+        }
+        for key, label, desc in KNOWN_FLAGS
+    ]
+
+    return render(request, "admin_tools/feature_flags.html", {"flags": flags})
+

@@ -240,3 +240,73 @@ def gocardless_webhook(request):
                 logger.info(f"GoCardless webhook {event_id} already processed, skipping.")
 
     return HttpResponse(status=200)
+
+
+# ---------------------------------------------------------------------------
+# Saved payment methods
+# ---------------------------------------------------------------------------
+
+@login_required
+def saved_cards(request):
+    """List the user's saved payment methods."""
+    from apps.payments.models import SavedPaymentMethod
+    cards = SavedPaymentMethod.objects.filter(user=request.user)
+    return render(request, "payments/saved_cards.html", {"cards": cards})
+
+
+@login_required
+def add_card(request):
+    """Create a Stripe SetupIntent and render the card form."""
+    if request.method == "POST":
+        # After Stripe.js confirms the SetupIntent, it POSTs the pm_id back
+        pm_id = request.POST.get("payment_method_id")
+        if pm_id:
+            try:
+                StripeService.attach_payment_method(request.user, pm_id, set_as_default=True)
+                messages.success(request, "Card saved successfully.")
+            except Exception as e:
+                logger.error("Failed to attach payment method: %s", e)
+                messages.error(request, "Could not save card. Please try again.")
+        return redirect("payments:saved_cards")
+
+    try:
+        intent = StripeService.create_setup_intent(request.user)
+    except Exception as e:
+        logger.error("Failed to create setup intent: %s", e)
+        messages.error(request, "Could not initialise card form.")
+        return redirect("payments:saved_cards")
+
+    stripe_pk = get_runtime_setting("STRIPE_PUBLISHABLE_KEY", "")
+    return render(request, "payments/add_card.html", {
+        "client_secret": intent["client_secret"],
+        "stripe_public_key": stripe_pk,
+    })
+
+
+@login_required
+@require_POST
+def delete_card(request, pk):
+    """Detach and delete a saved payment method."""
+    from apps.payments.models import SavedPaymentMethod
+    card = get_object_or_404(SavedPaymentMethod, pk=pk, user=request.user)
+    try:
+        import stripe
+        stripe.api_key = get_runtime_setting("STRIPE_SECRET_KEY", "")
+        stripe.PaymentMethod.detach(card.stripe_pm_id)
+    except Exception as e:
+        logger.warning("Could not detach PM from Stripe: %s", e)
+    card.delete()
+    messages.success(request, "Card removed.")
+    return redirect("payments:saved_cards")
+
+
+@login_required
+@require_POST
+def set_default_card(request, pk):
+    """Mark a saved payment method as the default."""
+    from apps.payments.models import SavedPaymentMethod
+    card = get_object_or_404(SavedPaymentMethod, pk=pk, user=request.user)
+    card.is_default = True
+    card.save()
+    messages.success(request, f"Default card updated to {card.brand} •••• {card.last4}.")
+    return redirect("payments:saved_cards")

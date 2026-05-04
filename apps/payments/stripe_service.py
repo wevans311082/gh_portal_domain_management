@@ -87,3 +87,85 @@ class StripeService:
         if amount_pence:
             params["amount"] = amount_pence
         return stripe.Refund.create(**params)
+
+    @staticmethod
+    def get_or_create_customer(user) -> str:
+        """Return existing Stripe Customer ID or create one for the user."""
+        from apps.payments.models import StripeCustomer
+        stripe.api_key = get_runtime_setting("STRIPE_SECRET_KEY", "")
+        try:
+            sc = StripeCustomer.objects.get(user=user)
+            return sc.stripe_customer_id
+        except StripeCustomer.DoesNotExist:
+            customer = stripe.Customer.create(email=user.email, name=user.get_full_name() or user.email)
+            StripeCustomer.objects.create(user=user, stripe_customer_id=customer["id"])
+            return customer["id"]
+
+    @staticmethod
+    def create_setup_intent(user) -> dict:
+        """Create a Stripe SetupIntent to save a card for future use."""
+        stripe.api_key = get_runtime_setting("STRIPE_SECRET_KEY", "")
+        customer_id = StripeService.get_or_create_customer(user)
+        intent = stripe.SetupIntent.create(
+            customer=customer_id,
+            payment_method_types=["card"],
+            usage="off_session",
+        )
+        return {"client_secret": intent["client_secret"], "setup_intent_id": intent["id"]}
+
+    @staticmethod
+    def attach_payment_method(user, stripe_pm_id: str, set_as_default: bool = True):
+        """Attach a confirmed payment method to the user and save it to the DB."""
+        from apps.payments.models import SavedPaymentMethod
+        stripe.api_key = get_runtime_setting("STRIPE_SECRET_KEY", "")
+        customer_id = StripeService.get_or_create_customer(user)
+
+        pm = stripe.PaymentMethod.retrieve(stripe_pm_id)
+        stripe.PaymentMethod.attach(stripe_pm_id, customer=customer_id)
+
+        card = pm.get("card", {})
+        saved, _ = SavedPaymentMethod.objects.update_or_create(
+            stripe_pm_id=stripe_pm_id,
+            defaults={
+                "user": user,
+                "last4": card.get("last4", ""),
+                "brand": card.get("brand", "card"),
+                "exp_month": card.get("exp_month", 0),
+                "exp_year": card.get("exp_year", 0),
+                "is_default": set_as_default,
+            },
+        )
+        return saved
+
+    @staticmethod
+    def charge_saved_payment_method(user, amount_pence: int, description: str, invoice=None) -> dict:
+        """Charge the user's default saved payment method via PaymentIntent."""
+        from apps.payments.models import SavedPaymentMethod, Payment
+        stripe.api_key = get_runtime_setting("STRIPE_SECRET_KEY", "")
+
+        default_pm = SavedPaymentMethod.objects.filter(user=user, is_default=True).first()
+        if not default_pm:
+            raise ValueError("No default payment method on file.")
+
+        customer_id = StripeService.get_or_create_customer(user)
+        intent = stripe.PaymentIntent.create(
+            amount=amount_pence,
+            currency="gbp",
+            customer=customer_id,
+            payment_method=default_pm.stripe_pm_id,
+            off_session=True,
+            confirm=True,
+            description=description,
+            metadata={"invoice_id": str(invoice.id)} if invoice else {},
+        )
+
+        payment = Payment.objects.create(
+            user=user,
+            invoice=invoice,
+            provider=Payment.PROVIDER_STRIPE,
+            status=Payment.STATUS_COMPLETED if intent["status"] == "succeeded" else Payment.STATUS_PENDING,
+            amount=amount_pence / 100,
+            external_id=intent["id"],
+            provider_data={"payment_intent_id": intent["id"]},
+        )
+        return {"payment": payment, "intent": intent}

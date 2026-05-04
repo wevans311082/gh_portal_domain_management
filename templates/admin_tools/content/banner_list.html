@@ -1,0 +1,46 @@
+{% extends "base_admin.html" %}
+{% block title %}Announcement Banners · {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Announcement Banners{% endblock %}
+{% block page_actions %}
+<a href="{% url 'admin_tools:banner_create' %}" class="px-4 py-2 rounded-lg bg-sky-600 text-white text-sm font-medium hover:bg-sky-700">New Banner</a>
+{% endblock %}
+{% block content %}
+<div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="text-left text-xs font-medium text-slate-500 uppercase border-b border-slate-200 bg-slate-50">
+        <th class="px-5 py-3">Message</th>
+        <th class="px-5 py-3">Level</th>
+        <th class="px-5 py-3">Valid Until</th>
+        <th class="px-5 py-3">Status</th>
+        <th class="px-5 py-3 text-right">Actions</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-100">
+      {% for banner in banners %}
+      <tr class="hover:bg-slate-50">
+        <td class="px-5 py-3 max-w-xs truncate text-slate-800">{{ banner.message }}</td>
+        <td class="px-5 py-3 capitalize">{{ banner.get_level_display }}</td>
+        <td class="px-5 py-3">{{ banner.valid_until|date:"d M Y"|default:"—" }}</td>
+        <td class="px-5 py-3">
+          {% if banner.is_visible %}
+          <span class="px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-700">Visible</span>
+          {% else %}
+          <span class="px-2 py-0.5 rounded-full text-xs bg-slate-100 text-slate-500">Hidden</span>
+          {% endif %}
+        </td>
+        <td class="px-5 py-3 text-right space-x-3">
+          <a href="{% url 'admin_tools:banner_edit' pk=banner.pk %}" class="text-sky-600 hover:underline text-xs">Edit</a>
+          <form method="post" action="{% url 'admin_tools:banner_delete' pk=banner.pk %}" class="inline" onsubmit="return confirm('Delete this banner?')">
+            {% csrf_token %}
+            <button type="submit" class="text-red-500 hover:underline text-xs">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="5" class="px-5 py-8 text-center text-slate-400">No banners yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

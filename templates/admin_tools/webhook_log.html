@@ -1,0 +1,75 @@
+{% extends "base_admin.html" %}
+
+{% block title %}Webhook Log — {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Webhook Event Log{% endblock %}
+
+{% block content %}
+<form method="get" class="bg-white rounded-xl border border-slate-200 shadow-sm p-4 mb-5 flex gap-3 flex-wrap items-end">
+    <div>
+        <label class="block text-xs text-slate-500 mb-1">Provider</label>
+        <input type="text" name="provider" value="{{ provider }}" placeholder="stripe, gocardless…"
+               class="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+    </div>
+    <div>
+        <label class="block text-xs text-slate-500 mb-1">Event Type</label>
+        <input type="text" name="event_type" value="{{ event_type }}" placeholder="e.g. payment_intent.succeeded"
+               class="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+    </div>
+    <div class="flex items-center gap-2 pb-0.5">
+        <input type="checkbox" id="unprocessed" name="unprocessed" value="1" {% if unprocessed_only %}checked{% endif %}
+               class="rounded border-slate-300">
+        <label for="unprocessed" class="text-sm text-slate-600">Unprocessed only</label>
+    </div>
+    <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700">Filter</button>
+    {% if provider or event_type or unprocessed_only %}<a href="{% url 'admin_tools:webhook_log' %}" class="border border-slate-200 text-slate-600 px-4 py-2 rounded-lg text-sm hover:bg-slate-50">Clear</a>{% endif %}
+</form>
+
+<div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+    <table class="w-full text-sm">
+        <thead class="bg-slate-50 border-b border-slate-200">
+            <tr>
+                <th class="px-4 py-3 text-left font-semibold text-slate-700">Time</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-700">Provider</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-700">Event Type</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-700">Event ID</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-700">Processed</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-700">Error</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+            {% for event in page_obj %}
+            <tr class="hover:bg-slate-50">
+                <td class="px-4 py-3 text-slate-500 text-xs font-mono whitespace-nowrap">{{ event.created_at|date:"Y-m-d H:i:s" }}</td>
+                <td class="px-4 py-3 capitalize text-slate-700">{{ event.provider }}</td>
+                <td class="px-4 py-3 font-mono text-xs text-slate-600">{{ event.event_type }}</td>
+                <td class="px-4 py-3 font-mono text-xs text-slate-500 max-w-xs truncate">{{ event.event_id }}</td>
+                <td class="px-4 py-3">
+                    {% if event.processed %}
+                    <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Yes</span>
+                    {% else %}
+                    <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">No</span>
+                    {% endif %}
+                </td>
+                <td class="px-4 py-3 text-xs text-red-600 max-w-xs truncate">{{ event.processing_error|default:"" }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" class="px-4 py-8 text-center text-slate-400">No webhook events found.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if page_obj.has_other_pages %}
+<div class="mt-4 flex justify-center gap-2">
+    {% if page_obj.has_previous %}
+    <a href="?page={{ page_obj.previous_page_number }}&provider={{ provider }}&event_type={{ event_type }}{% if unprocessed_only %}&unprocessed=1{% endif %}"
+       class="px-3 py-1 border rounded text-sm hover:bg-gray-50">← Prev</a>
+    {% endif %}
+    <span class="px-3 py-1 text-sm text-slate-600">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}
+    <a href="?page={{ page_obj.next_page_number }}&provider={{ provider }}&event_type={{ event_type }}{% if unprocessed_only %}&unprocessed=1{% endif %}"
+       class="px-3 py-1 border rounded text-sm hover:bg-gray-50">Next →</a>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

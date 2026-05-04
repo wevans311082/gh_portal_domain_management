@@ -72,6 +72,7 @@ MIDDLEWARE = [
     "apps.core.middleware.RequestCorrelationIDMiddleware",
     "apps.core.middleware.ContentSecurityPolicyMiddleware",
     "apps.audit.middleware.AuditLogMiddleware",
+    "apps.audit.middleware.IPAllowlistMiddleware",
 ]
 
 ROOT_URLCONF = "grumpy_portal.urls"
@@ -88,6 +89,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "apps.core.context_processors.site_settings",
+                "apps.core.context_processors.announcement_banners",
             ],
         },
     },

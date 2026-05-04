@@ -75,6 +75,9 @@
                     <div class="flex flex-wrap items-center gap-2">
                         <a href="{% url 'admin_tools:user_edit' u.pk %}" class="text-xs text-indigo-600 hover:underline">Edit user</a>
                         <a href="{% url 'admin_tools:user_mfa_manage' u.pk %}" class="text-xs text-sky-700 hover:underline">Manage MFA</a>
+                        {% if not u.is_staff %}
+                        <a href="{% url 'admin_tools:cart_builder' %}?user_id={{ u.pk }}" class="text-xs text-emerald-700 hover:underline">Cart Builder</a>
+                        {% endif %}
                         {% if u.pk != request.user.pk %}
                         <form method="post" action="{% url 'admin_tools:user_su_start' u.pk %}" class="inline">{% csrf_token %}
                             <button class="text-xs text-amber-700 hover:underline" onclick="return confirm('Impersonate this user in the customer portal?')">SU as user</button>

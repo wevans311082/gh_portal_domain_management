@@ -1,0 +1,249 @@
+{% extends "base_portal.html" %}
+
+{% block title %}Shop - {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Shop{% endblock %}
+
+{% block header_actions %}
+<a href="{% url 'portal:cart' %}" class="text-xs bg-sky-600 text-white px-3 py-1.5 rounded hover:bg-sky-700 inline-flex items-center gap-1.5">
+    Cart{% if cart_count %} ({{ cart_count }}){% endif %}
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+    <section class="xl:col-span-2 space-y-6">
+        <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+            <div class="flex items-start justify-between gap-4 mb-5">
+                <div>
+                    <h3 class="text-lg font-semibold text-slate-900">Hosting and Services</h3>
+                    <p class="text-sm text-slate-500 mt-1">Add hosting plans to your cart and turn them into either an invoice or a quote.</p>
+                </div>
+                <a href="{% url 'portal:cart' %}" class="text-sm text-sky-700 hover:underline">Review cart</a>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {% for package in packages %}
+                <article class="rounded-2xl border border-slate-200 p-5 bg-gradient-to-br from-white to-slate-50">
+                    <div class="flex items-start justify-between gap-3 mb-3">
+                        <div>
+                            <h4 class="text-base font-semibold text-slate-900">{{ package.name }}</h4>
+                            {% if package.card_blurb %}<p class="text-sm text-slate-500 mt-1">{{ package.card_blurb }}</p>{% endif %}
+                        </div>
+                        {% if package.card_badge %}<span class="rounded-full bg-sky-100 px-2.5 py-1 text-xs font-semibold text-sky-700">{{ package.card_badge }}</span>{% endif %}
+                    </div>
+                    <div class="flex gap-4 text-sm mb-4">
+                        <div>
+                            <p class="text-slate-400 uppercase tracking-wide text-xs">Monthly</p>
+                            <p class="font-semibold text-slate-900">£{{ package.price_monthly }}</p>
+                        </div>
+                        <div>
+                            <p class="text-slate-400 uppercase tracking-wide text-xs">Annual</p>
+                            <p class="font-semibold text-slate-900">£{{ package.price_annually }}</p>
+                        </div>
+                        {% if package.setup_fee %}
+                        <div>
+                            <p class="text-slate-400 uppercase tracking-wide text-xs">Setup</p>
+                            <p class="font-semibold text-slate-900">£{{ package.setup_fee }}</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% if package.get_features %}
+                    <ul class="space-y-1.5 mb-4 text-sm text-slate-600">
+                        {% for feature in package.get_features|slice:":4" %}
+                        <li>{{ feature.text }}</li>
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
+                    <form method="post" action="{% url 'portal:cart_add_hosting' %}" class="space-y-3">
+                        {% csrf_token %}
+                        <input type="hidden" name="package_id" value="{{ package.id }}">
+                        <input type="hidden" name="next" value="{% url 'portal:shop' %}">
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">Billing period</label>
+                            <select name="billing_period" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                                <option value="monthly">Monthly</option>
+                                <option value="annually">Annually</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">Primary domain</label>
+                            <input type="text" name="domain_name" value="{{ prefill_domain }}" placeholder="example.com (optional)" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                        </div>
+                        <button class="w-full rounded-lg bg-slate-900 text-white px-4 py-2.5 text-sm font-semibold hover:bg-slate-800">Add hosting plan</button>
+                    </form>
+                </article>
+                {% empty %}
+                <p class="text-slate-500">No packages are currently available.</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+            <div class="flex items-start justify-between gap-4 mb-5">
+                <div>
+                    <h3 class="text-lg font-semibold text-slate-900">Domain Registration</h3>
+                    <p class="text-sm text-slate-500 mt-1">Add a domain registration to the same cart as your hosting plans.</p>
+                </div>
+                <a href="{% url 'domains:search' %}" class="text-sm text-sky-700 hover:underline">Use live domain search</a>
+            </div>
+            <form method="post" action="{% url 'portal:cart_add_domain' %}" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{% url 'portal:shop' %}">
+                <div class="md:col-span-2">
+                    <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">Domain name</label>
+                    <input type="text" name="domain_name" value="{{ prefill_domain }}" placeholder="example.co.uk" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" required>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">Registration years</label>
+                    <select name="registration_years" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                        <option value="1">1 year</option>
+                        <option value="2">2 years</option>
+                        <option value="3">3 years</option>
+                        <option value="5">5 years</option>
+                        <option value="10">10 years</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">Registrant contact</label>
+                    <select name="domain_contact_id" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                        {% for contact in contacts %}
+                        <option value="{{ contact.id }}">{{ contact.label }}{% if contact.is_default %} (default){% endif %}</option>
+                        {% empty %}
+                        <option value="">A default contact will be created automatically</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">DNS provider</label>
+                    <select name="dns_provider" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                        <option value="cpanel">cPanel</option>
+                        <option value="cloudflare">Cloudflare</option>
+                        <option value="registrar">Registrar</option>
+                        <option value="external">External</option>
+                    </select>
+                </div>
+                <div class="flex flex-col justify-center gap-2 text-sm text-slate-600">
+                    <label class="inline-flex items-center gap-2"><input type="checkbox" name="privacy_enabled" checked> Domain privacy</label>
+                    <label class="inline-flex items-center gap-2"><input type="checkbox" name="auto_renew" checked> Auto-renew</label>
+                </div>
+                <div class="md:col-span-2 flex items-center justify-between gap-4 rounded-xl bg-slate-50 border border-slate-200 px-4 py-3">
+                    <div>
+                        <p class="text-sm font-semibold text-slate-900">Popular starting prices</p>
+                        <p class="text-xs text-slate-500 mt-1">
+                            {% for tld in featured_tlds %}
+                            .{{ tld.tld }} from £{{ tld.registration_price }}{% if not forloop.last %} · {% endif %}
+                            {% endfor %}
+                        </p>
+                    </div>
+                    <button class="rounded-lg bg-sky-600 text-white px-4 py-2.5 text-sm font-semibold hover:bg-sky-700 whitespace-nowrap">Add domain</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+                <div class="flex items-start justify-between gap-4 mb-5">
+                    <div>
+                        <h3 class="text-lg font-semibold text-slate-900">Domain Renewals</h3>
+                        <p class="text-sm text-slate-500 mt-1">Add renewals for domains already in your account.</p>
+                    </div>
+                </div>
+                <form method="post" action="{% url 'portal:cart_add_renewal' %}" class="space-y-4">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{% url 'portal:shop' %}">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">Domain</label>
+                        <select name="domain_id" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" required>
+                            <option value="">Choose domain…</option>
+                            {% for domain in renewable_domains %}
+                            <option value="{{ domain.id }}">{{ domain.name }}{% if domain.expires_at %} · expires {{ domain.expires_at|date:"Y-m-d" }}{% endif %}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">Renewal years</label>
+                        <select name="renewal_years" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                            <option value="1">1 year</option>
+                            <option value="2">2 years</option>
+                            <option value="3">3 years</option>
+                            <option value="5">5 years</option>
+                            <option value="10">10 years</option>
+                        </select>
+                    </div>
+                    <button class="w-full rounded-lg bg-violet-600 text-white px-4 py-2.5 text-sm font-semibold hover:bg-violet-700">Add renewal</button>
+                </form>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+                <div class="flex items-start justify-between gap-4 mb-5">
+                    <div>
+                        <h3 class="text-lg font-semibold text-slate-900">Domain Transfers</h3>
+                        <p class="text-sm text-slate-500 mt-1">Bring an external domain into the same invoice or quote.</p>
+                    </div>
+                </div>
+                <form method="post" action="{% url 'portal:cart_add_transfer' %}" class="space-y-4">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{% url 'portal:shop' %}">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">Domain name</label>
+                        <input type="text" name="domain_name" placeholder="external-example.com" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" required>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">EPP / auth code</label>
+                        <input type="text" name="auth_code" placeholder="Optional if supplied later" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">Registrant contact</label>
+                        <select name="domain_contact_id" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                            {% for contact in contacts %}
+                            <option value="{{ contact.id }}">{{ contact.label }}{% if contact.is_default %} (default){% endif %}</option>
+                            {% empty %}
+                            <option value="">A default contact will be created automatically</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <select name="dns_provider" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                            <option value="cpanel">cPanel</option>
+                            <option value="cloudflare">Cloudflare</option>
+                            <option value="registrar">Registrar</option>
+                            <option value="external">External</option>
+                        </select>
+                        <label class="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-600"><input type="checkbox" name="auto_renew" checked> Auto-renew</label>
+                    </div>
+                    <button class="w-full rounded-lg bg-emerald-600 text-white px-4 py-2.5 text-sm font-semibold hover:bg-emerald-700">Add transfer</button>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <aside class="space-y-6">
+        <div class="bg-slate-900 text-white rounded-2xl p-6 shadow-sm">
+            <p class="text-xs uppercase tracking-[0.2em] text-sky-300 mb-2">Current cart</p>
+            <h3 class="text-2xl font-semibold">{{ cart_count }} item{{ cart_count|pluralize }}</h3>
+            <p class="text-slate-300 mt-2">Subtotal £{{ cart.subtotal }}</p>
+            <div class="mt-5 space-y-2">
+                <a href="{% url 'portal:cart' %}" class="block w-full rounded-lg bg-white text-slate-900 text-center px-4 py-2.5 text-sm font-semibold hover:bg-slate-100">Open cart</a>
+                <form method="post" action="{% url 'portal:cart_checkout_invoice' %}">
+                    {% csrf_token %}
+                    <button class="block w-full rounded-lg bg-sky-500 text-white text-center px-4 py-2.5 text-sm font-semibold hover:bg-sky-400">Create invoice</button>
+                </form>
+                <form method="post" action="{% url 'portal:cart_checkout_quote' %}">
+                    {% csrf_token %}
+                    <button class="block w-full rounded-lg border border-sky-300 text-sky-100 text-center px-4 py-2.5 text-sm font-semibold hover:bg-sky-800">Create quote</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+            <h3 class="font-semibold text-slate-900 mb-3">How it works</h3>
+            <div class="space-y-3 text-sm text-slate-600">
+                <p>Add hosting and domains into one cart.</p>
+                <p>Renewals and inbound transfers use the same checkout path.</p>
+                <p>Generate an invoice when you are ready to pay now.</p>
+                <p>Generate a quote when you want pricing approved first.</p>
+                <p>Accepted quotes convert back into a real invoice and preserve the cart items.</p>
+            </div>
+        </div>
+    </aside>
+</div>
+{% endblock %}

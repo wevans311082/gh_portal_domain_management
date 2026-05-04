@@ -1,0 +1,41 @@
+{% extends "base_portal.html" %}
+{% block title %}Hosting Usage · {{ service.package.name }} · {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Hosting Usage — {{ service.domain_name|default:service.package.name }}{% endblock %}
+{% block content %}
+<div class="max-w-2xl space-y-6">
+  <div class="grid grid-cols-2 gap-4">
+    <div class="bg-white rounded-xl border border-slate-200 p-5">
+      <p class="text-xs text-slate-500 uppercase tracking-wide mb-1">Disk Used</p>
+      {% if quota.bytesused %}
+      <p class="text-2xl font-bold text-slate-900">{{ quota.bytesused|filesizeformat }}</p>
+      {% if quota.bytelimit and quota.bytelimit != "unlimited" %}
+      <p class="text-xs text-slate-400 mt-1">of {{ quota.bytelimit|filesizeformat }}</p>
+      {% else %}
+      <p class="text-xs text-slate-400 mt-1">Unlimited quota</p>
+      {% endif %}
+      {% else %}
+      <p class="text-slate-400 text-sm">Unavailable</p>
+      {% endif %}
+    </div>
+    <div class="bg-white rounded-xl border border-slate-200 p-5">
+      <p class="text-xs text-slate-500 uppercase tracking-wide mb-1">cPanel User</p>
+      <p class="text-lg font-semibold text-slate-800 font-mono">{{ service.cpanel_username|default:"—" }}</p>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-xl border border-slate-200 p-5">
+    <h2 class="text-sm font-semibold text-slate-700 mb-3">Actions</h2>
+    <div class="flex flex-wrap gap-3">
+      {% if service.cpanel_username %}
+      <a href="{% url 'portal:hosting_sso' service_pk=service.pk %}"
+         class="px-4 py-2 rounded-lg bg-sky-600 text-white text-sm font-medium hover:bg-sky-700">
+        Open cPanel →
+      </a>
+      {% endif %}
+      <a href="{% url 'portal:my_services' %}" class="px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">
+        ← My Services
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}

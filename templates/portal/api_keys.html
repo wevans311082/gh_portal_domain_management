@@ -1,0 +1,48 @@
+{% extends "base_portal.html" %}
+{% block title %}API Keys · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<div class="max-w-3xl mx-auto py-8 space-y-4">
+  <div class="flex items-center justify-between">
+    <h1 class="text-xl font-semibold text-slate-800">API Keys</h1>
+    <a href="{% url 'portal:api_key_create' %}" class="px-4 py-2 rounded bg-sky-600 text-white text-sm font-medium hover:bg-sky-700">+ New Key</a>
+  </div>
+  {% if request.session.new_api_key %}
+  <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+    <p class="text-sm font-medium text-green-800 mb-1">Your new API key (shown once — copy it now):</p>
+    <code class="font-mono text-sm break-all text-green-900">{{ request.session.new_api_key }}</code>
+  </div>
+  {% with request.session.pop as _ %}{% endwith %}
+  {% endif %}
+  <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+    <table class="min-w-full text-sm">
+      <thead class="bg-slate-50 text-slate-500 text-xs uppercase">
+        <tr>
+          <th class="px-4 py-3 text-left">Name</th>
+          <th class="px-4 py-3 text-left">Prefix</th>
+          <th class="px-4 py-3 text-left">Last used</th>
+          <th class="px-4 py-3 text-left">Expires</th>
+          <th class="px-4 py-3"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
+        {% for key in keys %}
+        <tr>
+          <td class="px-4 py-3">{{ key.name }}</td>
+          <td class="px-4 py-3 font-mono text-xs">{{ key.key_prefix }}…</td>
+          <td class="px-4 py-3 text-slate-400">{{ key.last_used_at|date:"d M Y H:i"|default:"Never" }}</td>
+          <td class="px-4 py-3 text-slate-400">{{ key.expires_at|date:"d M Y"|default:"Never" }}</td>
+          <td class="px-4 py-3 text-right">
+            <form method="post" action="{% url 'portal:api_key_revoke' key.pk %}" onsubmit="return confirm('Revoke this key?')">
+              {% csrf_token %}
+              <button class="text-red-500 text-xs hover:underline">Revoke</button>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">No API keys yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
