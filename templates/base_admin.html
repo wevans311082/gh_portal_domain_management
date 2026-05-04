@@ -2,6 +2,23 @@
 {% load static %}
 
 {% block body %}
+<style>
+    details.admin-nav-section > summary::-webkit-details-marker {
+        display: none;
+    }
+    details.admin-nav-section > summary {
+        list-style: none;
+    }
+    details.admin-nav-section > summary .admin-nav-minus {
+        display: none;
+    }
+    details.admin-nav-section[open] > summary .admin-nav-plus {
+        display: none;
+    }
+    details.admin-nav-section[open] > summary .admin-nav-minus {
+        display: inline;
+    }
+</style>
 <div class="flex h-full">
     <!-- ── Admin Sidebar ───────────────────────────────────────────────── -->
     <aside class="w-64 bg-slate-900 text-white flex-shrink-0 flex flex-col shadow-xl" style="min-height:100vh">
@@ -21,8 +38,12 @@
         <!-- Navigation -->
         <nav class="flex-1 overflow-y-auto px-3 py-3 space-y-0.5 text-sm">
             <!-- Overview -->
-            <div class="mb-3">
-                <p class="px-2 text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1">Overview</p>
+            <details class="admin-nav-section mb-3" {% if request.resolver_match.url_name == 'dashboard' or request.resolver_match.url_name == 'stats' %}open{% endif %}>
+                <summary class="list-none cursor-pointer px-2 text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1 flex items-center justify-between">
+                    <span>Overview</span>
+                    <span class="text-slate-600"><span class="admin-nav-plus">+</span><span class="admin-nav-minus">-</span></span>
+                </summary>
+                <div class="space-y-0.5">
                 <a href="{% url 'admin_tools:dashboard' %}"
                    class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition-colors {% if request.resolver_match.url_name == 'dashboard' %}bg-slate-800 text-white{% endif %}">
                     <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
@@ -33,21 +54,31 @@
                     <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
                     Stats &amp; Metrics
                 </a>
-            </div>
+                </div>
+            </details>
 
             <!-- People -->
-            <div class="mb-3">
-                <p class="px-2 text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1">People</p>
+            <details class="admin-nav-section mb-3" {% if request.resolver_match.url_name == 'users' or request.resolver_match.url_name == 'user_create' or request.resolver_match.url_name == 'user_update' %}open{% endif %}>
+                <summary class="list-none cursor-pointer px-2 text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1 flex items-center justify-between">
+                    <span>People</span>
+                    <span class="text-slate-600"><span class="admin-nav-plus">+</span><span class="admin-nav-minus">-</span></span>
+                </summary>
+                <div class="space-y-0.5">
                 <a href="{% url 'admin_tools:users' %}"
                    class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition-colors {% if request.resolver_match.url_name == 'users' %}bg-slate-800 text-white{% endif %}">
                     <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
                     Users &amp; Accounts
                 </a>
-            </div>
+                </div>
+            </details>
 
             <!-- Commerce -->
-            <div class="mb-3">
-                <p class="px-2 text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1">Commerce</p>
+            <details class="admin-nav-section mb-3" {% if 'invoice' in request.resolver_match.url_name or 'quote' in request.resolver_match.url_name or request.resolver_match.url_name == 'billing_branding' or 'payments_' in request.resolver_match.url_name or request.resolver_match.url_name == 'payments_list' %}open{% endif %}>
+                <summary class="list-none cursor-pointer px-2 text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1 flex items-center justify-between">
+                    <span>Commerce</span>
+                    <span class="text-slate-600"><span class="admin-nav-plus">+</span><span class="admin-nav-minus">-</span></span>
+                </summary>
+                <div class="space-y-0.5">
                 <a href="{% url 'admin_tools:invoice_list' %}"
                    class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition-colors {% if 'invoice' in request.resolver_match.url_name %}bg-slate-800 text-white{% endif %}">
                     <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
@@ -68,11 +99,16 @@
                     <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
                     Payments
                 </a>
-            </div>
+                </div>
+            </details>
 
             <!-- Website -->
-            <div class="mb-3">
-                <p class="px-2 text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1">Website</p>
+            <details class="admin-nav-section mb-3" {% if request.resolver_match.url_name == 'content_dashboard' or request.resolver_match.url_name == 'content_settings' or 'package_card' in request.resolver_match.url_name or 'service_card' in request.resolver_match.url_name or 'faq_' in request.resolver_match.url_name or 'error_page' in request.resolver_match.url_name %}open{% endif %}>
+                <summary class="list-none cursor-pointer px-2 text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1 flex items-center justify-between">
+                    <span>Website</span>
+                    <span class="text-slate-600"><span class="admin-nav-plus">+</span><span class="admin-nav-minus">-</span></span>
+                </summary>
+                <div class="space-y-0.5">
                 <a href="{% url 'admin_tools:content_dashboard' %}"
                    class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition-colors {% if request.resolver_match.url_name == 'content_dashboard' %}bg-slate-800 text-white{% endif %}">
                     <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h18M3 12h18M3 19h18"/></svg>
@@ -103,11 +139,16 @@
                     <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M10.29 3.86l-7.3 12.65A1 1 0 003.86 18h16.28a1 1 0 00.87-1.49l-7.3-12.65a1 1 0 00-1.74 0z"/></svg>
                     Error Pages
                 </a>
-            </div>
+                </div>
+            </details>
 
             <!-- Services -->
-            <div class="mb-3">
-                <p class="px-2 text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1">Services</p>
+            <details class="admin-nav-section mb-3" {% if 'domains_' in request.resolver_match.url_name or request.resolver_match.url_name == 'domains_list' or request.resolver_match.url_name == 'tld_pricing' or 'services_' in request.resolver_match.url_name or request.resolver_match.url_name == 'services_list' or 'tickets_' in request.resolver_match.url_name or request.resolver_match.url_name == 'tickets_list' or 'templates_' in request.resolver_match.url_name or request.resolver_match.url_name == 'templates_list' %}open{% endif %}>
+                <summary class="list-none cursor-pointer px-2 text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1 flex items-center justify-between">
+                    <span>Services</span>
+                    <span class="text-slate-600"><span class="admin-nav-plus">+</span><span class="admin-nav-minus">-</span></span>
+                </summary>
+                <div class="space-y-0.5">
                      <a href="{% url 'admin_tools:domains_list' %}"
                          class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition-colors {% if 'domains_' in request.resolver_match.url_name or request.resolver_match.url_name == 'domains_list' %}bg-slate-800 text-white{% endif %}">
                     <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"/></svg>
@@ -133,11 +174,16 @@
                     <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                     Website Templates
                 </a>
-            </div>
+                </div>
+            </details>
 
             <!-- System -->
-            <div class="mb-3">
-                <p class="px-2 text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1">System</p>
+            <details class="admin-nav-section mb-3" {% if request.resolver_match.url_name == 'task_management' or request.resolver_match.url_name == 'integrations_overview' or request.resolver_match.url_name == 'resellerclub_debug' or request.resolver_match.url_name == 'template_scan' or request.resolver_match.url_name == 'security' or request.resolver_match.url_name == 'database' or request.resolver_match.url_name == 'settings_overview' or 'wizard' in request.resolver_match.url_name %}open{% endif %}>
+                <summary class="list-none cursor-pointer px-2 text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1 flex items-center justify-between">
+                    <span>System</span>
+                    <span class="text-slate-600"><span class="admin-nav-plus">+</span><span class="admin-nav-minus">-</span></span>
+                </summary>
+                <div class="space-y-0.5">
                 <a href="{% url 'admin_tools:task_management' %}"
                    class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition-colors {% if request.resolver_match.url_name == 'task_management' %}bg-slate-800 text-white{% endif %}">
                     <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
@@ -178,11 +224,16 @@
                     <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
                     Setup Wizard
                 </a>
-            </div>
+                </div>
+            </details>
 
             <!-- External -->
-            <div class="mb-3">
-                <p class="px-2 text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1">External</p>
+            <details class="admin-nav-section mb-3">
+                <summary class="list-none cursor-pointer px-2 text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1 flex items-center justify-between">
+                    <span>External</span>
+                    <span class="text-slate-600"><span class="admin-nav-plus">+</span><span class="admin-nav-minus">-</span></span>
+                </summary>
+                <div class="space-y-0.5">
                 <a href="/{{ DJANGO_ADMIN_URL }}"
                    class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition-colors">
                     <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
@@ -193,7 +244,8 @@
                     <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
                     Client Portal
                 </a>
-            </div>
+                </div>
+            </details>
         </nav>
 
         <!-- User footer -->
