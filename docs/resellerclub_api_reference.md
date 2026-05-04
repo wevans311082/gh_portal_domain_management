@@ -771,12 +771,16 @@ Used to restore a domain in `Pending Delete Restorable` status.
 
 ## 10. Pricing Endpoints
 
-### 10.1 Get Customer Pricing
+### 10.1 Get Customer Pricing  *(VERIFIED LIVE 2026-05)*
 
 **Endpoint:** `GET products/customer-price.json`  
 KB: `https://manage.resellerclub.com/kb/answer/3449`
 
-Returns the selling price you charge customers for a specific product action.
+**⚠️ Critical:** Despite what older KB articles imply, this endpoint takes **only auth params** —
+any `productkey` / `action` / `years` filters are **ignored**.  A single call returns the
+**ENTIRE customer pricing catalog** for every product on your reseller account
+(≈120KB, 400+ classkey entries).  Calling it once per TLD per action (the obvious-looking pattern)
+will cause 504 timeouts under any kind of bulk sync.
 
 **Parameters:**
 
@@ -784,29 +788,57 @@ Returns the selling price you charge customers for a specific product action.
 |---|---|---|---|
 | `auth-userid` | Integer | Yes | Auth |
 | `api-key` | String | Yes | Auth |
-| `action` | String | Yes | `registration`, `renewal`, `transfer` |
-| `productkey` | String | Yes | Product key (e.g., `dotcom`, `dotnet`, `dotco_uk`). See section 12. |
-| `years` | Integer | Yes | Number of years |
 
 **Example:**
 ```
-GET https://httpapi.com/api/products/customer-price.json?auth-userid=0&api-key=key&action=registration&productkey=dotcom&years=1
+GET https://httpapi.com/api/products/customer-price.json?auth-userid=614860&api-key=...
 ```
 
-**Response structure:**
+**Response structure (real shape):**
 ```json
 {
-  "1": {
-    "sellingprice": 1299,
-    "resellingprice": 999,
-    "sellingcurrencysymbol": "GBP"
-  }
+  "domcno": {
+    "addnewdomain":      { "1": 13.59, "2": 13.59, "...": "...", "10": 13.59 },
+    "renewdomain":       { "1": 13.59, "...": "...", "10": 13.59 },
+    "addtransferdomain": { "1": 13.59 },
+    "restoredomain":     { "1": 53.99 }
+  },
+  "dotnet":          { "addnewdomain": { "1": 14.79 } },
+  "thirdleveldotuk": { "addnewdomain": { "1": 8.39  } }
 }
 ```
 
-The key `"1"` is the number of years. `sellingprice` is in the smallest currency unit (pence for GBP, cents for USD).
+Key points:
+* The top-level key is a **classkey**, NOT a TLD string and NOT `<tld>-domain`.
+  Examples (verified live): `.com→domcno`, `.net→dotnet`, `.org→domorg`, `.io→dotio`,
+  `.uk→dotuk`, `.co.uk`/`.org.uk→thirdleveldotuk`, `.de→dotde`, `.us→domus`,
+  `.info→dominfo`, `.biz→dombiz`, `.com.au→thirdleveldotau`.
+* Action keys are the catalog names: `addnewdomain` (registration),
+  `renewdomain` (renewal), `addtransferdomain` (transfer), `restoredomain` (restore).
+* Year keys are **strings** (`"1"`..`"10"`).
+* Prices are decimal numbers in your reseller's selling currency (no /100 conversion).
+* TLDs without an `addtransferdomain` block do not support transfers via the API
+  (e.g. some 3rd-level UK and `.es`).
 
-> **This is the endpoint our `TLDPricingService` uses.** The `productkey` for a TLD can be found via section 12.
+#### How to discover the classkey for a TLD
+
+There is no direct "TLD → classkey" endpoint. Use **`domains/available.json`** — every
+availability response embeds the `classkey` per TLD:
+
+```
+GET domains/available.json?domain-name=probe&tlds=com&tlds=net&tlds=co.uk
+→ { "probe.com":   { "classkey": "domcno",          "status": "..." },
+    "probe.net":   { "classkey": "dotnet",          "status": "..." },
+    "probe.co.uk": { "classkey": "thirdleveldotuk", "status": "..." } }
+```
+
+A full pricing sync for N TLDs is therefore exactly **2 API calls**:
+1. One chunked `domains/available.json` sweep → map every TLD → classkey.
+2. One `products/customer-price.json` → full catalog.
+
+This is implemented in `ResellerClubClient.prime_pricing_cache()` and used by `TLDPricingService.sync_pricing()`.
+
+> **This is the endpoint our `TLDPricingService` uses.** Do not call it per-TLD.
 
 ---
 
@@ -974,9 +1006,18 @@ For domain action responses (register, transfer, renew, modify, etc.):
 **Reality:** The test URL `test.httpapi.com` is a sandbox. It does not process real orders and has relaxed rules (GET allowed for mutations). Always use `httpapi.com` in production.  
 **This project default:** `https://httpapi.com/api` (configurable via `RESELLERCLUB_API_URL` env var).
 
-### ❌ Myth: The pricing response has a simple numeric price
-**Reality:** Pricing responses are nested maps. The top-level key is the number of years (`"1"`, `"2"`, etc.). `sellingprice` is in the smallest currency unit (pence for GBP).  
-**Fix:** Navigate `response["1"]["sellingprice"]` and divide by 100.
+### ❌ Myth: The pricing response has a simple numeric price keyed by years
+**Reality:** `customer-price.json` returns the **full reseller catalog** keyed by
+`classkey` → `action` → `years` → decimal price. Top-level keys are classkeys
+(`domcno`, `dotnet`, `thirdleveldotuk`, ...), NOT years. Year keys are strings.
+Prices are plain decimals in your reseller currency — no /100 conversion.  
+**Fix:** Navigate `catalog[classkey]["addnewdomain"][str(years)]`.
+
+### ❌ Myth: `customer-price.json` filters by `productkey` / `action` / `years`
+**Reality:** Those parameters are silently ignored — you always get the entire
+catalog (≈120KB, 400+ entries). Calling per-TLD per-action causes 504 timeouts.  
+**Fix:** Call ONCE, cache the response, look up classkeys via
+`domains/available.json` (which returns `classkey` for every TLD).
 
 ### ❌ Myth: Any IP can call the live API
 **Reality:** The live API requires your server's IP to be whitelisted. Takes 30–60 minutes after adding.  
@@ -991,7 +1032,13 @@ The API can return 500/502/503/504 transiently. Use retry logic (this project us
 ### ✅ Array params must be repeated
 Do NOT use comma-separated values for arrays. Use repeated parameters:  
 `tlds=com&tlds=net&tlds=org` — correct  
-`tlds=com,net,org` — **wrong**
+`tlds=com,net,org` — **wrong**: API treats the whole comma string as a single literal TLD and
+responds with `{"<label>.<comma-string>": {"status": "unknown"}}` — the canonical signature of this bug.
+
+### ✅ Discover TLD classkeys via `domains/available.json`
+`classkey` is included in every availability response and is the join key into the
+customer pricing catalog. One chunked availability call gives you the classkey for
+every TLD you support — do this once and cache the mapping.
 
 ---
 
@@ -1016,11 +1063,13 @@ File: `apps/domains/resellerclub_client.py`
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `check_availability(domain_names, tlds)` | `GET domains/available` | Check domain availability |
+| `check_availability(domain_names, tlds)` | `GET domains/available` | Check domain availability. Sends `domain-name` and `tlds` as **repeated** params; chunks TLDs to keep URLs under safe length. Response includes `classkey` per TLD. |
+| `discover_tld_classkeys(tlds, probe_label="example")` | `GET domains/available` | Returns `{tld: classkey}` mapping built from a single availability sweep. Caches results on the client instance. |
+| `get_customer_pricing()` | `GET products/customer-price` | Fetches the **full** customer pricing catalog (one call). Cached for the lifetime of the client instance. |
+| `prime_pricing_cache(tlds)` | `GET domains/available` + `GET products/customer-price` | One-shot: discover classkeys for the given TLDs and load the full pricing catalog. Total: 2 API calls. |
+| `get_tld_pricing(tld, years, action)` | _(cache lookup)_ | Returns pricing block for a single TLD/action from the cached catalog. Triggers cache priming on miss. |
+| `get_tld_costs(tld, years)` | _(cache lookup)_ | Registration + renewal + transfer costs from the cached catalog. |
 | `suggest_names(keyword, tlds)` | `GET domains/suggest-names` | Get name suggestions |
-| `get_price(domain_name, tld, action, years)` | `GET products/customer-price` | Get pricing for action |
-| `get_tld_pricing(tld, years, action)` | `GET products/customer-price` | Pricing for a TLD |
-| `get_tld_costs(tld, years)` | `GET products/customer-price` x3 | Registration + renewal + transfer costs |
 | `list_available_tlds()` | _(no API call)_ | Returns curated `SUPPORTED_TLDS` list |
 | `register_domain(...)` | `POST domains/register` | Register a domain |
 | `renew_domain(order_id, years, exp_date)` | `POST domains/renew` | Renew a domain |
