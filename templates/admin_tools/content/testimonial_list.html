@@ -4,6 +4,7 @@
 {% block content %}
 <div class="mb-4"><a href="{% url 'admin_tools:testimonial_create' %}" class="px-4 py-2 rounded bg-sky-600 text-white text-sm">+ New Testimonial</a></div>
 <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+<div class="overflow-x-auto">
 <table class="w-full text-sm">
   <thead class="bg-slate-50 border-b border-slate-200">
     <tr>
@@ -36,5 +37,6 @@
     {% endfor %}
   </tbody>
 </table>
+</div>
 </div>
 {% endblock %}

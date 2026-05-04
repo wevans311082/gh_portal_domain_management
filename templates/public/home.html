@@ -43,13 +43,14 @@
 <div id="hero-bg" class="relative overflow-hidden">
 <div class="hero-atmosphere"></div>
 <!-- Navigation -->
-<header class="text-white sticky top-0 z-40">
+<header class="text-white sticky top-0 z-40" x-data="{ mobileMenuOpen: false }">
     <nav class="container mx-auto px-4 py-4 flex justify-between items-center">
         <a href="{% url 'core:home' %}" class="flex items-center gap-2 text-xl font-bold text-white">
             <img src="{% static 'images/logo.png' %}" alt="{{ SITE_NAME }}"
                  class="h-10 w-10 rounded-lg shadow-lg ring-1 ring-white/30 bg-white/10 p-0.5">
             <span class="tracking-tight">{{ SITE_NAME }}</span>
         </a>
+        <!-- Desktop nav -->
         <div class="hidden md:flex gap-6 items-center glass-card rounded-full px-5 py-2">
             <a href="#features" class="hover:text-sky-100 text-sm">Features</a>
             <a href="{% url 'core:pricing' %}" class="hover:text-sky-100 text-sm">Pricing</a>
@@ -60,14 +61,36 @@
                 {% octicon "rocket" classes="w-3.5 h-3.5" %} Get Started
             </a>
         </div>
+        <!-- Mobile hamburger -->
+        <button @click="mobileMenuOpen = !mobileMenuOpen" class="md:hidden text-white p-2" aria-label="Toggle menu">
+            <svg x-show="!mobileMenuOpen" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+            <svg x-show="mobileMenuOpen" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
     </nav>
+    <!-- Mobile menu panel -->
+    <div x-show="mobileMenuOpen"
+         x-transition:enter="transition ease-out duration-150"
+         x-transition:enter-start="opacity-0 -translate-y-2"
+         x-transition:enter-end="opacity-100 translate-y-0"
+         x-transition:leave="transition ease-in duration-100"
+         x-transition:leave-start="opacity-100 translate-y-0"
+         x-transition:leave-end="opacity-0 -translate-y-2"
+         class="md:hidden glass-card border-t border-white/20 px-4 pb-4 space-y-2">
+        <a href="#features" @click="mobileMenuOpen = false" class="block py-2 text-sm text-white hover:text-sky-200">Features</a>
+        <a href="{% url 'core:pricing' %}" @click="mobileMenuOpen = false" class="block py-2 text-sm text-white hover:text-sky-200">Pricing</a>
+        <a href="{% url 'domains:search' %}" @click="mobileMenuOpen = false" class="block py-2 text-sm text-white hover:text-sky-200">Domains</a>
+        <a href="{% url 'account_login' %}" @click="mobileMenuOpen = false" class="block py-2 text-sm text-white hover:text-sky-200">Login</a>
+        <a href="{% url 'accounts_custom:register' %}" class="block mt-2 w-full text-center bg-cyan-500 px-4 py-2.5 rounded text-sm font-medium text-slate-900 hover:bg-cyan-400">
+            Get Started
+        </a>
+    </div>
 </header>
 
 <!-- Hero -->
-<section class="text-white py-24 relative">
+<section class="text-white py-16 md:py-24 relative">
     <div class="absolute inset-0 bg-slate-900/45"></div>
     <div class="container mx-auto px-4 text-center">
-        <h2 class="text-5xl font-bold mb-6 leading-tight relative z-10">
+        <h2 class="text-3xl sm:text-5xl font-bold mb-6 leading-tight relative z-10">
             Reliable Web Hosting<br>
             <span class="text-cyan-200">by Grumpy Hosting</span>
         </h2>
@@ -78,7 +101,7 @@
 
         <!-- Domain Search -->
         <div class="max-w-xl mx-auto mb-6 relative z-10 glass-card rounded-2xl p-4 md:p-5">
-            <form class="flex gap-2"
+            <form class="flex flex-col sm:flex-row gap-2"
                   hx-get="{% url 'domains:check' %}"
                   hx-target="#hero-results"
                   hx-trigger="submit, input from:#hero-domain-input changed delay:600ms"
@@ -113,7 +136,7 @@
 </div>
 
 <!-- Package Cards -->
-<section class="py-20 bg-slate-100/80">
+<section class="py-12 md:py-20 bg-slate-100/80">
     <div class="container mx-auto px-4">
         <h2 class="text-3xl font-bold text-center mb-4">Simple, Honest Pricing</h2>
         <p class="text-gray-600 text-center mb-12">No contracts. Cancel anytime.</p>
@@ -146,7 +169,7 @@
 </section>
 
 <!-- Features -->
-<section id="features" class="py-20 bg-gray-50">
+<section id="features" class="py-12 md:py-20 bg-gray-50">
     <div class="container mx-auto px-4">
         <h2 class="text-3xl font-bold text-center mb-12">Why Grumpy Hosting?</h2>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
@@ -167,7 +190,7 @@
 </section>
 
 <!-- FAQ -->
-<section class="py-20 bg-white">
+<section class="py-12 md:py-20 bg-white">
     <div class="container mx-auto px-4 max-w-3xl">
         <h2 class="text-3xl font-bold text-center mb-12">Frequently Asked Questions</h2>
         <div class="space-y-4" x-data="{}">
@@ -188,7 +211,7 @@
 </section>
 
 <!-- CTA -->
-<section class="py-20 bg-sky-600 text-white">
+<section class="py-12 md:py-20 bg-sky-600 text-white">
     <div class="container mx-auto px-4 text-center">
         <h2 class="text-3xl font-bold mb-4">Ready to get started?</h2>
         <p class="text-orange-100 mb-8 text-lg">Join hundreds of businesses already hosted with Grumpy Hosting.</p>

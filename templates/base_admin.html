@@ -19,19 +19,39 @@
         display: inline;
     }
 </style>
-<div class="admin-shell flex h-full">
-    <!-- ── Admin Sidebar ───────────────────────────────────────────────── -->
-    <aside class="w-64 bg-slate-900 text-white flex-shrink-0 flex flex-col shadow-xl" style="min-height:100vh">
-        <!-- Brand -->
+<div class="admin-shell flex h-full" x-data="{ sidebarOpen: false }">
+
+    <!-- ── Mobile backdrop overlay ─────────────────────────────────── -->
+    <div x-show="sidebarOpen"
+         x-transition:enter="transition-opacity ease-out duration-200"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition-opacity ease-in duration-150"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         @click="sidebarOpen = false"
+         class="fixed inset-0 z-30 bg-slate-900/60 lg:hidden"
+         aria-hidden="true"></div>
+
+    <!-- ── Admin Sidebar (drawer on mobile, static on lg+) ─────────── -->
+    <aside class="fixed inset-y-0 left-0 z-40 w-72 bg-slate-900 text-white flex flex-col shadow-xl
+                  transition-transform duration-300 ease-in-out
+                  lg:relative lg:translate-x-0 lg:w-64 lg:flex-shrink-0 lg:inset-auto lg:z-auto"
+           :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'">
+        <!-- Brand + close btn -->
         <div class="px-5 py-4 border-b border-slate-700">
             <div class="flex items-center gap-2.5">
                 <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center flex-shrink-0">
                     <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
                 </div>
-                <div>
+                <div class="flex-1 min-w-0">
                     <p class="text-sm font-bold text-white leading-tight">{{ SITE_NAME }}</p>
                     <p class="text-xs text-indigo-400 font-medium">Admin Panel</p>
                 </div>
+                <!-- Close btn — mobile only -->
+                <button @click="sidebarOpen = false" class="lg:hidden text-slate-400 hover:text-white p-1 -mr-1 flex-shrink-0" aria-label="Close menu">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
             </div>
         </div>
 
@@ -288,15 +308,21 @@
     </aside>
 
     <!-- ── Main content ──────────────────────────────────────────────────── -->
-    <main class="flex-1 overflow-auto flex flex-col bg-slate-50" style="min-height:100vh">
-        <header class="bg-white border-b border-slate-200 px-6 py-3.5 flex justify-between items-center flex-shrink-0 shadow-sm">
-            <h2 class="text-base font-semibold text-slate-800">{% block page_title %}{% endblock %}</h2>
-            <div class="flex items-center gap-3 text-sm text-slate-600">
-                {% block header_actions %}{% endblock %}
+    <main class="flex-1 min-w-0 overflow-auto flex flex-col bg-slate-50">
+        <!-- Top bar: hamburger on mobile + page title -->
+        <header class="bg-white border-b border-slate-200 flex-shrink-0 shadow-sm">
+            <div class="flex items-center justify-between px-4 py-3.5 gap-3">
+                <button @click="sidebarOpen = true" class="lg:hidden text-slate-600 hover:text-slate-900 p-1 -ml-1 flex-shrink-0" aria-label="Open menu">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                </button>
+                <h2 class="text-base font-semibold text-slate-800 flex-1 min-w-0 truncate">{% block page_title %}{% endblock %}</h2>
+                <div class="flex items-center gap-3 text-sm text-slate-600 flex-shrink-0">
+                    {% block header_actions %}{% endblock %}
+                </div>
             </div>
         </header>
         {% if messages %}
-        <div class="px-6 pt-4 space-y-2">
+        <div class="px-4 md:px-6 pt-4 space-y-2">
             {% for msg in messages %}
             <div class="px-4 py-3 rounded-lg text-sm font-medium
                 {% if msg.tags == 'error' %}bg-red-50 text-red-700 border border-red-200
@@ -307,7 +333,7 @@
             {% endfor %}
         </div>
         {% endif %}
-        <div class="flex-1 p-6 overflow-auto">
+        <div class="flex-1 p-4 md:p-6 overflow-auto">
             {% block content %}{% endblock %}
         </div>
     </main>

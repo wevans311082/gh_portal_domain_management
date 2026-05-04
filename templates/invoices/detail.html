@@ -39,7 +39,7 @@
     </div>
 
     <!-- Billing Info -->
-    <div class="grid grid-cols-2 gap-8 mb-8 text-sm">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8 text-sm">
         <div>
             <h3 class="font-semibold text-gray-700 mb-2">Billed To</h3>
             <p class="text-gray-600">{{ invoice.billing_name|default:invoice.user.full_name }}</p>
@@ -71,7 +71,8 @@
     </div>
 
     <!-- Line Items -->
-    <table class="w-full text-sm mb-6">
+    <div class="overflow-x-auto">
+<table class="w-full text-sm mb-6">
         <thead class="border-b-2 border-gray-200">
             <tr>
                 <th class="py-2 text-left font-semibold text-gray-700">Description</th>
@@ -91,6 +92,7 @@
             {% endfor %}
         </tbody>
     </table>
+</div>
 
     <!-- Totals -->
     <div class="flex justify-end">

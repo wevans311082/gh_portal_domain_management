@@ -4,9 +4,9 @@
 {% block page_title %}My Domains{% endblock %}
 
 {% block content %}
-<div class="flex justify-between items-center mb-6">
+<div class="flex flex-wrap justify-between items-center gap-3 mb-6">
     <p class="text-gray-600">{{ domains|length }} domain{% if domains|length != 1 %}s{% endif %} registered</p>
-    <div class="flex gap-2">
+    <div class="flex flex-wrap gap-2">
         <a href="{% url 'portal:shop' %}" class="bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700 text-sm">
             Shop / Renew / Transfer
         </a>
@@ -22,7 +22,8 @@
     <input type="hidden" name="renewal_years" value="1">
 
     <div class="bg-white rounded-lg shadow overflow-hidden">
-        <table class="w-full text-sm">
+        <div class="overflow-x-auto">
+<table class="w-full text-sm">
             <thead class="bg-gray-50 border-b">
                 <tr>
                     <th class="px-4 py-3 w-8">
@@ -83,6 +84,7 @@
                 {% endfor %}
             </tbody>
         </table>
+</div>
     </div>
 
     <!-- Bulk action bar -->

@@ -26,7 +26,8 @@
 
 {% if submissions %}
 <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-    <table class="w-full text-sm">
+    <div class="overflow-x-auto">
+<table class="w-full text-sm">
         <thead class="bg-slate-50 border-b border-slate-200">
             <tr>
                 <th class="text-left px-5 py-3 font-semibold text-slate-700">Status</th>
@@ -62,6 +63,7 @@
             {% endfor %}
         </tbody>
     </table>
+</div>
 </div>
 
 {% if page_obj.has_other_pages %}

@@ -25,7 +25,7 @@
 
 <!-- Summary -->
 {% if totals.total_invoiced %}
-<div class="grid grid-cols-3 gap-4 mb-6">
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
     <div class="bg-white rounded-lg shadow p-4 text-center">
         <div class="text-xs text-gray-500 mb-1">Total Invoiced</div>
         <div class="text-xl font-bold text-gray-900">£{{ totals.total_invoiced|floatformat:2 }}</div>
@@ -45,7 +45,8 @@
 
 <!-- Invoice list -->
 <div class="bg-white rounded-lg shadow overflow-hidden">
-    <table class="w-full text-sm">
+    <div class="overflow-x-auto">
+<table class="w-full text-sm">
         <thead class="bg-gray-50 border-b">
             <tr>
                 <th class="px-4 py-3 text-left font-semibold text-gray-700">Invoice #</th>
@@ -89,6 +90,7 @@
             {% endfor %}
         </tbody>
     </table>
+</div>
 </div>
 
 {% if page_obj.has_other_pages %}

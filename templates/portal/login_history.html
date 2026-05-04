@@ -4,7 +4,8 @@
 <div class="max-w-3xl mx-auto py-8 space-y-4">
   <h1 class="text-xl font-semibold text-slate-800">Login History</h1>
   <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
-    <table class="min-w-full text-sm">
+    <div class="overflow-x-auto">
+<table class="min-w-full text-sm">
       <thead class="bg-slate-50 text-slate-500 text-xs uppercase">
         <tr>
           <th class="px-4 py-3 text-left">Event</th>
@@ -24,6 +25,7 @@
         {% endfor %}
       </tbody>
     </table>
+</div>
   </div>
   <p class="text-xs text-slate-400">Showing last 50 events.</p>
 </div>

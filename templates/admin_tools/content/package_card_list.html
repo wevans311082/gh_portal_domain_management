@@ -3,7 +3,9 @@
 {% block page_title %}Homepage Package Cards{% endblock %}
 {% block content %}
 <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+<div class="overflow-x-auto">
 <table class="w-full text-sm"><thead class="bg-slate-50"><tr><th class="px-4 py-2 text-left">Package</th><th class="px-4 py-2 text-right">Monthly</th><th class="px-4 py-2">Home</th><th class="px-4 py-2">Badge</th><th class="px-4 py-2 text-right">Actions</th></tr></thead><tbody class="divide-y">
 {% for p in packages %}<tr><td class="px-4 py-2">{{ p.name }}</td><td class="px-4 py-2 text-right">£{{ p.price_monthly }}</td><td class="px-4 py-2 text-center">{% if p.show_on_homepage %}Yes{% else %}No{% endif %}</td><td class="px-4 py-2">{{ p.card_badge|default:'—' }}</td><td class="px-4 py-2 text-right"><a href="{% url 'admin_tools:package_card_edit' p.pk %}" class="text-xs text-sky-700">Edit + Preview</a></td></tr>{% endfor %}
-</tbody></table></div>
+</tbody></table>
+</div></div>
 {% endblock %}

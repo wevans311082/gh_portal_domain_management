@@ -28,7 +28,8 @@
 </div>
 
 <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-  <table class="min-w-full text-sm">
+  <div class="overflow-x-auto">
+<table class="min-w-full text-sm">
     <thead class="bg-slate-50 text-xs uppercase text-slate-600">
       <tr>
         <th class="px-4 py-3 text-left">Number</th>
@@ -59,6 +60,7 @@
       {% endfor %}
     </tbody>
   </table>
+</div>
 </div>
 
 {% include "admin_tools/_pagination.html" with page_obj=page_obj %}

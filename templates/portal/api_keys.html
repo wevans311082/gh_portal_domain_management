@@ -14,7 +14,8 @@
   {% with request.session.pop as _ %}{% endwith %}
   {% endif %}
   <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
-    <table class="min-w-full text-sm">
+    <div class="overflow-x-auto">
+<table class="min-w-full text-sm">
       <thead class="bg-slate-50 text-slate-500 text-xs uppercase">
         <tr>
           <th class="px-4 py-3 text-left">Name</th>
@@ -43,6 +44,7 @@
         {% endfor %}
       </tbody>
     </table>
+</div>
   </div>
 </div>
 {% endblock %}

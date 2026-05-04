@@ -85,7 +85,7 @@
 
     <div class="bg-white rounded-lg shadow p-6">
         <h3 class="font-semibold text-gray-900 mb-4">Domain Renewals</h3>
-        <div class="grid grid-cols-3 gap-4 text-center">
+        <div class="grid sm:grid-cols-3 gap-4 text-center">
             <div>
                 <p class="text-3xl font-bold text-emerald-600">{{ renewal_counts.completed }}</p>
                 <p class="text-xs text-gray-500 mt-1">Completed</p>
@@ -105,7 +105,7 @@
 <!-- Task health -->
 <div class="bg-white rounded-lg shadow p-6 mb-6">
     <h3 class="font-semibold text-gray-900 mb-4">Task Health (last 7 days)</h3>
-    <div class="grid grid-cols-3 gap-4 text-center">
+    <div class="grid sm:grid-cols-3 gap-4 text-center">
         {% for bar in task_chart_bars %}
         <div>
             <p class="text-3xl font-bold {% if bar.color == 'bg-emerald-500' %}text-emerald-600{% elif bar.color == 'bg-rose-500' %}text-red-600{% else %}text-yellow-600{% endif %}">{{ bar.count }}</p>

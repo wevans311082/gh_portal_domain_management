@@ -48,7 +48,8 @@
         </div>
       </div>
 
-      <table class="w-full text-sm mb-6">
+      <div class="overflow-x-auto">
+<table class="w-full text-sm mb-6">
         <thead>
           <tr class="text-xs uppercase text-slate-500 border-b border-slate-200">
             <th class="text-left py-2">Description</th>
@@ -68,6 +69,7 @@
           {% endfor %}
         </tbody>
       </table>
+</div>
 
       <dl class="ml-auto max-w-xs text-sm space-y-1">
         <div class="flex justify-between"><dt class="text-slate-500">Subtotal</dt><dd>{{ quote.currency }} {{ quote.subtotal|floatformat:2 }}</dd></div>

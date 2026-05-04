@@ -6,7 +6,8 @@
 {% block content %}
 {% if invoices %}
 <div class="bg-white rounded-lg shadow overflow-hidden">
-    <table class="w-full text-sm">
+    <div class="overflow-x-auto">
+<table class="w-full text-sm">
         <thead class="bg-gray-50 border-b">
             <tr>
                 <th class="px-4 py-3 text-left font-semibold text-gray-700">Invoice #</th>
@@ -50,6 +51,7 @@
             {% endfor %}
         </tbody>
     </table>
+</div>
 </div>
 {% else %}
 <div class="bg-white rounded-lg shadow p-12 text-center">
