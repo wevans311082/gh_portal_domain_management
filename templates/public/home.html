@@ -1,5 +1,5 @@
 ﻿{% extends "base.html" %}
-{% load static %}
+{% load static core_tags %}
 
 {% block title %}{{ SITE_NAME }} - Reliable UK Web Hosting{% endblock %}
 
@@ -29,15 +29,19 @@
 <!-- Navigation -->
 <header class="text-white sticky top-0 z-40">
     <nav class="container mx-auto px-4 py-4 flex justify-between items-center">
-        <h1 class="text-xl font-bold text-white">{{ SITE_NAME }}</h1>
+        <a href="{% url 'core:home' %}" class="flex items-center gap-2 text-xl font-bold text-white">
+            <img src="{% static 'images/logo.png' %}" alt="{{ SITE_NAME }}"
+                 class="h-10 w-10 rounded-lg shadow-lg ring-1 ring-white/30 bg-white/10 p-0.5">
+            <span class="tracking-tight">{{ SITE_NAME }}</span>
+        </a>
         <div class="hidden md:flex gap-6 items-center glass-card rounded-full px-5 py-2">
             <a href="#features" class="hover:text-sky-100 text-sm">Features</a>
             <a href="{% url 'core:pricing' %}" class="hover:text-sky-100 text-sm">Pricing</a>
             <a href="{% url 'domains:search' %}" class="hover:text-sky-100 text-sm">Domains</a>
             <a href="{% url 'account_login' %}" class="hover:text-sky-100 text-sm">Login</a>
             <a href="{% url 'accounts_custom:register' %}"
-               class="bg-cyan-500 px-4 py-2 rounded text-sm hover:bg-cyan-400 font-medium text-slate-900">
-                Get Started
+               class="bg-cyan-500 px-4 py-2 rounded text-sm hover:bg-cyan-400 font-medium text-slate-900 inline-flex items-center gap-1.5">
+                {% octicon "rocket" classes="w-3.5 h-3.5" %} Get Started
             </a>
         </div>
     </nav>

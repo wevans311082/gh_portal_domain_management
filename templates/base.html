@@ -7,6 +7,7 @@
     <title>{% block title %}{{ SITE_NAME }}{% endblock %}</title>
     {% load static %}
     <link rel="icon" type="image/svg+xml" href="{% static 'images/logo.svg' %}">
+    <link rel="alternate icon" type="image/png" href="{% static 'images/logo.png' %}">
     <!-- Tailwind CSS -->
     <script src="{% static 'js/tailwind-config.js' %}"></script>
     <script src="{% static 'vendor/tailwindcss-cdn.js' %}"></script>
@@ -15,7 +16,7 @@
     <link rel="stylesheet" href="{% static 'css/app.css' %}">
     {% block extra_head %}{% endblock %}
 </head>
-<body class="h-full bg-sky-50">
+<body class="h-full bg-sky-50" data-noise-texture="{% static 'images/noise.png' %}">
     {% if messages %}
     <div class="fixed top-4 right-4 z-50 space-y-2">
         {% for message in messages %}

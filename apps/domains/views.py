@@ -14,7 +14,7 @@ from django.views.decorators.http import require_GET, require_POST
 
 from apps.billing.models import Invoice, InvoiceLineItem
 from apps.domains.forms import DomainContactForm, DomainRegistrationForm
-from apps.domains.models import Domain, DomainContact, DomainOrder, DomainRenewal, TLDPricing
+from apps.domains.models import Domain, DomainContact, DomainOrder, DomainPricingSettings, DomainRenewal, TLDPricing
 from apps.domains.pricing import TLDPricingService
 from apps.domains.resellerclub_client import ResellerClubClient, ResellerClubError
 from apps.domains.services import DomainContactService
@@ -22,7 +22,41 @@ from apps.core.runtime_settings import get_runtime_setting
 
 logger = logging.getLogger(__name__)
 
-POPULAR_TLDS = ["co.uk", "com", "uk", "org", "net", "io", "org.uk"]
+# Fallback used only if DomainPricingSettings is empty.
+_FALLBACK_POPULAR_TLDS = ["co.uk", "com", "uk", "org", "net", "io", "org.uk"]
+
+
+def _normalize_tld(value: str) -> str:
+    return str(value or "").strip().lower().lstrip(".")
+
+
+def get_active_tlds():
+    """Return the staff-configured list of supported TLDs (dynamic).
+
+    Uses ``DomainPricingSettings.supported_tlds`` when set so admins can
+    add/remove TLDs in the Django admin without a code change. Falls back to
+    a sensible UK-focused default list if the setting is empty or unreadable.
+    """
+    try:
+        settings_obj = DomainPricingSettings.get_solo()
+        configured = [_normalize_tld(t) for t in (settings_obj.supported_tlds or []) if str(t).strip()]
+        if configured:
+            # Preserve admin-defined ordering and de-dupe.
+            seen = set()
+            ordered = []
+            for tld in configured:
+                if tld and tld not in seen:
+                    seen.add(tld)
+                    ordered.append(tld)
+            return ordered
+    except Exception as exc:
+        logger.warning("Could not read DomainPricingSettings.supported_tlds: %s", exc)
+    return list(_FALLBACK_POPULAR_TLDS)
+
+
+# Kept for backwards compatibility with imports/tests; the dynamic list is
+# preferred via ``get_active_tlds()``.
+POPULAR_TLDS = list(_FALLBACK_POPULAR_TLDS)
 
 # Basic allow-list: only alphanumeric + hyphens, 2-63 chars
 _DOMAIN_LABEL_RE = re.compile(r"^[a-z0-9]([a-z0-9\-]{0,61}[a-z0-9])?$")
@@ -148,7 +182,8 @@ def _fetch_live_debug_prices(client: ResellerClubClient, tlds: list) -> dict:
 
 def _split_domain_name(domain_name: str):
     normalized = domain_name.strip().lower()
-    for tld in sorted(POPULAR_TLDS, key=len, reverse=True):
+    known_tlds = sorted(set(get_active_tlds() + _FALLBACK_POPULAR_TLDS), key=len, reverse=True)
+    for tld in known_tlds:
         suffix = f".{tld}"
         if normalized.endswith(suffix):
             return normalized[: -len(suffix)], tld
@@ -180,19 +215,20 @@ def _sync_missing_tld_pricing(tlds):
 
 def domain_search(request):
     """Public domain search page."""
-    existing_tlds = set(TLDPricing.objects.filter(tld__in=POPULAR_TLDS).values_list("tld", flat=True))
-    missing_tlds = [tld for tld in POPULAR_TLDS if tld not in existing_tlds]
+    active_tlds = get_active_tlds()
+    existing_tlds = set(TLDPricing.objects.filter(tld__in=active_tlds).values_list("tld", flat=True))
+    missing_tlds = [tld for tld in active_tlds if tld not in existing_tlds]
     _sync_missing_tld_pricing(missing_tlds)
 
-    pricing_lookup = TLDPricing.objects.in_bulk(POPULAR_TLDS, field_name="tld")
+    pricing_lookup = TLDPricing.objects.in_bulk(active_tlds, field_name="tld")
     featured_tlds = [
         {
             "tld": tld,
             "price": pricing_lookup.get(tld).registration_price if pricing_lookup.get(tld) else None,
         }
-        for tld in POPULAR_TLDS
+        for tld in active_tlds
     ]
-    return render(request, "domains/search.html", {"popular_tlds": POPULAR_TLDS, "featured_tlds": featured_tlds})
+    return render(request, "domains/search.html", {"popular_tlds": active_tlds, "featured_tlds": featured_tlds})
 
 
 @require_GET
@@ -220,12 +256,21 @@ def domain_check(request):
         return HttpResponse("Invalid domain name.", status=400)
 
     # If user typed a full domain with TLD (e.g. "example.com"), only check that TLD.
-    # Otherwise check all popular TLDs.
+    # Otherwise check the active TLD set, optionally filtered via ?tlds=com,io.
+    active_tlds = get_active_tlds()
     if "." in query:
         _, typed_tld = query.split(".", 1)
         tlds_to_check = [typed_tld]
     else:
-        tlds_to_check = POPULAR_TLDS
+        # Optional filter: ?tlds=com,co.uk,io  (comma-separated for the URL,
+        # the registrar client correctly sends them as repeated params).
+        raw_filter = (request.GET.get("tlds") or "").strip()
+        if raw_filter:
+            requested = [_normalize_tld(t) for t in raw_filter.split(",") if _normalize_tld(t)]
+            allowed = set(active_tlds)
+            tlds_to_check = [t for t in requested if t in allowed] or active_tlds
+        else:
+            tlds_to_check = active_tlds
 
     debug_mode = _is_debug_mode_enabled()
 
@@ -302,27 +347,52 @@ def domain_check(request):
 
 @require_GET
 def domain_whois(request):
-    domain = (request.GET.get("domain") or "").strip().lower()
+    domain = (request.GET.get("domain") or "").strip().lower().strip(".")
     if not domain or "." not in domain:
         return render(
             request,
             "domains/partials/whois_result.html",
             {"domain": domain, "error": "Enter a valid domain name."},
-            status=400,
         )
 
-    label, tld = domain.rsplit(".", 1)
-    if not _is_valid_label(label) or not tld:
+    # Multi-part TLD aware split: try longest matching known TLD first,
+    # then fall back to "everything after the first dot".
+    label = None
+    tld = None
+    for known_tld in sorted(get_active_tlds(), key=len, reverse=True):
+        suffix = f".{known_tld}"
+        if domain.endswith(suffix):
+            label = domain[: -len(suffix)]
+            tld = known_tld
+            break
+    if not tld:
+        label, _, tld = domain.partition(".")
+
+    if not label or not tld or not _is_valid_label(label):
         return render(
             request,
             "domains/partials/whois_result.html",
             {"domain": domain, "error": "Invalid domain name."},
-            status=400,
         )
 
     rdap_url = f"https://rdap.org/domain/{domain}"
     try:
-        response = requests.get(rdap_url, timeout=_WHOIS_TIMEOUT, headers={"Accept": "application/rdap+json, application/json"})
+        response = requests.get(
+            rdap_url,
+            timeout=_WHOIS_TIMEOUT,
+            allow_redirects=True,
+            headers={"Accept": "application/rdap+json, application/json"},
+        )
+        if response.status_code == 404:
+            return render(
+                request,
+                "domains/partials/whois_result.html",
+                {
+                    "domain": domain,
+                    "error": "No public WHOIS/RDAP record found for this domain — the registry may not publish RDAP data, or the domain is not registered.",
+                    "fallback_url": f"https://lookup.icann.org/en/lookup?name={domain}",
+                },
+            )
         response.raise_for_status()
         data = response.json()
     except Exception as exc:
@@ -335,7 +405,6 @@ def domain_whois(request):
                 "error": "WHOIS lookup is temporarily unavailable.",
                 "fallback_url": f"https://lookup.icann.org/en/lookup?name={domain}",
             },
-            status=502,
         )
 
     statuses = data.get("status") if isinstance(data.get("status"), list) else []

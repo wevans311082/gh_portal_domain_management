@@ -1,72 +1,91 @@
 ﻿{% extends "base.html" %}
-{% load static %}
+{% load static core_tags %}
 
 {% block title %}Domain Search - {{ SITE_NAME }}{% endblock %}
 
 {% block extra_head %}
 <script src="{% static 'vendor/htmx-1.9.10.min.js' %}"></script>
 <style>
-    .domain-loading {
-        display: none;
-    }
+    .domain-loading { display: none; }
     .htmx-request .domain-loading,
-    .htmx-request.domain-loading {
-        display: block;
-    }
+    .htmx-request.domain-loading { display: block; }
     .scan-bar {
         background: linear-gradient(90deg, rgba(14,165,233,0) 0%, rgba(14,165,233,0.35) 50%, rgba(14,165,233,0) 100%);
         animation: domain-scan 1.3s linear infinite;
     }
     @keyframes domain-scan {
-        0% { transform: translateX(-120%); }
+        0%   { transform: translateX(-120%); }
         100% { transform: translateX(120%); }
     }
-    .pulse-dot {
-        animation: dot-pulse 1s ease-in-out infinite;
-    }
+    .pulse-dot { animation: dot-pulse 1s ease-in-out infinite; }
     .pulse-dot:nth-child(2) { animation-delay: 0.15s; }
     .pulse-dot:nth-child(3) { animation-delay: 0.3s; }
     @keyframes dot-pulse {
         0%, 100% { opacity: 0.35; transform: translateY(0); }
-        50% { opacity: 1; transform: translateY(-2px); }
+        50%      { opacity: 1; transform: translateY(-2px); }
+    }
+    /* Filter chip active styling */
+    .tld-chip[data-active="true"] {
+        background: linear-gradient(135deg, #0ea5e9, #0284c7);
+        border-color: #0284c7;
+        color: #fff;
+        box-shadow: 0 4px 14px -4px rgba(14, 165, 233, 0.6);
+    }
+    .tld-chip[data-active="true"] .tld-chip-price { color: #e0f2fe; }
+    .hero-grad {
+        background: radial-gradient(ellipse at top, #0c4a6e 0%, #0f172a 60%);
     }
 </style>
 {% endblock %}
 
 {% block body %}
-<header class="bg-sky-800 text-white">
+<header class="hero-grad text-white">
     <nav class="container mx-auto px-4 py-4 flex justify-between items-center">
-        <a href="{% url 'core:home' %}" class="text-xl font-bold text-sky-300">{{ SITE_NAME }}</a>
-        <div class="flex gap-4">
-            <a href="{% url 'account_login' %}" class="hover:text-sky-300">Login</a>
+        <a href="{% url 'core:home' %}" class="flex items-center gap-2 text-xl font-bold">
+            <img src="{% static 'images/logo.png' %}" alt="{{ SITE_NAME }}" class="h-9 w-9 rounded-lg shadow-md ring-1 ring-white/20 bg-white/10 p-0.5">
+            <span class="text-sky-100">{{ SITE_NAME }}</span>
+        </a>
+        <div class="flex gap-4 items-center text-sm">
+            <a href="{% url 'core:pricing' %}" class="hover:text-sky-200">Pricing</a>
+            <a href="{% url 'account_login' %}" class="hover:text-sky-200">Login</a>
+            <a href="{% url 'accounts_custom:register' %}" class="bg-cyan-400 text-slate-900 font-semibold px-3 py-1.5 rounded hover:bg-cyan-300">Get Started</a>
         </div>
     </nav>
 </header>
 
-<main class="container mx-auto px-4 py-16">
-    <div class="max-w-2xl mx-auto text-center mb-12">
-        <h1 class="text-4xl font-bold text-gray-900 mb-4">Find Your Perfect Domain</h1>
-        <p class="text-lg text-gray-600">Search for your domain name and check availability across popular extensions.</p>
+<main class="container mx-auto px-4 py-12">
+    <div class="max-w-2xl mx-auto text-center mb-10">
+        <span class="inline-flex items-center gap-1.5 rounded-full bg-sky-100 text-sky-700 px-3 py-1 text-xs font-semibold mb-4">
+            {% octicon "globe" classes="w-3.5 h-3.5" %} Live registry availability
+        </span>
+        <h1 class="text-4xl md:text-5xl font-bold text-slate-900 mb-3">Find Your Perfect Domain</h1>
+        <p class="text-lg text-slate-600">Search across our supported extensions in real time. Results refresh as you type.</p>
     </div>
 
-    <div class="max-w-3xl mx-auto mb-8">
-        <form class="flex gap-2"
+    <div class="max-w-3xl mx-auto mb-6">
+        <form id="domain-search-form"
+              class="flex gap-2"
               hx-get="{% url 'domains:check' %}"
               hx-target="#availability-results"
-              hx-trigger="submit, input from:#domain-search-input changed delay:600ms"
+              hx-trigger="submit, input from:#domain-search-input changed delay:600ms, change from:#tld-filter-input"
+              hx-include="#tld-filter-input"
               hx-indicator="#search-indicator">
-            <input
-                type="text"
-                id="domain-search-input"
-                name="q"
-                placeholder="Enter domain name..."
-                class="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-lg focus:outline-none focus:border-orange-500"
-            >
-            <button
-                type="submit"
-                class="bg-sky-600 text-white px-6 py-3 rounded-lg hover:bg-sky-700 font-semibold"
-            >
-                Search
+            <div class="flex-1 relative">
+                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                    {% octicon "search" classes="w-4 h-4" %}
+                </span>
+                <input
+                    type="text"
+                    id="domain-search-input"
+                    name="q"
+                    placeholder="Enter your perfect domain..."
+                    class="w-full border border-slate-300 rounded-lg pl-10 pr-4 py-3 text-lg focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+                    autocomplete="off">
+                <input type="hidden" name="tlds" id="tld-filter-input" value="">
+            </div>
+            <button type="submit"
+                    class="bg-sky-600 text-white px-6 py-3 rounded-lg hover:bg-sky-700 font-semibold inline-flex items-center gap-2">
+                {% octicon "search" classes="w-4 h-4" %} Search
             </button>
         </form>
         <div id="search-indicator" class="domain-loading mt-3 rounded-xl border border-sky-100 bg-sky-50/70 px-3 py-3 overflow-hidden relative">
@@ -82,22 +101,31 @@
         </div>
     </div>
 
-    <div class="max-w-3xl mx-auto mb-8">
-        <p class="text-sm text-gray-500 mb-3">Popular extensions:</p>
-        <div class="flex flex-wrap gap-2">
+    <div class="max-w-3xl mx-auto mb-10">
+        <div class="flex items-center justify-between mb-3">
+            <p class="text-sm text-slate-600 inline-flex items-center gap-1.5 font-medium">
+                {% octicon "filter" classes="w-3.5 h-3.5 text-slate-500" %}
+                Filter by extension
+            </p>
+            <button type="button"
+                    id="tld-clear"
+                    class="text-xs text-sky-600 hover:underline hidden">Clear filters</button>
+        </div>
+        <div id="tld-filter-chips" class="flex flex-wrap gap-2">
             {% for featured in featured_tlds %}
             <button
                 type="button"
                 data-domain-tld="{{ featured.tld }}"
-                class="px-3 py-2 border border-gray-300 rounded-2xl text-left text-sm hover:bg-orange-50 hover:border-orange-400"
-            >
-                <span class="block font-semibold text-gray-800">.{{ featured.tld }}</span>
-                <span class="block text-xs text-gray-500">
-                    {% if featured.price %}from GBP {{ featured.price|floatformat:2 }}/yr{% else %}price pending sync{% endif %}
+                data-active="false"
+                class="tld-chip group px-3 py-2 border border-slate-300 rounded-2xl text-left text-sm bg-white hover:bg-sky-50 hover:border-sky-400 transition-colors min-w-[110px]">
+                <span class="block font-semibold">.{{ featured.tld }}</span>
+                <span class="tld-chip-price block text-xs text-slate-500">
+                    {% if featured.price %}from £{{ featured.price|floatformat:2 }}/yr{% else %}price pending{% endif %}
                 </span>
             </button>
             {% endfor %}
         </div>
+        <p class="text-xs text-slate-400 mt-2">Click chips to narrow results. With no filter selected, all extensions are checked.</p>
     </div>
 
     <div id="availability-results" class="max-w-5xl mx-auto"></div>
