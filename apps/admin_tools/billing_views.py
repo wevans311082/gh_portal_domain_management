@@ -273,7 +273,11 @@ def invoice_edit(request, pk):
             except ValueError:
                 pass
         new_status = (request.POST.get("status") or "").strip()
-        if new_status and new_status in dict(Invoice.STATUS_CHOICES):
+        # Only allow safe status transitions via the edit form.
+        # PAID and VOID must go through invoice_action (mark_paid / void)
+        # so that paid_at, amount_paid, and provisioning queuing are handled.
+        _EDITABLE_STATUSES = {Invoice.STATUS_DRAFT, Invoice.STATUS_UNPAID, Invoice.STATUS_OVERDUE}
+        if new_status and new_status in _EDITABLE_STATUSES:
             invoice.status = new_status
         invoice.save()
 

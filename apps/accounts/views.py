@@ -146,7 +146,11 @@ def custom_login(request):
             try:
                 db_user = User.objects.get(email__iexact=email)
                 if db_user.mfa_enabled and db_user.check_password(password):
-                    # Password correct, MFA required → redirect to TOTP step
+                    # Password correct, MFA required → redirect to TOTP step.
+                    # Increment the counter so attackers cannot silently enumerate
+                    # valid passwords for MFA-protected accounts without cost.
+                    # The counter is cleared on successful MFA completion.
+                    cache.set(rl_key, attempts + 1, timeout=_LOGIN_RATE_WINDOW)
                     request.session[_MFA_USER_SESSION_KEY] = db_user.pk
                     request.session.modified = True
                     return redirect("accounts_custom:mfa_verify")
@@ -215,6 +219,7 @@ def mfa_verify(request):
             if token.isdigit() and len(token) == 6 and totp.verify(token, valid_window=1):
                 del request.session[_MFA_USER_SESSION_KEY]
                 login(request, pending_user, backend="apps.accounts.backends.EmailBackend")
+                cache.delete(_login_rate_key(request))  # reset counter after successful MFA
                 if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
                     return redirect(next_url)
                 if pending_user.is_staff:
@@ -223,6 +228,7 @@ def mfa_verify(request):
             if consume_backup_code(pending_user, token):
                 del request.session[_MFA_USER_SESSION_KEY]
                 login(request, pending_user, backend="apps.accounts.backends.EmailBackend")
+                cache.delete(_login_rate_key(request))  # reset counter after successful backup-code MFA
                 messages.warning(
                     request,
                     "Signed in using a backup code. Generate a fresh set soon.",

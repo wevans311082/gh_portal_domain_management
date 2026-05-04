@@ -203,11 +203,7 @@ def _queue_paid_domain_orders(invoice: Invoice) -> None:
 
     pending_orders = DomainOrder.objects.filter(
         invoice=invoice,
-        status__in=[
-            DomainOrder.STATUS_PENDING_PAYMENT,
-            DomainOrder.STATUS_DRAFT,
-            DomainOrder.STATUS_PAID,
-        ],
+        status=DomainOrder.STATUS_PENDING_PAYMENT,
     )
     for order in pending_orders:
         order.status = DomainOrder.STATUS_PAID
@@ -224,6 +220,7 @@ def _queue_paid_domain_orders(invoice: Invoice) -> None:
         domain_tasks.execute_domain_renewal.delay(renewal.id)
 
 
+@transaction.atomic
 def mark_invoice_paid(
     invoice: Invoice,
     *,
@@ -232,6 +229,10 @@ def mark_invoice_paid(
     send_email: bool = True,
 ) -> Invoice:
     """Flip an invoice to PAID and run all downstream follow-ups."""
+    # Reload with a row-lock so concurrent webhook deliveries don't double-pay.
+    invoice = Invoice.objects.select_for_update().get(pk=invoice.pk)
+    if invoice.status == Invoice.STATUS_PAID:
+        return invoice  # idempotent — already paid, nothing to do
     paid_at = paid_at or timezone.now()
     invoice.status = Invoice.STATUS_PAID
     invoice.amount_paid = invoice.total

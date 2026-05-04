@@ -210,6 +210,11 @@ def quote_public_accept(request, token):
         login_url = reverse("account_login")
         return redirect(f"{login_url}?next={reverse('billing_public:quote_public_accept_continue', args=[token])}&quote_token={token}")
 
+    # Reject if this quote is already linked to a different user.
+    if quote.user_id is not None and quote.user_id != request.user.pk:
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied("This quote belongs to another account.")
+
     # Link quote to logged-in user if not already linked
     if quote.user_id is None:
         quote.user = request.user
@@ -234,6 +239,11 @@ def quote_public_accept_continue(request, token):
     if not quote.is_acceptable:
         messages.error(request, "This quote can no longer be accepted.")
         return redirect("billing_public:quote_public", token=token)
+
+    # Reject if this quote is already linked to a different user.
+    if quote.user_id is not None and quote.user_id != request.user.pk:
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied("This quote belongs to another account.")
 
     if quote.user_id is None:
         quote.user = request.user
