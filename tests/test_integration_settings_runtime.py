@@ -45,19 +45,24 @@ def test_extract_tlds_from_productkey_payload_values():
     assert tlds == ["co.uk", "com", "io"]
 
 
-def test_list_available_tlds_uses_first_successful_catalog(monkeypatch):
+def test_list_available_tlds_returns_curated_list_without_api_call(monkeypatch):
+    """list_available_tlds() uses a built-in curated list; it must not call the API.
+
+    ResellerClub/LogicBoxes has no TLD-discovery endpoint and all attempts to
+    probe one will result in HTTP 404.  The curated list is the correct approach.
+    """
     client = ResellerClubClient()
-    calls = []
 
-    def fake_get(endpoint, params=None):
-        calls.append(endpoint)
-        if endpoint == "products/list":
-            return [{"productkey": "com-domain"}, {"productkey": "net-domain"}]
-        raise AssertionError("Fallback endpoint should not be called after successful extraction")
+    def should_not_be_called(*args, **kwargs):
+        raise AssertionError("list_available_tlds must NOT call the API")
 
-    monkeypatch.setattr(client, "_get", fake_get)
+    monkeypatch.setattr(client, "_get", should_not_be_called)
 
     tlds = client.list_available_tlds()
 
-    assert tlds == ["com", "net"]
-    assert calls == ["products/list"]
+    assert isinstance(tlds, list)
+    assert len(tlds) > 50, "Expected a comprehensive curated TLD list"
+    assert "com" in tlds
+    assert "net" in tlds
+    assert "co.uk" in tlds
+    assert "io" in tlds

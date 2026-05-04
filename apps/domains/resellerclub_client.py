@@ -382,28 +382,50 @@ class ResellerClubClient:
         walk(payload)
         return sorted(seen)
 
+    # ResellerClub/LogicBoxes has no API endpoint for discovering available TLDs.
+    # This curated list covers the TLDs they support for registration and pricing.
+    # Extend this list as needed when ResellerClub adds new TLDs to your reseller account.
+    SUPPORTED_TLDS = [
+        # Popular generic TLDs
+        "com", "net", "org", "info", "biz", "name", "mobi", "tel", "asia",
+        # UK
+        "co.uk", "org.uk", "me.uk", "uk",
+        # European ccTLDs
+        "de", "fr", "es", "it", "nl", "be", "eu", "at", "ch", "dk", "se",
+        "no", "fi", "pl", "cz", "hu", "ro", "pt", "gr", "tr", "ru", "ua",
+        # Americas
+        "us", "ca", "com.mx", "mx", "com.ar", "com.br",
+        # Asia-Pacific
+        "com.au", "net.au", "org.au", "co.nz", "nz", "in", "co.in", "net.in",
+        "org.in", "hk", "tw", "sg", "cn", "jp", "co.kr",
+        # New gTLDs — commonly offered by ResellerClub resellers
+        "co", "io", "me", "tv", "cc",
+        "club", "online", "site", "website", "tech", "store", "shop",
+        "blog", "digital", "media", "email", "space", "host", "press",
+        "design", "studio", "agency", "solutions", "services", "support",
+        "expert", "works", "systems", "group", "network", "team",
+        "today", "center", "business", "management", "properties",
+        "estate", "land", "house", "foundation", "education", "school",
+        "training", "institute", "academy", "science", "energy",
+        "solar", "green", "photography", "video", "film", "art", "gallery",
+        "band", "music", "chat", "social", "community", "life",
+        "health", "care", "clinic", "dental", "doctor", "lawyer", "legal",
+        "finance", "financial", "consulting", "marketing", "events",
+        "wedding", "holiday", "travel", "hotel", "tours", "guide",
+        "news", "link", "click", "ninja", "guru", "rocks", "tips",
+        "tools", "codes", "pro",
+    ]
+
     def list_available_tlds(self) -> list:
-        """Return an imported TLD list by probing common LogicBoxes catalog endpoints."""
-        candidates = [
-            ("products/list", {"type": "domain"}),
-            ("domains/available-tlds", {}),
-            ("domains/tlds", {}),
-        ]
-        last_error = None
+        """
+        Return the curated list of TLDs supported by ResellerClub.
 
-        for endpoint, params in candidates:
-            try:
-                payload = self._get(endpoint, params)
-                tlds = self._extract_tlds_from_payload(payload)
-                if tlds:
-                    return tlds
-            except Exception as exc:
-                last_error = exc
-                continue
-
-        if last_error:
-            raise ResellerClubError(f"Unable to import TLD list from registrar: {last_error}")
-        raise ResellerClubError("Unable to import TLD list from registrar.")
+        The ResellerClub/LogicBoxes HTTP API does not provide any endpoint for
+        dynamically discovering available TLDs — attempts to call such endpoints
+        will 404.  This returns a built-in curated list instead; add TLDs here
+        as ResellerClub makes new ones available on your reseller account.
+        """
+        return list(self.SUPPORTED_TLDS)
 
     def register_domain(
         self,
