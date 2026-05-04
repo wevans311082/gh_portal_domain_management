@@ -156,19 +156,34 @@ def contact(request):
                         from django.core.mail import send_mail
                         from django.conf import settings as django_settings
 
-                        body = (
-                            f"Name: {name}\n"
-                            f"Email: {email}\n"
-                            f"Phone: {phone}\n"
-                            f"Subject: {subject}\n\n"
-                            f"Message:\n{message}"
+                        plain_body = (
+                            f"You have received a new contact form submission.\n\n"
+                            f"Name:    {name}\n"
+                            f"Email:   {email}\n"
+                            f"Phone:   {phone or '—'}\n"
+                            f"Subject: {subject or '—'}\n\n"
+                            f"Message:\n{'-' * 40}\n{message}\n{'-' * 40}"
+                        )
+                        html_body = (
+                            "<html><body style='font-family:sans-serif;font-size:14px;color:#1e293b'>"
+                            "<p>You have received a new contact form submission.</p>"
+                            "<table style='border-collapse:collapse;margin-bottom:16px'>"
+                            f"<tr><td style='padding:4px 12px 4px 0;font-weight:bold'>Name</td><td>{name}</td></tr>"
+                            f"<tr><td style='padding:4px 12px 4px 0;font-weight:bold'>Email</td><td><a href='mailto:{email}'>{email}</a></td></tr>"
+                            f"<tr><td style='padding:4px 12px 4px 0;font-weight:bold'>Phone</td><td>{phone or '—'}</td></tr>"
+                            f"<tr><td style='padding:4px 12px 4px 0;font-weight:bold'>Subject</td><td>{subject or '—'}</td></tr>"
+                            "</table>"
+                            "<p style='font-weight:bold;margin-bottom:4px'>Message:</p>"
+                            f"<div style='background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:12px 16px;white-space:pre-wrap'>{message}</div>"
+                            "</body></html>"
                         )
                         send_mail(
                             subject=f"[Contact] {subject or 'New enquiry'} from {name}",
-                            message=body,
+                            message=plain_body,
                             from_email=django_settings.DEFAULT_FROM_EMAIL,
                             recipient_list=[dest],
-                            fail_silently=True,
+                            fail_silently=False,
+                            html_message=html_body,
                         )
                     except Exception:
                         pass
