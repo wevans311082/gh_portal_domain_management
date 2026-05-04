@@ -290,6 +290,53 @@ def test_staff_can_save_companies_house_api_key(client, django_user_model):
 
 
 @pytest.mark.django_db
+def test_staff_can_open_settings_setup_step_editor(client, django_user_model):
+    staff_user = django_user_model.objects.create_user(
+        email="settings-editor@example.com",
+        password="password123",
+        is_staff=True,
+    )
+    client.force_login(staff_user)
+
+    response = client.get(
+        reverse("admin_tools:settings_setup_step", kwargs={"step_key": "registrar"})
+    )
+
+    assert response.status_code == 200
+    assert "Settings Editor" in response.content.decode()
+
+
+@pytest.mark.django_db
+def test_staff_can_save_site_settings_from_normal_admin_settings(client, django_user_model, monkeypatch):
+    staff_user = django_user_model.objects.create_user(
+        email="settings-save@example.com",
+        password="password123",
+        is_staff=True,
+    )
+    client.force_login(staff_user)
+
+    monkeypatch.setattr("apps.admin_tools.wizard_views._write_env_key", lambda *args, **kwargs: None)
+
+    response = client.post(
+        reverse("admin_tools:settings_setup_step", kwargs={"step_key": "site"}),
+        {
+            "action": "save",
+            "site_name": "Ops Edited Name",
+            "site_domain": "example.test",
+            "time_zone": "UTC",
+            "admin_url_slug": "manage-site-xyz/",
+        },
+        follow=True,
+    )
+
+    assert response.status_code == 200
+    assert IntegrationSetting.get_value("SITE_NAME") == "Ops Edited Name"
+    assert IntegrationSetting.get_value("SITE_DOMAIN") == "example.test"
+    assert IntegrationSetting.get_value("DJANGO_TIME_ZONE") == "UTC"
+    assert IntegrationSetting.get_value("DJANGO_ADMIN_URL") == "manage-site-xyz/"
+
+
+@pytest.mark.django_db
 def test_company_lookup_endpoint_returns_company_data(client, django_user_model, monkeypatch):
     staff_user = django_user_model.objects.create_user(
         email="lookup-admin@example.com",

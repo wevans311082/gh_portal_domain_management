@@ -6,9 +6,27 @@
 {% block content %}
 <p class="text-sm text-slate-500 mb-5">
     Read-only view of application configuration. Secrets are redacted.
-    Edit values via the setup wizard at <a href="{% url 'admin_tools:wizard_index' %}" class="text-sky-700 hover:underline">Setup Wizard</a>
-    (or directly in <code class="font-mono bg-slate-100 px-1 py-0.5 rounded">.env</code>) and restart the server.
+    Use the configuration editor below for all setup-related values, or use <a href="{% url 'admin_tools:wizard_index' %}" class="text-sky-700 hover:underline">Setup Wizard</a>
+    for guided first-time onboarding.
 </p>
+
+<div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 mb-5">
+    <div class="flex items-center justify-between gap-3 mb-4">
+        <h2 class="text-sm font-semibold text-slate-800">Configuration Manager</h2>
+        <span class="text-xs text-slate-500">Editable outside setup wizard</span>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+        {% for step in wizard_setting_steps %}
+        <a href="{% url 'admin_tools:settings_setup_step' step.key %}" class="group rounded-lg border border-slate-200 bg-slate-50 hover:bg-sky-50 hover:border-sky-200 p-3 transition-colors">
+            <div class="flex items-center gap-2 mb-1">
+                <span class="text-lg">{{ step.icon }}</span>
+                <p class="text-sm font-semibold text-slate-800 group-hover:text-sky-800">{{ step.title }}</p>
+            </div>
+            <p class="text-xs text-slate-500 group-hover:text-sky-700">{{ step.description }}</p>
+        </a>
+        {% endfor %}
+    </div>
+</div>
 
 <div class="mb-5 rounded-xl border {% if has_companies_house_key %}border-emerald-200 bg-emerald-50{% else %}border-amber-200 bg-amber-50{% endif %} p-4 flex items-center justify-between gap-4">
     <div>

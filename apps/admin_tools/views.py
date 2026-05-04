@@ -24,6 +24,7 @@ from apps.domains.models import Domain, DomainPricingSettings, DomainRenewal, TL
 from apps.payments.models import Payment
 from apps.services.models import Service
 from apps.support.models import SupportTicket
+from . import wizard_views
 
 
 def _build_task_summary():
@@ -1090,6 +1091,16 @@ def settings_overview(request):
     }
 
     has_companies_house_key = bool(get_runtime_setting("COMPANIES_HOUSE_API_KEY", ""))
+    wizard_setting_steps = [
+        {
+            "key": step_key,
+            "title": wizard_views.STEP_META[step_key]["title"],
+            "description": wizard_views.STEP_META[step_key]["description"],
+            "icon": wizard_views.STEP_META[step_key]["icon"],
+        }
+        for step_key in wizard_views.WizardProgress.STEPS
+        if step_key != wizard_views.WizardProgress.STEP_ADMIN
+    ]
 
     return render(
         request,
@@ -1097,6 +1108,65 @@ def settings_overview(request):
         {
             "cfg": cfg,
             "has_companies_house_key": has_companies_house_key,
+            "wizard_setting_steps": wizard_setting_steps,
+        },
+    )
+
+
+@staff_member_required
+def settings_setup_step(request, step_key: str):
+    """Edit wizard-managed settings from the normal Admin Tools settings area."""
+    editable_steps = [
+        key
+        for key in wizard_views.WizardProgress.STEPS
+        if key != wizard_views.WizardProgress.STEP_ADMIN
+    ]
+    if step_key not in editable_steps:
+        messages.error(request, f"Unknown settings section: {step_key}")
+        return redirect("admin_tools:settings_overview")
+
+    step_meta = wizard_views.STEP_META[step_key]
+    form_class = step_meta["form_class"]
+    connection_result = None
+
+    if request.method == "POST":
+        action = request.POST.get("action", "save")
+        form = form_class(request.POST)
+        if form.is_valid():
+            if action == "test":
+                ok, detail = wizard_views._test_connection(step_key, form.cleaned_data)
+                connection_result = {"ok": ok, "detail": detail}
+                if ok:
+                    messages.success(request, f"Connection test passed: {detail}")
+                else:
+                    messages.error(request, f"Connection test failed: {detail}")
+            else:
+                wizard_views._process_step(step_key, form.cleaned_data, request)
+                messages.success(request, f"{step_meta['title']} updated.")
+                return redirect("admin_tools:settings_setup_step", step_key=step_key)
+    else:
+        form = form_class(initial=wizard_views._initial_for_step(step_key))
+
+    steps = [
+        {
+            "key": key,
+            "title": wizard_views.STEP_META[key]["title"],
+            "icon": wizard_views.STEP_META[key]["icon"],
+            "description": wizard_views.STEP_META[key]["description"],
+            "current": key == step_key,
+        }
+        for key in editable_steps
+    ]
+
+    return render(
+        request,
+        "admin_tools/settings_setup_step.html",
+        {
+            "form": form,
+            "step_key": step_key,
+            "meta": step_meta,
+            "steps": steps,
+            "connection_result": connection_result,
         },
     )
 

@@ -64,6 +64,7 @@ urlpatterns = [
     path("security/", views.security, name="security"),
     path("database/", views.database, name="database"),
     path("settings/", views.settings_overview, name="settings_overview"),
+    path("settings/setup/<str:step_key>/", views.settings_setup_step, name="settings_setup_step"),
     path("setup/", views.setup, name="setup"),
     # Setup wizard
     path("setup/wizard/", wizard_views.wizard_index, name="wizard_index"),
