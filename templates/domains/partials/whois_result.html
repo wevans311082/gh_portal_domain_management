@@ -1,0 +1,80 @@
+{% if error %}
+<div class="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+    {{ error }}
+    {% if fallback_url %}
+    <a href="{{ fallback_url }}" target="_blank" rel="noopener noreferrer" class="font-semibold underline ml-1">Open ICANN lookup</a>
+    {% endif %}
+</div>
+{% else %}
+<div class="space-y-2 text-xs text-slate-700">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+        <div>
+            <p class="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Domain</p>
+            <p class="font-semibold text-slate-900">{{ ldh_name }}</p>
+        </div>
+        {% if unicode_name %}
+        <div>
+            <p class="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Unicode</p>
+            <p class="font-semibold text-slate-900">{{ unicode_name }}</p>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if statuses %}
+    <div>
+        <p class="text-[10px] uppercase tracking-wide text-slate-500 font-semibold mb-1">Statuses</p>
+        <div class="flex flex-wrap gap-1.5">
+            {% for status in statuses %}
+            <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium">{{ status }}</span>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if nameservers %}
+    <div>
+        <p class="text-[10px] uppercase tracking-wide text-slate-500 font-semibold mb-1">Nameservers</p>
+        <div class="flex flex-wrap gap-1.5">
+            {% for ns in nameservers %}
+            <span class="rounded bg-indigo-50 text-indigo-700 px-2 py-0.5 text-[11px]">{{ ns }}</span>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if events %}
+    <div>
+        <p class="text-[10px] uppercase tracking-wide text-slate-500 font-semibold mb-1">Registry Events</p>
+        <ul class="space-y-1">
+            {% for event in events %}
+            <li>
+                <span class="font-semibold">{{ event.action|default:"event" }}:</span>
+                <span>{{ event.date|default:"n/a" }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    {% if entities %}
+    <div>
+        <p class="text-[10px] uppercase tracking-wide text-slate-500 font-semibold mb-1">Contacts</p>
+        <ul class="space-y-1">
+            {% for entity in entities|slice:":4" %}
+            <li>
+                {% if entity.name %}<span class="font-semibold">{{ entity.name }}</span>{% endif %}
+                {% if entity.handle %}<span class="text-slate-500"> ({{ entity.handle }})</span>{% endif %}
+                {% if entity.roles %}
+                <span class="text-slate-500"> — {{ entity.roles|join:", " }}</span>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    <div>
+        <a href="{{ raw_link }}" target="_blank" rel="noopener noreferrer" class="font-semibold text-sky-700 underline">Open raw RDAP</a>
+    </div>
+</div>
+{% endif %}

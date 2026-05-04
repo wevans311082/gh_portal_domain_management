@@ -174,10 +174,55 @@ def test_domain_check_shows_transfer_price_and_whois_for_taken_domain(client, mo
     content = response.content.decode()
 
     assert response.status_code == 200
-    assert "Taken" in content
+    assert "Already registered" in content
     assert "Transfer GBP 12.50/yr" in content
-    assert "lookup.icann.org" in content
+    assert "View WHOIS" in content
+    assert reverse("domains:whois") in content
     assert "Transfer In" in content
+
+
+@pytest.mark.django_db
+def test_domain_check_debug_mode_bypasses_cache_and_calls_api(client, monkeypatch):
+    TLDPricing.objects.create(tld="com", registration_cost=Decimal("8.00"), renewal_cost=Decimal("9.00"), transfer_cost=Decimal("10.00"))
+
+    calls = {"availability": 0, "costs": 0}
+
+    class FakeClient:
+        def check_availability(self, domain_names, tlds):
+            calls["availability"] += 1
+            full_domain = f"{domain_names[0]}.{tlds[0]}"
+            return {full_domain: {"status": "available"}}
+
+        def get_tld_costs(self, tld, years=1):
+            calls["costs"] += 1
+            return {
+                "registration": {"price": "8.00"},
+                "renewal": {"price": "9.00"},
+                "transfer": {"price": "10.00"},
+            }
+
+    # Seed cache with stale value; debug mode should still force live API check.
+    from django.core.cache import cache
+
+    cache.set("domain_avail:debugcheck.com", False, timeout=60)
+
+    def fake_runtime_setting(key, default=""):
+        if key == "RESELLERCLUB_DEBUG_MODE":
+            return "true"
+        if key == "RESELLERCLUB_API_URL":
+            return "https://httpapi.com/api"
+        return default
+
+    monkeypatch.setattr("apps.domains.views.ResellerClubClient", lambda: FakeClient())
+    monkeypatch.setattr("apps.domains.views.get_runtime_setting", fake_runtime_setting)
+
+    response = client.get(reverse("domains:check"), {"q": "debugcheck.com"})
+    content = response.content.decode()
+
+    assert response.status_code == 200
+    assert "Available to register now" in content
+    assert calls["availability"] == 1
+    assert calls["costs"] >= 1
 
 
 @pytest.mark.django_db
@@ -209,4 +254,4 @@ def test_domain_check_syncs_missing_pricing_records(client, monkeypatch):
 
     assert response.status_code == 200
     assert TLDPricing.objects.filter(tld="com").exists()
-    assert "Registration GBP 12.50/yr" in content
+    assert "GBP 12.50/yr" in content

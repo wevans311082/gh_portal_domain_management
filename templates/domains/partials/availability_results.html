@@ -1,88 +1,102 @@
 ﻿{% if results %}
-<div class="bg-white rounded-lg shadow divide-y">
-    <div class="px-4 py-3 text-sm text-gray-500">
-        Results for <strong>{{ query }}</strong>
+<div class="space-y-4">
+    <div class="rounded-2xl border border-slate-200 bg-white/90 backdrop-blur-sm px-4 py-3 text-sm text-slate-600 shadow-sm">
+        Results for <strong class="text-slate-900">{{ query }}</strong>
         {% if prices_are_test_mode %}
         <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
             Test mode &mdash; prices are sandbox placeholders, not real rates
         </span>
         {% endif %}
+        {% if debug_mode %}
+        <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">
+            Debug mode: live API data (cache bypassed)
+        </span>
+        {% endif %}
     </div>
+
     {% for result in results %}
-    <div class="px-4 py-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-3 mb-2">
-                {% if result.available is None %}
-                <span class="w-3 h-3 rounded-full bg-gray-300 flex-shrink-0"></span>
-                {% elif result.available %}
-                <span class="w-3 h-3 rounded-full bg-green-500 flex-shrink-0"></span>
-                {% else %}
-                <span class="w-3 h-3 rounded-full bg-red-500 flex-shrink-0"></span>
-                {% endif %}
-                <span class="font-medium text-gray-900 break-all">{{ result.domain }}</span>
-            </div>
+    <article class="group rounded-2xl border border-slate-200 bg-white shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+        <div class="p-5">
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div class="min-w-0">
+                    <div class="flex items-center gap-3 mb-2">
+                        {% if result.available is None %}
+                        <span class="inline-flex h-3 w-3 rounded-full bg-slate-300"></span>
+                        {% elif result.available %}
+                        <span class="inline-flex h-3 w-3 rounded-full bg-emerald-500"></span>
+                        {% else %}
+                        <span class="inline-flex h-3 w-3 rounded-full bg-rose-500"></span>
+                        {% endif %}
+                        <h3 class="text-lg font-semibold text-slate-900 break-all">{{ result.domain }}</h3>
+                    </div>
 
-            <div class="flex flex-wrap gap-2 text-xs">
-                {% if result.registration_price %}
-                <span class="rounded-full bg-sky-50 px-2 py-1 font-semibold text-sky-700">
-                    Registration GBP {{ result.registration_price|floatformat:2 }}/yr
-                </span>
-                {% endif %}
-                {% if result.renewal_price %}
-                <span class="rounded-full bg-indigo-50 px-2 py-1 font-semibold text-indigo-700">
-                    Renewal GBP {{ result.renewal_price|floatformat:2 }}/yr
-                </span>
-                {% endif %}
-                {% if result.transfer_price %}
-                <span class="rounded-full bg-emerald-50 px-2 py-1 font-semibold text-emerald-700">
-                    Transfer GBP {{ result.transfer_price|floatformat:2 }}/yr
-                </span>
-                {% endif %}
+                    <p class="text-sm {% if result.available is None %}text-slate-500{% elif result.available %}text-emerald-700{% else %}text-rose-700{% endif %}">
+                        {% if result.available is None %}Availability unknown
+                        {% elif result.available %}Available to register now
+                        {% else %}Already registered{% endif %}
+                    </p>
+
+                    <div class="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                        <div class="rounded-xl bg-sky-50 px-3 py-2">
+                            <p class="uppercase tracking-wide text-[10px] text-sky-700 font-semibold">Registration</p>
+                            <p class="text-slate-900 font-semibold">{% if result.registration_price %}GBP {{ result.registration_price|floatformat:2 }}/yr{% else %}&mdash;{% endif %}</p>
+                        </div>
+                        <div class="rounded-xl bg-indigo-50 px-3 py-2">
+                            <p class="uppercase tracking-wide text-[10px] text-indigo-700 font-semibold">Renewal</p>
+                            <p class="text-slate-900 font-semibold">{% if result.renewal_price %}GBP {{ result.renewal_price|floatformat:2 }}/yr{% else %}&mdash;{% endif %}</p>
+                        </div>
+                        <div class="rounded-xl bg-emerald-50 px-3 py-2">
+                            <p class="uppercase tracking-wide text-[10px] text-emerald-700 font-semibold">Transfer</p>
+                            <p class="text-slate-900 font-semibold">{% if result.transfer_price %}GBP {{ result.transfer_price|floatformat:2 }}/yr{% else %}&mdash;{% endif %}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap gap-2 lg:justify-end">
+                    {% if result.available %}
+                    {% if request.user.is_authenticated %}
+                    <a href="{% url 'domains:register' %}?domain={{ result.domain }}"
+                       class="inline-flex items-center rounded-lg bg-sky-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-sky-700 transition-colors">
+                        Register
+                    </a>
+                    {% else %}
+                    <a href="{% url 'account_login' %}?next={% url 'domains:register' %}%3Fdomain%3D{{ result.domain|urlencode }}"
+                       class="inline-flex items-center rounded-lg bg-sky-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-sky-700 transition-colors">
+                        Register
+                    </a>
+                    {% endif %}
+                    {% elif result.available == False %}
+                    <button
+                        type="button"
+                        class="inline-flex items-center rounded-lg border border-slate-300 px-3.5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                        hx-get="{% url 'domains:whois' %}?domain={{ result.domain|urlencode }}"
+                        hx-target="#whois-{{ forloop.counter }}"
+                        hx-swap="innerHTML"
+                    >
+                        View WHOIS
+                    </button>
+                    {% if request.user.is_authenticated %}
+                    <a href="{% url 'support:create' %}?domain={{ result.domain|urlencode }}"
+                       class="inline-flex items-center rounded-lg bg-emerald-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors">
+                        Transfer In
+                    </a>
+                    {% else %}
+                    <a href="{% url 'account_login' %}?next={% url 'support:create' %}%3Fdomain%3D{{ result.domain|urlencode }}"
+                       class="inline-flex items-center rounded-lg bg-emerald-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors">
+                        Transfer In
+                    </a>
+                    {% endif %}
+                    {% endif %}
+                </div>
             </div>
         </div>
 
-        <div class="flex items-center gap-3">
-            <span class="text-sm
-                {% if result.available is None %}text-gray-400
-                {% elif result.available %}text-green-600 font-semibold
-                {% else %}text-red-500{% endif %}">
-                {% if result.available is None %}Unknown
-                {% elif result.available %}Available
-                {% else %}Taken{% endif %}
-            </span>
-            {% if result.available %}
-            {% if request.user.is_authenticated %}
-            <a href="{% url 'domains:register' %}?domain={{ result.domain }}"
-               class="bg-sky-600 text-white text-sm px-3 py-1 rounded hover:bg-sky-700">
-                Register
-            </a>
-            {% else %}
-            <a href="{% url 'account_login' %}?next={% url 'domains:register' %}%3Fdomain%3D{{ result.domain|urlencode }}"
-               class="bg-sky-600 text-white text-sm px-3 py-1 rounded hover:bg-sky-700">
-                Register
-            </a>
-            {% endif %}
-            {% elif result.available == False %}
-            <a href="{{ result.whois_url }}"
-               target="_blank"
-               rel="noopener noreferrer"
-               class="border border-gray-300 text-gray-700 text-sm px-3 py-1 rounded hover:bg-gray-50">
-                Whois
-            </a>
-            {% if request.user.is_authenticated %}
-            <a href="{% url 'support:create' %}?domain={{ result.domain|urlencode }}"
-               class="bg-emerald-600 text-white text-sm px-3 py-1 rounded hover:bg-emerald-700">
-                Transfer In
-            </a>
-            {% else %}
-            <a href="{% url 'account_login' %}?next={% url 'support:create' %}%3Fdomain%3D{{ result.domain|urlencode }}"
-               class="bg-emerald-600 text-white text-sm px-3 py-1 rounded hover:bg-emerald-700">
-                Transfer In
-            </a>
-            {% endif %}
-            {% endif %}
+        {% if result.available == False %}
+        <div id="whois-{{ forloop.counter }}" class="border-t border-slate-100 bg-slate-50/70 px-5 py-3 text-xs text-slate-500">
+            Click <strong>View WHOIS</strong> to load live registration details.
         </div>
-    </div>
+        {% endif %}
+    </article>
     {% endfor %}
 </div>
 {% endif %}

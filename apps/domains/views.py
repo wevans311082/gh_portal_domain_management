@@ -2,6 +2,7 @@
 from decimal import Decimal
 import logging
 import re
+import requests
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -17,6 +18,7 @@ from apps.domains.models import Domain, DomainContact, DomainOrder, DomainRenewa
 from apps.domains.pricing import TLDPricingService
 from apps.domains.resellerclub_client import ResellerClubClient, ResellerClubError
 from apps.domains.services import DomainContactService
+from apps.core.runtime_settings import get_runtime_setting
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +30,7 @@ _DOMAIN_LABEL_RE = re.compile(r"^[a-z0-9]([a-z0-9\-]{0,61}[a-z0-9])?$")
 # Cache availability results for 60 seconds to reduce upstream API calls
 _CACHE_TTL = 60
 _PRICING_SYNC_TTL = 900
+_WHOIS_TIMEOUT = (5, 12)
 
 
 def _is_valid_label(label: str) -> bool:
@@ -42,6 +45,105 @@ def _rate_limit_key(request) -> str:
         or request.META.get("REMOTE_ADDR", "unknown")
     )
     return f"domain_check_rl:{ip}"
+
+
+def _is_debug_mode_enabled() -> bool:
+    return str(get_runtime_setting("RESELLERCLUB_DEBUG_MODE", "false")).strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+
+
+def _as_bool_from_status(value):
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return None
+    text = str(value).strip().lower()
+    if text in ("available", "true", "yes", "free"):
+        return True
+    if text in (
+        "regthroughothers",
+        "registered",
+        "taken",
+        "notavailable",
+        "unavailable",
+        "false",
+        "no",
+        "exists",
+    ):
+        return False
+    return None
+
+
+def _extract_availability(payload, full_domain: str, tld: str):
+    """Best-effort parser for varied registrar payload shapes."""
+    if payload is None:
+        return None
+
+    if isinstance(payload, dict):
+        direct = payload.get(full_domain)
+        if direct is not None:
+            if isinstance(direct, dict) and "status" in direct:
+                parsed = _as_bool_from_status(direct.get("status"))
+                if parsed is not None:
+                    return parsed
+            parsed = _as_bool_from_status(direct)
+            if parsed is not None:
+                return parsed
+
+        # Common nested variant: {"example": {"com": "available"}}
+        label = full_domain.rsplit(".", 1)[0]
+        nested = payload.get(label)
+        if isinstance(nested, dict):
+            nested_status = nested.get(tld)
+            if isinstance(nested_status, dict) and "status" in nested_status:
+                parsed = _as_bool_from_status(nested_status.get("status"))
+                if parsed is not None:
+                    return parsed
+            parsed = _as_bool_from_status(nested_status)
+            if parsed is not None:
+                return parsed
+
+        # Direct status payload
+        if "status" in payload:
+            parsed = _as_bool_from_status(payload.get("status"))
+            if parsed is not None:
+                return parsed
+
+        # Recursive fallback
+        for value in payload.values():
+            parsed = _extract_availability(value, full_domain, tld)
+            if parsed is not None:
+                return parsed
+
+    if isinstance(payload, (list, tuple)):
+        for item in payload:
+            parsed = _extract_availability(item, full_domain, tld)
+            if parsed is not None:
+                return parsed
+
+    return _as_bool_from_status(payload)
+
+
+def _fetch_live_debug_prices(client: ResellerClubClient, tlds: list) -> dict:
+    """In debug mode, fetch pricing live so output reflects upstream registrar state."""
+    service = TLDPricingService(client=client)
+    out = {}
+    for tld in tlds:
+        try:
+            payload = client.get_tld_costs(tld=tld, years=1)
+            out[tld] = {
+                "registration_price": service._extract_amount(payload.get("registration", {})),
+                "renewal_price": service._extract_amount(payload.get("renewal", {})),
+                "transfer_price": service._extract_amount(payload.get("transfer", {})),
+            }
+        except Exception as exc:
+            logger.warning("Live debug price fetch failed for .%s: %s", tld, exc)
+            out[tld] = None
+    return out
 
 
 def _split_domain_name(domain_name: str):
@@ -125,16 +227,22 @@ def domain_check(request):
     else:
         tlds_to_check = POPULAR_TLDS
 
+    debug_mode = _is_debug_mode_enabled()
+
     existing_tlds = set(TLDPricing.objects.filter(tld__in=tlds_to_check).values_list("tld", flat=True))
     missing_tlds = [tld for tld in tlds_to_check if tld not in existing_tlds]
-    _sync_missing_tld_pricing(missing_tlds)
+    if not debug_mode:
+        _sync_missing_tld_pricing(missing_tlds)
 
-    pricing_lookup = TLDPricing.objects.in_bulk(tlds_to_check, field_name="tld")
+    pricing_lookup = TLDPricing.objects.in_bulk(tlds_to_check, field_name="tld") if not debug_mode else {}
 
     # Split TLDs into those already cached and those needing a live API call
     cache_hits = {}
     tlds_needing_check = []
     for tld in tlds_to_check:
+        if debug_mode:
+            tlds_needing_check.append(tld)
+            continue
         cached = cache.get(f"domain_avail:{domain_part}.{tld}")
         if cached is not None:
             cache_hits[tld] = cached
@@ -149,34 +257,38 @@ def domain_check(request):
             data = client.check_availability([domain_part], tlds_needing_check)
             for tld in tlds_needing_check:
                 full_domain = f"{domain_part}.{tld}"
-                status = data.get(full_domain, {})
-                if isinstance(status, dict):
-                    available = status.get("status") == "available"
-                else:
-                    available = str(status).lower() == "available"
+                available = _extract_availability(data, full_domain, tld)
                 live_availability[tld] = available
-                cache.set(f"domain_avail:{full_domain}", available, timeout=_CACHE_TTL)
+                if not debug_mode and available is not None:
+                    cache.set(f"domain_avail:{full_domain}", available, timeout=_CACHE_TTL)
         except ResellerClubError as e:
             logger.warning(f"Domain bulk check failed for {domain_part}: {e}")
             for tld in tlds_needing_check:
                 live_availability[tld] = None
+
+    live_prices = _fetch_live_debug_prices(client, tlds_to_check) if debug_mode and tlds_to_check else {}
 
     results = []
     for tld in tlds_to_check:
         full_domain = f"{domain_part}.{tld}"
         available = cache_hits.get(tld) if tld in cache_hits else live_availability.get(tld)
         pricing = pricing_lookup.get(tld)
+        live_price = live_prices.get(tld) if debug_mode else None
         results.append({
             "domain": full_domain,
             "tld": tld,
             "available": available,
-            "registration_price": pricing.registration_price if pricing else None,
-            "renewal_price": pricing.renewal_price if pricing else None,
-            "transfer_price": pricing.transfer_price if pricing else None,
-            "whois_url": f"https://lookup.icann.org/en/lookup?name={full_domain}",
+            "registration_price": (
+                live_price.get("registration_price") if live_price else (pricing.registration_price if pricing else None)
+            ),
+            "renewal_price": (
+                live_price.get("renewal_price") if live_price else (pricing.renewal_price if pricing else None)
+            ),
+            "transfer_price": (
+                live_price.get("transfer_price") if live_price else (pricing.transfer_price if pricing else None)
+            ),
         })
 
-    from apps.core.runtime_settings import get_runtime_setting
     api_url = get_runtime_setting("RESELLERCLUB_API_URL", "")
     prices_are_test_mode = "test.httpapi.com" in api_url
 
@@ -184,7 +296,84 @@ def domain_check(request):
         "results": results,
         "query": query,
         "prices_are_test_mode": prices_are_test_mode,
+        "debug_mode": debug_mode,
     })
+
+
+@require_GET
+def domain_whois(request):
+    domain = (request.GET.get("domain") or "").strip().lower()
+    if not domain or "." not in domain:
+        return render(
+            request,
+            "domains/partials/whois_result.html",
+            {"domain": domain, "error": "Enter a valid domain name."},
+            status=400,
+        )
+
+    label, tld = domain.rsplit(".", 1)
+    if not _is_valid_label(label) or not tld:
+        return render(
+            request,
+            "domains/partials/whois_result.html",
+            {"domain": domain, "error": "Invalid domain name."},
+            status=400,
+        )
+
+    rdap_url = f"https://rdap.org/domain/{domain}"
+    try:
+        response = requests.get(rdap_url, timeout=_WHOIS_TIMEOUT, headers={"Accept": "application/rdap+json, application/json"})
+        response.raise_for_status()
+        data = response.json()
+    except Exception as exc:
+        logger.warning("WHOIS lookup failed for %s: %s", domain, exc)
+        return render(
+            request,
+            "domains/partials/whois_result.html",
+            {
+                "domain": domain,
+                "error": "WHOIS lookup is temporarily unavailable.",
+                "fallback_url": f"https://lookup.icann.org/en/lookup?name={domain}",
+            },
+            status=502,
+        )
+
+    statuses = data.get("status") if isinstance(data.get("status"), list) else []
+    events = []
+    for event in data.get("events", []) if isinstance(data.get("events"), list) else []:
+        action = event.get("eventAction")
+        date = event.get("eventDate")
+        if action or date:
+            events.append({"action": action, "date": date})
+
+    entities = []
+    for entity in data.get("entities", []) if isinstance(data.get("entities"), list) else []:
+        handle = entity.get("handle")
+        roles = entity.get("roles") if isinstance(entity.get("roles"), list) else []
+        vcard = entity.get("vcardArray")
+        name = None
+        if isinstance(vcard, list) and len(vcard) > 1 and isinstance(vcard[1], list):
+            for item in vcard[1]:
+                if isinstance(item, list) and len(item) >= 4 and item[0] == "fn":
+                    name = item[3]
+                    break
+        if handle or roles or name:
+            entities.append({"handle": handle, "roles": roles, "name": name})
+
+    return render(
+        request,
+        "domains/partials/whois_result.html",
+        {
+            "domain": domain,
+            "ldh_name": data.get("ldhName") or domain,
+            "unicode_name": data.get("unicodeName"),
+            "statuses": statuses,
+            "events": events,
+            "entities": entities,
+            "nameservers": [ns.get("ldhName") for ns in data.get("nameservers", []) if isinstance(ns, dict) and ns.get("ldhName")],
+            "raw_link": rdap_url,
+        },
+    )
 
 
 @login_required

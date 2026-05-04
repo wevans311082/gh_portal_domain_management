@@ -5,6 +5,32 @@
 
 {% block extra_head %}
 <script src="{% static 'vendor/htmx-1.9.10.min.js' %}"></script>
+<style>
+    .domain-loading {
+        display: none;
+    }
+    .htmx-request .domain-loading,
+    .htmx-request.domain-loading {
+        display: block;
+    }
+    .scan-bar {
+        background: linear-gradient(90deg, rgba(14,165,233,0) 0%, rgba(14,165,233,0.35) 50%, rgba(14,165,233,0) 100%);
+        animation: domain-scan 1.3s linear infinite;
+    }
+    @keyframes domain-scan {
+        0% { transform: translateX(-120%); }
+        100% { transform: translateX(120%); }
+    }
+    .pulse-dot {
+        animation: dot-pulse 1s ease-in-out infinite;
+    }
+    .pulse-dot:nth-child(2) { animation-delay: 0.15s; }
+    .pulse-dot:nth-child(3) { animation-delay: 0.3s; }
+    @keyframes dot-pulse {
+        0%, 100% { opacity: 0.35; transform: translateY(0); }
+        50% { opacity: 1; transform: translateY(-2px); }
+    }
+</style>
 {% endblock %}
 
 {% block body %}
@@ -23,7 +49,7 @@
         <p class="text-lg text-gray-600">Search for your domain name and check availability across popular extensions.</p>
     </div>
 
-    <div class="max-w-2xl mx-auto mb-8">
+    <div class="max-w-3xl mx-auto mb-8">
         <form class="flex gap-2"
               hx-get="{% url 'domains:check' %}"
               hx-target="#availability-results"
@@ -43,12 +69,20 @@
                 Search
             </button>
         </form>
-        <div id="search-indicator" class="htmx-indicator text-center py-2 text-gray-500">
-            Checking availability...
+        <div id="search-indicator" class="domain-loading mt-3 rounded-xl border border-sky-100 bg-sky-50/70 px-3 py-3 overflow-hidden relative">
+            <div class="scan-bar absolute inset-y-0 w-1/2"></div>
+            <div class="relative flex items-center justify-center gap-2 text-sky-800 text-sm font-medium">
+                <span>Checking live registrar availability</span>
+                <span class="flex items-center gap-1">
+                    <span class="pulse-dot inline-block h-1.5 w-1.5 rounded-full bg-sky-500"></span>
+                    <span class="pulse-dot inline-block h-1.5 w-1.5 rounded-full bg-sky-500"></span>
+                    <span class="pulse-dot inline-block h-1.5 w-1.5 rounded-full bg-sky-500"></span>
+                </span>
+            </div>
         </div>
     </div>
 
-    <div class="max-w-2xl mx-auto mb-8">
+    <div class="max-w-3xl mx-auto mb-8">
         <p class="text-sm text-gray-500 mb-3">Popular extensions:</p>
         <div class="flex flex-wrap gap-2">
             {% for featured in featured_tlds %}
@@ -66,7 +100,7 @@
         </div>
     </div>
 
-    <div id="availability-results" class="max-w-2xl mx-auto"></div>
+    <div id="availability-results" class="max-w-5xl mx-auto"></div>
 </main>
 {% endblock %}
 
