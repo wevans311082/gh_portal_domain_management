@@ -32,7 +32,7 @@ def ensure_whm_sync_schedule():
     return task
 
 
-@shared_task(name="provisioning.sync_whm_inventory")
+@shared_task(name="apps.provisioning.tasks.sync_whm_inventory")
 def sync_whm_inventory():
     """Fetch and persist WHM accounts/packages/usage snapshots."""
     from apps.provisioning.whm_sync import WHMSyncService
