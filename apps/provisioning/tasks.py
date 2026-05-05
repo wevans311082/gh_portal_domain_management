@@ -12,6 +12,42 @@ from apps.provisioning.whm_client import WHMClient, WHMClientError, generate_cpa
 
 logger = logging.getLogger(__name__)
 
+WHM_SYNC_TASK_NAME = "Sync WHM inventory"
+WHM_SYNC_TASK_PATH = "apps.provisioning.tasks.sync_whm_inventory"
+
+
+def ensure_whm_sync_schedule():
+    """Register a recurring WHM inventory sync task (idempotent)."""
+    from django_celery_beat.models import IntervalSchedule, PeriodicTask
+
+    schedule, _ = IntervalSchedule.objects.get_or_create(
+        every=15,
+        period=IntervalSchedule.MINUTES,
+    )
+    task, created = PeriodicTask.objects.update_or_create(
+        name=WHM_SYNC_TASK_NAME,
+        defaults={"task": WHM_SYNC_TASK_PATH, "interval": schedule, "enabled": True},
+    )
+    logger.info("%s beat task: %s", "Registered" if created else "Updated", WHM_SYNC_TASK_NAME)
+    return task
+
+
+@shared_task(name="provisioning.sync_whm_inventory")
+def sync_whm_inventory():
+    """Fetch and persist WHM accounts/packages/usage snapshots."""
+    from apps.provisioning.whm_sync import WHMSyncService
+
+    result = WHMSyncService().sync_all()
+    logger.info(
+        "WHM sync complete run=%s packages=%s accounts=%s usage=%s errors=%s",
+        result.get("sync_run_id"),
+        result.get("package_count"),
+        result.get("account_count"),
+        result.get("usage_count"),
+        result.get("error_count"),
+    )
+    return result
+
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=300)
 def provision_hosting_account(self, service_id: int, job_id: int):

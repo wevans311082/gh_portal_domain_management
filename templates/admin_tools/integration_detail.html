@@ -8,6 +8,13 @@
 {% if service == 'resellerclub' %}
 <a href="{% url 'admin_tools:resellerclub_debug' %}" class="text-sm text-amber-700 hover:underline font-medium">HTTP Debug</a>
 {% endif %}
+{% if service == 'whm' %}
+<form method="post" class="inline">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="sync_now">
+    <button type="submit" class="text-sm text-emerald-700 hover:underline font-medium">Run Sync Now</button>
+</form>
+{% endif %}
 {% endblock %}
 
 {% block content %}
@@ -57,4 +64,116 @@
     </div>
     {% endfor %}
 </div>
+
+{% if service == 'whm' and whm_context %}
+<div class="mt-8 space-y-5">
+    <div class="bg-white rounded-xl shadow-sm border border-sky-100 p-5">
+        <h2 class="text-sm font-semibold text-sky-900 mb-3">Synced WHM Inventory</h2>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
+            <div class="bg-sky-50 rounded-lg p-3">
+                <p class="text-sky-500">Packages</p>
+                <p class="text-sky-900 font-semibold text-base">{{ whm_context.package_total }}</p>
+            </div>
+            <div class="bg-sky-50 rounded-lg p-3">
+                <p class="text-sky-500">Accounts</p>
+                <p class="text-sky-900 font-semibold text-base">{{ whm_context.account_total }}</p>
+            </div>
+            <div class="bg-sky-50 rounded-lg p-3">
+                <p class="text-sky-500">Usage Snapshots</p>
+                <p class="text-sky-900 font-semibold text-base">{{ whm_context.usage_total }}</p>
+            </div>
+            <div class="bg-sky-50 rounded-lg p-3">
+                <p class="text-sky-500">Server Version</p>
+                <p class="text-sky-900 font-semibold text-base">{{ whm_context.latest_server.server_version|default:"—" }}</p>
+            </div>
+        </div>
+        {% if whm_context.latest_run %}
+        <p class="text-xs text-slate-500 mt-3">
+            Last sync: {{ whm_context.latest_run.started_at }}
+            {% if whm_context.latest_run.finished_at %}→ {{ whm_context.latest_run.finished_at }}{% endif %}
+            ({{ whm_context.latest_run.status }}, errors: {{ whm_context.latest_run.error_count }})
+        </p>
+        {% if whm_context.latest_run.last_error %}
+        <p class="text-xs text-red-600 mt-2">Last error: {{ whm_context.latest_run.last_error }}</p>
+        {% endif %}
+        {% endif %}
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-sky-100 overflow-hidden">
+        <div class="px-5 py-3 border-b border-sky-100 bg-sky-50/50">
+            <h3 class="text-sm font-semibold text-sky-900">Packages (Top 100)</h3>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full text-xs">
+                <thead class="bg-slate-50 text-slate-600">
+                    <tr>
+                        <th class="px-4 py-2 text-left">Name</th>
+                        <th class="px-4 py-2 text-left">Owner</th>
+                        <th class="px-4 py-2 text-left">Disk (MB)</th>
+                        <th class="px-4 py-2 text-left">Bandwidth (MB)</th>
+                        <th class="px-4 py-2 text-left">Feature List</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for pkg in whm_context.packages %}
+                    <tr class="border-t border-slate-100">
+                        <td class="px-4 py-2 font-medium text-slate-800">{{ pkg.name }}</td>
+                        <td class="px-4 py-2 text-slate-600">{{ pkg.owner|default:"—" }}</td>
+                        <td class="px-4 py-2 text-slate-600">{{ pkg.disk_quota_mb|default:"—" }}</td>
+                        <td class="px-4 py-2 text-slate-600">{{ pkg.bandwidth_quota_mb|default:"—" }}</td>
+                        <td class="px-4 py-2 text-slate-600">{{ pkg.feature_list|default:"—" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="5" class="px-4 py-4 text-slate-500">No package snapshots yet.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-sky-100 overflow-hidden">
+        <div class="px-5 py-3 border-b border-sky-100 bg-sky-50/50">
+            <h3 class="text-sm font-semibold text-sky-900">Accounts & Usage (Top 200)</h3>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full text-xs">
+                <thead class="bg-slate-50 text-slate-600">
+                    <tr>
+                        <th class="px-4 py-2 text-left">Username</th>
+                        <th class="px-4 py-2 text-left">Domain</th>
+                        <th class="px-4 py-2 text-left">Plan</th>
+                        <th class="px-4 py-2 text-left">Service Link</th>
+                        <th class="px-4 py-2 text-left">Suspended</th>
+                        <th class="px-4 py-2 text-left">Disk Used</th>
+                        <th class="px-4 py-2 text-left">Disk Limit</th>
+                        <th class="px-4 py-2 text-left">BW Used</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for acct in whm_context.accounts %}
+                    <tr class="border-t border-slate-100">
+                        <td class="px-4 py-2 font-medium text-slate-800">{{ acct.username }}</td>
+                        <td class="px-4 py-2 text-slate-600">{{ acct.domain|default:"—" }}</td>
+                        <td class="px-4 py-2 text-slate-600">{{ acct.plan|default:"—" }}</td>
+                        <td class="px-4 py-2 text-slate-600">
+                            {% if acct.service %}
+                            #{{ acct.service.id }}
+                            {% else %}
+                            —
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-2 text-slate-600">{{ acct.suspended|yesno:"Yes,No" }}</td>
+                        <td class="px-4 py-2 text-slate-600">{% if acct.usage_snapshot %}{{ acct.usage_snapshot.disk_used_mb|default:"—" }}{% else %}—{% endif %}</td>
+                        <td class="px-4 py-2 text-slate-600">{% if acct.usage_snapshot %}{{ acct.usage_snapshot.disk_limit_mb|default:"—" }}{% else %}—{% endif %}</td>
+                        <td class="px-4 py-2 text-slate-600">{% if acct.usage_snapshot %}{{ acct.usage_snapshot.monthly_bandwidth_used_mb|default:"—" }}{% else %}—{% endif %}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="8" class="px-4 py-4 text-slate-500">No account snapshots yet.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
 {% endblock %}

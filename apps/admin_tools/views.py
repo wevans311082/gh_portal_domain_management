@@ -374,6 +374,14 @@ def integration_detail(request, service):
     from apps.cloudflare_integration.services import CloudflareService
     from apps.companies.services import CompaniesHouseService
     from apps.provisioning.whm_client import WHMClient
+    from apps.provisioning.models import (
+        WHMAccountSnapshot,
+        WHMAccountUsageSnapshot,
+        WHMPackageSnapshot,
+        WHMServerSnapshot,
+        WHMSyncRun,
+    )
+    from apps.provisioning.tasks import sync_whm_inventory
     import stripe as stripe_module
     import requests as _req
 
@@ -413,6 +421,16 @@ def integration_detail(request, service):
         from django.http import Http404
         raise Http404(f"Unknown integration: {service}")
 
+    if request.method == "POST" and service == "whm":
+        action = (request.POST.get("action") or "").strip()
+        if action == "sync_now":
+            task = sync_whm_inventory.delay()
+            messages.success(
+                request,
+                f"WHM sync queued (task id: {task.id}). Refresh shortly to view updated data.",
+            )
+            return redirect("admin_tools:integration_detail", service="whm")
+
     # Set Stripe API key before probe
     stripe_module.api_key = get_runtime_setting("STRIPE_SECRET_KEY", "")
 
@@ -430,10 +448,36 @@ def integration_detail(request, service):
         "stripe": "Stripe",
     }
 
+    whm_context = None
+    if service == "whm":
+        latest_run = WHMSyncRun.objects.order_by("-started_at").first()
+        latest_server = WHMServerSnapshot.objects.order_by("-synced_at").first()
+        packages = WHMPackageSnapshot.objects.filter(is_active=True).order_by("name")[:100]
+        accounts = list(
+            WHMAccountSnapshot.objects.filter(is_active=True).select_related("service").order_by("username")[:200]
+        )
+        usage_map = {
+            u.account_id: u
+            for u in WHMAccountUsageSnapshot.objects.filter(account__in=accounts).select_related("account")
+        }
+        for account in accounts:
+            account.usage_snapshot = usage_map.get(account.id)
+
+        whm_context = {
+            "latest_run": latest_run,
+            "latest_server": latest_server,
+            "packages": packages,
+            "accounts": accounts,
+            "package_total": WHMPackageSnapshot.objects.filter(is_active=True).count(),
+            "account_total": WHMAccountSnapshot.objects.filter(is_active=True).count(),
+            "usage_total": WHMAccountUsageSnapshot.objects.count(),
+        }
+
     return render(request, "admin_tools/integration_detail.html", {
         "service": service,
         "service_label": SERVICE_LABELS[service],
         "tests": tests,
+        "whm_context": whm_context,
     })
 
 

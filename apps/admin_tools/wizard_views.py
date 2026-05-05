@@ -408,9 +408,9 @@ def _initial_for_step(step_key: str) -> dict:
 def _test_connection(step_key: str, data: dict):
     """Run lightweight connectivity checks for a wizard step."""
     if step_key == WizardProgress.STEP_REGISTRAR:
-        base_url = (data.get("resellerclub_api_url") or "").rstrip("/")
-        reseller_id = data.get("resellerclub_reseller_id") or ""
-        api_key = data.get("resellerclub_api_key") or ""
+        base_url = ((data.get("resellerclub_api_url") or _read_env_key("RESELLERCLUB_API_URL", "") or "").rstrip("/"))
+        reseller_id = (data.get("resellerclub_reseller_id") or _read_env_key("RESELLERCLUB_RESELLER_ID", "") or "").strip()
+        api_key = (data.get("resellerclub_api_key") or _read_env_key("RESELLERCLUB_API_KEY", "") or "").strip()
         if not (base_url and reseller_id and api_key):
             return False, "Provide API URL, Reseller ID, and API key first."
 
@@ -434,10 +434,12 @@ def _test_connection(step_key: str, data: dict):
         return True, f"Connection OK. Sample response keys: {', '.join(list(parsed.keys())[:5])}"
 
     if step_key == WizardProgress.STEP_HOSTING:
-        host = data.get("whm_host") or ""
+        host = (data.get("whm_host") or _read_env_key("WHM_HOST", "") or "").strip()
         port = data.get("whm_port")
-        username = data.get("whm_username") or ""
-        token = data.get("whm_api_token") or ""
+        if not port:
+            port = _as_int(_read_env_key("WHM_PORT", "2087"), 2087)
+        username = (data.get("whm_username") or _read_env_key("WHM_USERNAME", "root") or "").strip()
+        token = (data.get("whm_api_token") or _read_env_key("WHM_API_TOKEN", "") or "").strip()
         if not (host and port and username and token):
             return False, "Provide WHM host, port, username, and API token first."
 
@@ -452,7 +454,7 @@ def _test_connection(step_key: str, data: dict):
         return True, "Connection OK. WHM version endpoint responded successfully."
 
     if step_key == WizardProgress.STEP_CLOUDFLARE:
-        token = data.get("cloudflare_api_token") or ""
+        token = (data.get("cloudflare_api_token") or _read_env_key("CLOUDFLARE_API_TOKEN", "") or "").strip()
         if not token:
             return False, "Provide a Cloudflare API token first."
         resp = requests.get(
@@ -468,9 +470,9 @@ def _test_connection(step_key: str, data: dict):
         return True, "Connection OK. Cloudflare token is valid."
 
     if step_key == WizardProgress.STEP_PAYMENTS:
-        stripe_key = data.get("stripe_secret_key") or ""
-        gocardless_token = data.get("gocardless_access_token") or ""
-        gc_env = data.get("gocardless_environment") or "sandbox"
+        stripe_key = (data.get("stripe_secret_key") or _read_env_key("STRIPE_SECRET_KEY", "") or "").strip()
+        gocardless_token = (data.get("gocardless_access_token") or _read_env_key("GOCARDLESS_ACCESS_TOKEN", "") or "").strip()
+        gc_env = (data.get("gocardless_environment") or _read_env_key("GOCARDLESS_ENVIRONMENT", "sandbox") or "sandbox").strip()
 
         messages = []
         if stripe_key:
@@ -504,11 +506,13 @@ def _test_connection(step_key: str, data: dict):
         return True, ", ".join(messages)
 
     if step_key == WizardProgress.STEP_EMAIL:
-        host = data.get("email_host") or ""
+        host = (data.get("email_host") or _read_env_key("EMAIL_HOST", "") or "").strip()
         port = data.get("email_port")
+        if not port:
+            port = _as_int(_read_env_key("EMAIL_PORT", "587"), 587)
         use_tls = bool(data.get("email_use_tls"))
-        username = data.get("email_host_user") or ""
-        password = data.get("email_host_password") or ""
+        username = (data.get("email_host_user") or _read_env_key("EMAIL_HOST_USER", "") or "").strip()
+        password = (data.get("email_host_password") or _read_env_key("EMAIL_HOST_PASSWORD", "") or "").strip()
         if not (host and port):
             return False, "Provide SMTP host and port first."
 
@@ -639,11 +643,18 @@ def _process_step(step_key: str, data: dict, request):
         value = data.get(form_field)
         if value is not None:
             string_value = str(value)
+            is_secret = ("KEY" in env_key or "TOKEN" in env_key or "SECRET" in env_key or "PASSWORD" in env_key)
+
+            # Password/token widgets submit an empty value when left untouched.
+            # Keep the existing secret instead of clearing it accidentally.
+            if is_secret and not string_value.strip():
+                continue
+
             _write_env_key(env_key, string_value)
             IntegrationSetting.set_value(
                 key=env_key,
                 value=string_value,
-                is_secret=("KEY" in env_key or "TOKEN" in env_key or "SECRET" in env_key or "PASSWORD" in env_key),
+                is_secret=is_secret,
             )
 
 

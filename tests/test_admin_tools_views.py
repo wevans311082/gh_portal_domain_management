@@ -378,6 +378,42 @@ def test_staff_can_save_site_settings_from_normal_admin_settings(client, django_
 
 
 @pytest.mark.django_db
+def test_settings_editor_hosting_test_uses_saved_whm_token_when_form_token_blank(client, django_user_model, monkeypatch):
+    staff_user = django_user_model.objects.create_user(
+        email="settings-hosting-test@example.com",
+        password="password123",
+        is_staff=True,
+    )
+    client.force_login(staff_user)
+
+    IntegrationSetting.set_value("WHM_API_TOKEN", "saved-token", is_secret=True)
+
+    class DummyResponse:
+        status_code = 200
+        text = "ok"
+
+    def fake_get(url, params=None, headers=None, timeout=None):
+        assert headers["Authorization"] == "whm root:saved-token"
+        return DummyResponse()
+
+    monkeypatch.setattr("apps.admin_tools.wizard_views.requests.get", fake_get)
+
+    response = client.post(
+        reverse("admin_tools:settings_setup_step", kwargs={"step_key": "hosting"}),
+        {
+            "action": "test",
+            "whm_host": "whm.example.com",
+            "whm_port": "2087",
+            "whm_username": "root",
+            "whm_api_token": "",
+        },
+    )
+
+    assert response.status_code == 200
+    assert "Connection test passed" in response.content.decode()
+
+
+@pytest.mark.django_db
 def test_company_lookup_endpoint_returns_company_data(client, django_user_model, monkeypatch):
     staff_user = django_user_model.objects.create_user(
         email="lookup-admin@example.com",

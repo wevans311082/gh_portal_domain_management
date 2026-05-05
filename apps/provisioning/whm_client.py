@@ -106,7 +106,25 @@ class WHMClient:
     def list_accounts(self) -> list:
         """List all cPanel accounts."""
         data = self._call("listaccts")
-        return data.get("acct", [])
+        if isinstance(data.get("acct"), list):
+            return data.get("acct", [])
+        if isinstance(data.get("data"), dict) and isinstance(data["data"].get("acct"), list):
+            return data["data"].get("acct", [])
+        return []
+
+    def list_packages(self) -> list:
+        """List WHM packages."""
+        data = self._call("listpkgs")
+        if isinstance(data.get("package"), list):
+            return data.get("package", [])
+        if isinstance(data.get("pkg"), list):
+            return data.get("pkg", [])
+        if isinstance(data.get("data"), dict):
+            if isinstance(data["data"].get("package"), list):
+                return data["data"].get("package", [])
+            if isinstance(data["data"].get("pkg"), list):
+                return data["data"].get("pkg", [])
+        return []
 
     # ── cPanel UAPI proxy methods ────────────────────────────────────────────
     # WHM can proxy cPanel UAPI calls on behalf of any user via:
