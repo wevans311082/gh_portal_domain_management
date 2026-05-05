@@ -367,6 +367,51 @@ def _safe_json(obj):
         return str(obj)
 
 
+def _dig_values(payload, keys):
+    if isinstance(payload, dict):
+        for key in keys:
+            value = payload.get(key)
+            if value not in (None, ""):
+                return value
+        for value in payload.values():
+            found = _dig_values(value, keys)
+            if found not in (None, ""):
+                return found
+    elif isinstance(payload, list):
+        for item in payload:
+            found = _dig_values(item, keys)
+            if found not in (None, ""):
+                return found
+    return ""
+
+
+def _probe_summary(service: str, label: str, data):
+    if not data:
+        return ""
+
+    if service == "whm" and label == "WHM version":
+        version = _dig_values(data, ["version", "server_version"])
+        if version:
+            return f"Version: {version}"
+
+    if service == "whm" and label == "List packages":
+        packages = data.get("package") if isinstance(data, dict) else None
+        if not isinstance(packages, list):
+            packages = _dig_values(data, ["package", "pkg"]) if isinstance(data, dict) else None
+        if isinstance(packages, list):
+            return f"{len(packages)} package(s) returned"
+        if isinstance(data.get("data"), dict):
+            package_map = data["data"].get("pkg") or data["data"].get("package")
+            if isinstance(package_map, dict):
+                return f"{len(package_map)} package(s) returned"
+
+    if service == "resellerclub" and label == "List registered domains":
+        if isinstance(data, list):
+            return f"{len(data)} domain order(s) returned"
+
+    return ""
+
+
 @staff_member_required
 def integration_detail(request, service):
     """Detailed test view for a single integration."""
@@ -390,6 +435,7 @@ def integration_detail(request, service):
             ("Check availability (google.com)", lambda: ResellerClubClient().check_availability(["google"], ["com"])),
             ("Check availability (example.com)", lambda: ResellerClubClient().check_availability(["example"], ["com"])),
             ("Get .com TLD pricing", lambda: ResellerClubClient().get_tld_pricing("com", years=1, action="registration")),
+            ("List registered domains", lambda: ResellerClubClient().list_domain_orders(page_no=1, no_of_records=25, status="Active")),
         ],
         "cloudflare": [
             ("Verify token", lambda: _req.get(
@@ -444,6 +490,7 @@ def integration_detail(request, service):
     for label, fn in SERVICE_TESTS[service]:
         probe = _probe(label, fn)
         probe["json"] = _safe_json(probe["data"])
+        probe["summary"] = _probe_summary(service, label, probe["data"])
         tests.append(probe)
 
     SERVICE_LABELS = {
@@ -455,19 +502,30 @@ def integration_detail(request, service):
     }
 
     whm_context = None
+    resellerclub_context = None
     if service == "whm":
+        account_query = (request.GET.get("q") or "").strip().lower()
+        suspended_filter = (request.GET.get("suspended") or "all").strip().lower()
+
         latest_run = WHMSyncRun.objects.order_by("-started_at").first()
         latest_server = WHMServerSnapshot.objects.order_by("-synced_at").first()
         packages = WHMPackageSnapshot.objects.filter(is_active=True).order_by("name")[:100]
-        accounts = list(
-            WHMAccountSnapshot.objects.filter(is_active=True).select_related("service").order_by("username")[:200]
-        )
+        accounts_qs = WHMAccountSnapshot.objects.filter(is_active=True).select_related("service").order_by("username")
+        if account_query:
+            accounts_qs = accounts_qs.filter(Q(username__icontains=account_query) | Q(domain__icontains=account_query))
+        if suspended_filter == "yes":
+            accounts_qs = accounts_qs.filter(suspended=True)
+        elif suspended_filter == "no":
+            accounts_qs = accounts_qs.filter(suspended=False)
+
+        accounts = list(accounts_qs[:200])
         usage_map = {
             u.account_id: u
             for u in WHMAccountUsageSnapshot.objects.filter(account__in=accounts).select_related("account")
         }
         for account in accounts:
             account.usage_snapshot = usage_map.get(account.id)
+            account.status_label = "Suspended" if account.suspended else "Active"
 
         whm_context = {
             "latest_run": latest_run,
@@ -477,6 +535,22 @@ def integration_detail(request, service):
             "package_total": WHMPackageSnapshot.objects.filter(is_active=True).count(),
             "account_total": WHMAccountSnapshot.objects.filter(is_active=True).count(),
             "usage_total": WHMAccountUsageSnapshot.objects.count(),
+            "filters": {
+                "q": account_query,
+                "suspended": suspended_filter,
+            },
+        }
+
+    if service == "resellerclub":
+        try:
+            domain_orders = ResellerClubClient().list_domain_orders(page_no=1, no_of_records=100, status="Active")
+        except Exception as exc:
+            domain_orders = []
+            messages.error(request, f"Could not load registrar domain list: {exc}")
+
+        resellerclub_context = {
+            "domain_orders": domain_orders,
+            "domain_total": len(domain_orders),
         }
 
     return render(request, "admin_tools/integration_detail.html", {
@@ -484,6 +558,7 @@ def integration_detail(request, service):
         "service_label": SERVICE_LABELS[service],
         "tests": tests,
         "whm_context": whm_context,
+        "resellerclub_context": resellerclub_context,
     })
 
 

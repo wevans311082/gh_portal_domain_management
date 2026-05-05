@@ -1,6 +1,7 @@
 """ResellerClub (LogicBoxes) API client for domain management."""
 import logging
 import re
+from datetime import datetime, timezone
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -606,6 +607,44 @@ class ResellerClubClient:
     def get_order_details(self, order_id: str) -> dict:
         """Get details for a domain order."""
         return self._get("domains/details", {"order-id": order_id, "options": "All"})
+
+    @staticmethod
+    def _epoch_to_iso(value):
+        try:
+            epoch = int(value)
+        except (TypeError, ValueError):
+            return ""
+        if epoch <= 0:
+            return ""
+        return datetime.fromtimestamp(epoch, tz=timezone.utc).date().isoformat()
+
+    def list_domain_orders(self, page_no: int = 1, no_of_records: int = 100, status: str = "Active") -> list[dict]:
+        """Return a page of registrar domain orders with normalized expiry dates."""
+        payload = self._get(
+            "domains/search",
+            {
+                "page-no": page_no,
+                "no-of-records": no_of_records,
+                "status": status,
+            },
+        )
+
+        if isinstance(payload, list):
+            records = payload
+        elif isinstance(payload, dict):
+            records = payload.get("orders") or payload.get("data") or payload.get("results") or []
+        else:
+            records = []
+
+        normalized = []
+        for record in records:
+            if not isinstance(record, dict):
+                continue
+            item = dict(record)
+            item["expiry_date"] = self._epoch_to_iso(record.get("endtime"))
+            item["creation_date"] = self._epoch_to_iso(record.get("creationtime"))
+            normalized.append(item)
+        return normalized
 
     def modify_nameservers(self, order_id: str, nameservers: list) -> dict:
         """Update the nameservers for a domain."""

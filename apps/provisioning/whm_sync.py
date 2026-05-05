@@ -42,6 +42,73 @@ class WHMSyncService:
         return []
 
     @staticmethod
+    def _extract_mapping(payload: dict, candidates: Iterable[str]) -> dict:
+        for key in candidates:
+            current = payload
+            try:
+                for part in key.split("."):
+                    current = current[part]
+            except Exception:
+                continue
+            if isinstance(current, dict):
+                return current
+        return {}
+
+    def _extract_packages(self, payload: dict) -> list[dict]:
+        packages = self._extract_list(payload, ("package", "pkg", "data.package", "data.pkg", "data.packages"))
+        if packages:
+            return [pkg for pkg in packages if isinstance(pkg, dict)]
+
+        package_map = self._extract_mapping(payload, ("data.pkg", "data.package", "pkg", "package"))
+        records = []
+        for name, details in package_map.items():
+            if isinstance(details, dict):
+                record = dict(details)
+                record.setdefault("name", name)
+                records.append(record)
+        return records
+
+    def _extract_accounts(self, payload: dict) -> list[dict]:
+        accounts = self._extract_list(payload, ("acct", "data.acct", "metadata.acct", "result.acct"))
+        if accounts:
+            return [acct for acct in accounts if isinstance(acct, dict)]
+
+        account_map = self._extract_mapping(payload, ("data.acct", "acct"))
+        records = []
+        for username, details in account_map.items():
+            if isinstance(details, dict):
+                record = dict(details)
+                record.setdefault("user", username)
+                records.append(record)
+        return records
+
+    def _extract_accountsummary(self, payload: dict) -> dict:
+        items = self._extract_list(payload, ("data.acct", "acct", "data.account", "account"))
+        if items:
+            first_item = items[0]
+            if isinstance(first_item, dict):
+                return first_item
+        mapping = self._extract_mapping(payload, ("data", "metadata", "result"))
+        return mapping if isinstance(mapping, dict) else {}
+
+    @staticmethod
+    def _flatten_for_lookup(payload):
+        if isinstance(payload, dict):
+            yield payload
+            for value in payload.values():
+                yield from WHMSyncService._flatten_for_lookup(value)
+        elif isinstance(payload, list):
+            for item in payload:
+                yield from WHMSyncService._flatten_for_lookup(item)
+
+    def _pick_value(self, payload, *keys, default=""):
+        for node in self._flatten_for_lookup(payload):
+            for key in keys:
+                if key in node and node[key] not in (None, ""):
+                    return node[key]
+        return default
+
+    @staticmethod
     def _to_bool(value) -> bool:
         return str(value).strip().lower() in {"1", "true", "yes", "on", "y"}
 
@@ -74,10 +141,7 @@ class WHMSyncService:
             )
 
             package_payload = self.client._call("listpkgs")
-            packages = self._extract_list(
-                package_payload,
-                ("package", "pkg", "data.package", "data.pkg", "data.packages"),
-            )
+            packages = self._extract_packages(package_payload)
             WHMPackageSnapshot.objects.update(is_active=False)
             for pkg in packages:
                 name = str(self._first_non_empty(pkg.get("name"), pkg.get("pkg"), default="")).strip()
@@ -87,11 +151,11 @@ class WHMSyncService:
                 WHMPackageSnapshot.objects.update_or_create(
                     name=name,
                     defaults={
-                        "owner": str(pkg.get("owner", "") or ""),
-                        "feature_list": str(self._first_non_empty(pkg.get("featurelist"), pkg.get("feature_list"), default="")),
-                        "disk_quota_mb": str(self._first_non_empty(pkg.get("quota"), pkg.get("diskquota"), default="")),
-                        "bandwidth_quota_mb": str(self._first_non_empty(pkg.get("bwlimit"), pkg.get("bandwidth"), default="")),
-                        "max_email_accounts": str(self._first_non_empty(pkg.get("maxpop"), pkg.get("max_emailacct_quota"), default="")),
+                        "owner": str(self._pick_value(pkg, "owner", "reseller", default="")),
+                        "feature_list": str(self._pick_value(pkg, "featurelist", "feature_list", "featurelistname", default="")),
+                        "disk_quota_mb": str(self._pick_value(pkg, "quota", "diskquota", "disk_limit", default="")),
+                        "bandwidth_quota_mb": str(self._pick_value(pkg, "bwlimit", "bandwidth", "bandwidth_limit", default="")),
+                        "max_email_accounts": str(self._pick_value(pkg, "maxpop", "max_emailacct_quota", "max_email_accounts", default="")),
                         "max_ftp_accounts": str(self._first_non_empty(pkg.get("maxftp"), default="")),
                         "max_databases": str(self._first_non_empty(pkg.get("maxsql"), default="")),
                         "max_subdomains": str(self._first_non_empty(pkg.get("maxsub"), default="")),
@@ -103,10 +167,7 @@ class WHMSyncService:
                 )
 
             account_payload = self.client._call("listaccts")
-            accounts = self._extract_list(
-                account_payload,
-                ("acct", "data.acct", "metadata.acct", "result.acct"),
-            )
+            accounts = self._extract_accounts(account_payload)
 
             WHMAccountSnapshot.objects.update(is_active=False)
             for acct in accounts:
@@ -155,18 +216,42 @@ class WHMSyncService:
 
                 quota = usage_payload.get("quota") or {}
                 showbw = usage_payload.get("showbw") or {}
+                summary = self._extract_accountsummary(usage_payload.get("accountsummary") or {})
 
                 WHMAccountUsageSnapshot.objects.update_or_create(
                     account=account_obj,
                     defaults={
-                        "disk_used_mb": str(self._first_non_empty(quota.get("used"), quota.get("disk_used"), default="")),
-                        "disk_limit_mb": str(self._first_non_empty(quota.get("limit"), quota.get("disk_limit"), default="")),
-                        "disk_used_percent": str(self._first_non_empty(quota.get("percent_used"), quota.get("disk_percent"), default="")),
-                        "inode_used": str(self._first_non_empty(quota.get("inode_used"), default="")),
-                        "inode_limit": str(self._first_non_empty(quota.get("inode_limit"), default="")),
-                        "inode_used_percent": str(self._first_non_empty(quota.get("inode_percent_used"), default="")),
-                        "monthly_bandwidth_used_mb": str(self._first_non_empty(showbw.get("bandwidthused"), showbw.get("bwused"), default="")),
-                        "monthly_bandwidth_limit_mb": str(self._first_non_empty(showbw.get("bandwidthlimit"), showbw.get("bwlimit"), default="")),
+                        "disk_used_mb": str(self._first_non_empty(
+                            self._pick_value(quota, "used", "disk_used", "usage", default=""),
+                            self._pick_value(summary, "diskused", "disk_used", default=""),
+                            self._pick_value(acct, "diskused", "disk_used", default=""),
+                            default="",
+                        )),
+                        "disk_limit_mb": str(self._first_non_empty(
+                            self._pick_value(quota, "limit", "disk_limit", default=""),
+                            self._pick_value(summary, "disklimit", "disk_limit", default=""),
+                            self._pick_value(acct, "disklimit", "disk_limit", default=""),
+                            default="",
+                        )),
+                        "disk_used_percent": str(self._first_non_empty(
+                            self._pick_value(quota, "percent_used", "disk_percent", default=""),
+                            self._pick_value(summary, "diskusedpercent", default=""),
+                            default="",
+                        )),
+                        "inode_used": str(self._pick_value(quota, "inode_used", "file_usage", default="")),
+                        "inode_limit": str(self._pick_value(quota, "inode_limit", "file_limit", default="")),
+                        "inode_used_percent": str(self._pick_value(quota, "inode_percent_used", "file_usage_percent", default="")),
+                        "monthly_bandwidth_used_mb": str(self._first_non_empty(
+                            self._pick_value(showbw, "bandwidthused", "bwused", default=""),
+                            self._pick_value(summary, "bandwidthused", default=""),
+                            self._pick_value(acct, "bandwidthused", "bwused", default=""),
+                            default="",
+                        )),
+                        "monthly_bandwidth_limit_mb": str(self._first_non_empty(
+                            self._pick_value(showbw, "bandwidthlimit", "bwlimit", default=""),
+                            self._pick_value(summary, "maxbw", default=""),
+                            default="",
+                        )),
                         "payload": usage_payload,
                     },
                 )

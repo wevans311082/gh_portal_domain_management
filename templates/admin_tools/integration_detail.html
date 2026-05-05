@@ -46,6 +46,12 @@
                 <p class="text-xs text-red-600 bg-red-50 rounded-lg p-3 break-words">{{ test.error }}</p>
             </div>
             {% endif %}
+            {% if test.summary %}
+            <div class="mb-3">
+                <p class="text-xs font-semibold text-slate-700 uppercase tracking-wide mb-1">Summary</p>
+                <p class="text-sm text-slate-800 bg-slate-50 rounded-lg p-3 break-words">{{ test.summary }}</p>
+            </div>
+            {% endif %}
             {% if test.json %}
             <div x-data="{ open: false }">
                 <button @click="open = !open"
@@ -64,6 +70,43 @@
     </div>
     {% endfor %}
 </div>
+
+{% if service == 'resellerclub' and resellerclub_context %}
+<div class="mt-8 bg-white rounded-xl shadow-sm border border-sky-100 overflow-hidden">
+    <div class="px-5 py-3 border-b border-sky-100 bg-sky-50/50 flex items-center justify-between gap-4">
+        <h3 class="text-sm font-semibold text-sky-900">Registrar Domains (Top 100 Active)</h3>
+        <span class="text-xs text-slate-500">{{ resellerclub_context.domain_total }} domain(s)</span>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="min-w-full text-xs">
+            <thead class="bg-slate-50 text-slate-600">
+                <tr>
+                    <th class="px-4 py-2 text-left">Domain</th>
+                    <th class="px-4 py-2 text-left">Status</th>
+                    <th class="px-4 py-2 text-left">Order ID</th>
+                    <th class="px-4 py-2 text-left">Registered</th>
+                    <th class="px-4 py-2 text-left">Expiry</th>
+                    <th class="px-4 py-2 text-left">Auto Renew</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for order in resellerclub_context.domain_orders %}
+                <tr class="border-t border-slate-100">
+                    <td class="px-4 py-2 font-medium text-slate-800">{{ order.domainname|default:"—" }}</td>
+                    <td class="px-4 py-2 text-slate-600">{{ order.currentstatus|default:"—" }}</td>
+                    <td class="px-4 py-2 text-slate-600">{{ order.orderid|default:"—" }}</td>
+                    <td class="px-4 py-2 text-slate-600">{{ order.creation_date|default:"—" }}</td>
+                    <td class="px-4 py-2 text-slate-600">{{ order.expiry_date|default:"—" }}</td>
+                    <td class="px-4 py-2 text-slate-600">{{ order.recurring|yesno:"Yes,No" }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" class="px-4 py-4 text-slate-500">No registrar domain orders returned.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
 
 {% if service == 'whm' and whm_context %}
 <div class="mt-8 space-y-5">
@@ -132,8 +175,18 @@
     </div>
 
     <div class="bg-white rounded-xl shadow-sm border border-sky-100 overflow-hidden">
-        <div class="px-5 py-3 border-b border-sky-100 bg-sky-50/50">
+        <div class="px-5 py-3 border-b border-sky-100 bg-sky-50/50 flex items-center justify-between gap-4 flex-wrap">
             <h3 class="text-sm font-semibold text-sky-900">Accounts & Usage (Top 200)</h3>
+            <form method="get" class="flex items-center gap-2 flex-wrap">
+                <input type="text" name="q" value="{{ whm_context.filters.q }}" placeholder="Search username/domain"
+                       class="px-3 py-1.5 rounded-lg border border-slate-200 text-xs text-slate-700">
+                <select name="suspended" class="px-3 py-1.5 rounded-lg border border-slate-200 text-xs text-slate-700">
+                    <option value="all" {% if whm_context.filters.suspended == 'all' %}selected{% endif %}>All statuses</option>
+                    <option value="yes" {% if whm_context.filters.suspended == 'yes' %}selected{% endif %}>Suspended only</option>
+                    <option value="no" {% if whm_context.filters.suspended == 'no' %}selected{% endif %}>Active only</option>
+                </select>
+                <button type="submit" class="px-3 py-1.5 rounded-lg bg-sky-600 text-white text-xs font-medium">Filter</button>
+            </form>
         </div>
         <div class="overflow-x-auto">
             <table class="min-w-full text-xs">
@@ -143,10 +196,16 @@
                         <th class="px-4 py-2 text-left">Domain</th>
                         <th class="px-4 py-2 text-left">Plan</th>
                         <th class="px-4 py-2 text-left">Service Link</th>
-                        <th class="px-4 py-2 text-left">Suspended</th>
+                        <th class="px-4 py-2 text-left">Status</th>
+                        <th class="px-4 py-2 text-left">Owner</th>
+                        <th class="px-4 py-2 text-left">IP</th>
                         <th class="px-4 py-2 text-left">Disk Used</th>
                         <th class="px-4 py-2 text-left">Disk Limit</th>
+                        <th class="px-4 py-2 text-left">Disk %</th>
+                        <th class="px-4 py-2 text-left">Inodes Used</th>
+                        <th class="px-4 py-2 text-left">Inode Limit</th>
                         <th class="px-4 py-2 text-left">BW Used</th>
+                        <th class="px-4 py-2 text-left">BW Limit</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -162,13 +221,25 @@
                             —
                             {% endif %}
                         </td>
-                        <td class="px-4 py-2 text-slate-600">{{ acct.suspended|yesno:"Yes,No" }}</td>
+                        <td class="px-4 py-2 text-slate-600">
+                            {% if acct.suspended %}
+                            <span class="inline-flex items-center rounded-full bg-red-100 text-red-700 px-2 py-0.5 font-medium">Suspended</span>
+                            {% else %}
+                            <span class="inline-flex items-center rounded-full bg-emerald-100 text-emerald-700 px-2 py-0.5 font-medium">Active</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-2 text-slate-600">{{ acct.owner|default:"—" }}</td>
+                        <td class="px-4 py-2 text-slate-600">{{ acct.ip|default:"—" }}</td>
                         <td class="px-4 py-2 text-slate-600">{% if acct.usage_snapshot %}{{ acct.usage_snapshot.disk_used_mb|default:"—" }}{% else %}—{% endif %}</td>
                         <td class="px-4 py-2 text-slate-600">{% if acct.usage_snapshot %}{{ acct.usage_snapshot.disk_limit_mb|default:"—" }}{% else %}—{% endif %}</td>
+                        <td class="px-4 py-2 text-slate-600">{% if acct.usage_snapshot %}{{ acct.usage_snapshot.disk_used_percent|default:"—" }}{% else %}—{% endif %}</td>
+                        <td class="px-4 py-2 text-slate-600">{% if acct.usage_snapshot %}{{ acct.usage_snapshot.inode_used|default:"—" }}{% else %}—{% endif %}</td>
+                        <td class="px-4 py-2 text-slate-600">{% if acct.usage_snapshot %}{{ acct.usage_snapshot.inode_limit|default:"—" }}{% else %}—{% endif %}</td>
                         <td class="px-4 py-2 text-slate-600">{% if acct.usage_snapshot %}{{ acct.usage_snapshot.monthly_bandwidth_used_mb|default:"—" }}{% else %}—{% endif %}</td>
+                        <td class="px-4 py-2 text-slate-600">{% if acct.usage_snapshot %}{{ acct.usage_snapshot.monthly_bandwidth_limit_mb|default:"—" }}{% else %}—{% endif %}</td>
                     </tr>
                     {% empty %}
-                    <tr><td colspan="8" class="px-4 py-4 text-slate-500">No account snapshots yet.</td></tr>
+                    <tr><td colspan="13" class="px-4 py-4 text-slate-500">No account snapshots yet.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
