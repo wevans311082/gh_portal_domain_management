@@ -11,8 +11,8 @@
 {% if service == 'whm' %}
 <form method="post" class="inline">
     {% csrf_token %}
-    <input type="hidden" name="action" value="sync_now">
-    <button type="submit" class="text-sm text-emerald-700 hover:underline font-medium">Run Sync Now</button>
+    <input type="hidden" name="action" value="refresh_now">
+    <button type="submit" class="text-sm text-emerald-700 hover:underline font-medium">Refresh Now</button>
 </form>
 {% endif %}
 {% endblock %}

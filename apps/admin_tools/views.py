@@ -381,7 +381,7 @@ def integration_detail(request, service):
         WHMServerSnapshot,
         WHMSyncRun,
     )
-    from apps.provisioning.tasks import sync_whm_inventory
+    from apps.provisioning.whm_sync import WHMSyncService
     import stripe as stripe_module
     import requests as _req
 
@@ -423,12 +423,18 @@ def integration_detail(request, service):
 
     if request.method == "POST" and service == "whm":
         action = (request.POST.get("action") or "").strip()
-        if action == "sync_now":
-            task = sync_whm_inventory.delay()
-            messages.success(
-                request,
-                f"WHM sync queued (task id: {task.id}). Refresh shortly to view updated data.",
-            )
+        if action == "refresh_now":
+            try:
+                result = WHMSyncService().sync_all()
+                messages.success(
+                    request,
+                    "WHM inventory refreshed: "
+                    f"{result.get('package_count', 0)} packages, "
+                    f"{result.get('account_count', 0)} accounts, "
+                    f"{result.get('usage_count', 0)} usage snapshots.",
+                )
+            except Exception as exc:
+                messages.error(request, f"WHM refresh failed: {exc}")
             return redirect("admin_tools:integration_detail", service="whm")
 
     # Set Stripe API key before probe

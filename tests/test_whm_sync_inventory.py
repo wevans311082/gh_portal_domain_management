@@ -98,7 +98,7 @@ def test_whm_sync_service_persists_inventory(django_user_model):
 
 
 @pytest.mark.django_db
-def test_whm_integration_detail_allows_manual_sync_trigger(client, django_user_model, monkeypatch):
+def test_whm_integration_detail_refresh_now_runs_sync_immediately(client, django_user_model, monkeypatch):
     staff = django_user_model.objects.create_user(
         email="whm-admin@example.com",
         password="password123",
@@ -106,20 +106,24 @@ def test_whm_integration_detail_allows_manual_sync_trigger(client, django_user_m
     )
     client.force_login(staff)
 
-    class _TaskResult:
-        id = "task-123"
+    called = {}
 
     monkeypatch.setattr(
-        "apps.provisioning.tasks.sync_whm_inventory.delay",
-        lambda: _TaskResult(),
+        "apps.provisioning.whm_sync.WHMSyncService.sync_all",
+        lambda self: called.setdefault("result", {
+            "package_count": 1,
+            "account_count": 2,
+            "usage_count": 2,
+        }),
     )
 
     response = client.post(
         reverse("admin_tools:integration_detail", kwargs={"service": "whm"}),
-        {"action": "sync_now"},
+        {"action": "refresh_now"},
     )
 
     assert response.status_code == 302
+    assert called["result"]["account_count"] == 2
 
 
 @pytest.mark.django_db
