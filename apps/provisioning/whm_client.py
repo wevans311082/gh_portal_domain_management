@@ -211,9 +211,23 @@ class WHMClient:
     # ── Disk / quota ─────────────────────────────────────────────────────────
 
     def get_quota(self, cpanel_username: str) -> dict:
-        """Return disk quota info for *cpanel_username* via cPanel UAPI."""
-        data = self._cpanel_call(cpanel_username, "DiskUsage", "get_quota")
-        return data.get("data", {})
+        """Return disk quota info for *cpanel_username* via cPanel UAPI.
+
+        Some servers expose quota via ``Quota/get_quota_info`` while others
+        still rely on ``DiskUsage/get_quota``. Try the modern endpoint first,
+        then fall back for compatibility.
+        """
+        errors = []
+        for module, function in (("Quota", "get_quota_info"), ("DiskUsage", "get_quota")):
+            try:
+                data = self._cpanel_call(cpanel_username, module, function)
+                return data.get("data", {}) if isinstance(data, dict) else {}
+            except WHMClientError as exc:
+                errors.append(f"{module}/{function}: {exc}")
+
+        raise WHMClientError(
+            "cPanel quota endpoints unavailable: " + " | ".join(errors)
+        )
 
     def create_cpanel_session(self, cpanel_username: str) -> str:
         """Create a WHM-authenticated cPanel session and return the login URL."""
