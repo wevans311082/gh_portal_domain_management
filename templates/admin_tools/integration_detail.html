@@ -7,6 +7,11 @@
 <a href="{% url 'admin_tools:integrations_overview' %}" class="text-sm text-sky-600 hover:underline font-medium">← All Integrations</a>
 {% if service == 'resellerclub' %}
 <a href="{% url 'admin_tools:resellerclub_debug' %}" class="text-sm text-amber-700 hover:underline font-medium">HTTP Debug</a>
+<form method="post" class="inline">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="refresh_now">
+    <button type="submit" class="text-sm text-emerald-700 hover:underline font-medium">Refresh Now (All Fields)</button>
+</form>
 {% endif %}
 {% if service == 'whm' %}
 <form method="post" class="inline">
@@ -75,7 +80,7 @@
 <div class="mt-8 bg-white rounded-xl shadow-sm border border-sky-100 overflow-hidden">
     <div class="px-5 py-3 border-b border-sky-100 bg-sky-50/50 flex items-center justify-between gap-4">
         <h3 class="text-sm font-semibold text-sky-900">Registrar Domains (Top 100 Active)</h3>
-        <span class="text-xs text-slate-500">{{ resellerclub_context.domain_total }} domain(s)</span>
+        <span class="text-xs text-slate-500">{{ resellerclub_context.domain_total }} domain(s){% if resellerclub_context.full_refresh %} • full field refresh{% endif %}</span>
     </div>
     <div class="overflow-x-auto">
         <table class="min-w-full text-xs">
@@ -87,6 +92,7 @@
                     <th class="px-4 py-2 text-left">Registered</th>
                     <th class="px-4 py-2 text-left">Expiry</th>
                     <th class="px-4 py-2 text-left">Auto Renew</th>
+                    <th class="px-4 py-2 text-left">All Fields</th>
                 </tr>
             </thead>
             <tbody>
@@ -98,9 +104,21 @@
                     <td class="px-4 py-2 text-slate-600">{{ order.creation_date|default:"—" }}</td>
                     <td class="px-4 py-2 text-slate-600">{{ order.expiry_date|default:"—" }}</td>
                     <td class="px-4 py-2 text-slate-600">{{ order.recurring|yesno:"Yes,No" }}</td>
+                    <td class="px-4 py-2 text-slate-600">
+                        {% if order.order_details_json %}
+                        <details>
+                            <summary class="cursor-pointer text-sky-600">View</summary>
+                            <pre class="mt-2 text-[11px] text-slate-700 bg-slate-50 rounded p-2 max-h-48 overflow-auto whitespace-pre-wrap">{{ order.order_details_json }}</pre>
+                        </details>
+                        {% elif order.order_details_error %}
+                        <span class="text-red-600">{{ order.order_details_error }}</span>
+                        {% else %}
+                        —
+                        {% endif %}
+                    </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="6" class="px-4 py-4 text-slate-500">No registrar domain orders returned.</td></tr>
+                <tr><td colspan="7" class="px-4 py-4 text-slate-500">No registrar domain orders returned.</td></tr>
                 {% endfor %}
             </tbody>
         </table>

@@ -302,6 +302,28 @@ def test_staff_cart_builder_creates_invoice_for_selected_customer(client, django
 
 
 @pytest.mark.django_db
+def test_staff_cart_builder_page_renders_with_featured_tlds(client, django_user_model):
+    staff_user = django_user_model.objects.create_user(
+        email="cart-builder-view-admin@example.com",
+        password="password123",
+        is_staff=True,
+    )
+    TLDPricing.objects.create(
+        tld="com",
+        registration_cost="8.00",
+        renewal_cost="9.00",
+        transfer_cost="10.00",
+        is_active=True,
+    )
+
+    client.force_login(staff_user)
+    response = client.get(reverse("admin_tools:cart_builder"))
+
+    assert response.status_code == 200
+    assert "featured_tlds" in response.context
+
+
+@pytest.mark.django_db
 def test_companies_house_config_requires_staff(client):
     response = client.get(reverse("admin_tools:companies_house_config"))
 
@@ -523,3 +545,74 @@ def test_staff_can_su_as_user_and_stop(client, django_user_model):
     stop = client.post(reverse("admin_tools:user_su_stop"))
     assert stop.status_code == 302
     assert stop.url == reverse("admin_tools:users")
+
+
+    @pytest.mark.django_db
+    def test_users_page_shows_whm_sync_button(client, django_user_model):
+        staff = django_user_model.objects.create_user(
+            email="users-sync-ui@example.com",
+            password="password123",
+            is_staff=True,
+        )
+        client.force_login(staff)
+
+        response = client.get(reverse("admin_tools:users"))
+
+        assert response.status_code == 200
+        assert "Sync WHM" in response.content.decode()
+
+
+    @pytest.mark.django_db
+    def test_users_sync_import_direction_invokes_import_flow(client, django_user_model, monkeypatch):
+        staff = django_user_model.objects.create_user(
+            email="users-sync-import@example.com",
+            password="password123",
+            is_staff=True,
+        )
+        client.force_login(staff)
+
+        called = {"import": False}
+
+        def fake_import():
+            called["import"] = True
+            return {
+                "accounts_seen": 1,
+                "users_created": 1,
+                "domains_created": 1,
+                "services_created": 1,
+                "services_updated": 0,
+                "managed_domains_linked": 1,
+                "warnings": [],
+            }
+
+        monkeypatch.setattr("apps.admin_tools.views._sync_whm_import", fake_import)
+
+        response = client.post(reverse("admin_tools:users"), {"action": "sync_whm", "direction": "import"})
+
+        assert response.status_code == 302
+        assert response.url == reverse("admin_tools:users")
+        assert called["import"] is True
+
+
+    @pytest.mark.django_db
+    def test_users_sync_export_direction_invokes_export_flow(client, django_user_model, monkeypatch):
+        staff = django_user_model.objects.create_user(
+            email="users-sync-export@example.com",
+            password="password123",
+            is_staff=True,
+        )
+        client.force_login(staff)
+
+        called = {"export": False}
+
+        def fake_export():
+            called["export"] = True
+            return {"eligible": 2, "created": 2, "failed": 0, "warnings": []}
+
+        monkeypatch.setattr("apps.admin_tools.views._sync_whm_export", fake_export)
+
+        response = client.post(reverse("admin_tools:users"), {"action": "sync_whm", "direction": "export"})
+
+        assert response.status_code == 302
+        assert response.url == reverse("admin_tools:users")
+        assert called["export"] is True

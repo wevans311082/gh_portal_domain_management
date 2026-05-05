@@ -618,8 +618,15 @@ class ResellerClubClient:
             return ""
         return datetime.fromtimestamp(epoch, tz=timezone.utc).date().isoformat()
 
-    def list_domain_orders(self, page_no: int = 1, no_of_records: int = 100, status: str = "Active") -> list[dict]:
-        """Return a page of registrar domain orders with normalized expiry dates."""
+    def list_domain_orders(
+        self,
+        page_no: int = 1,
+        no_of_records: int = 100,
+        status: str = "Active",
+        include_details: bool = False,
+        max_details: int = 100,
+    ) -> list[dict]:
+        """Return registrar domain orders with normalized dates and optional full details."""
         payload = self._get(
             "domains/search",
             {
@@ -637,12 +644,31 @@ class ResellerClubClient:
             records = []
 
         normalized = []
-        for record in records:
+        for idx, record in enumerate(records):
             if not isinstance(record, dict):
                 continue
             item = dict(record)
             item["expiry_date"] = self._epoch_to_iso(record.get("endtime"))
             item["creation_date"] = self._epoch_to_iso(record.get("creationtime"))
+
+            if include_details and idx < max_details:
+                order_id = str(record.get("orderid") or "").strip()
+                if order_id:
+                    try:
+                        details = self.get_order_details(order_id)
+                        item["order_details"] = details
+                        # Backfill common fields from details if list payload omits them.
+                        if isinstance(details, dict):
+                            item.setdefault("domainname", details.get("domainname"))
+                            item.setdefault("currentstatus", details.get("currentstatus"))
+                            item.setdefault("recurring", details.get("recurring"))
+                            item.setdefault("endtime", details.get("endtime"))
+                            item.setdefault("creationtime", details.get("creationtime"))
+                            item["expiry_date"] = item["expiry_date"] or self._epoch_to_iso(details.get("endtime"))
+                            item["creation_date"] = item["creation_date"] or self._epoch_to_iso(details.get("creationtime"))
+                    except Exception as exc:
+                        item["order_details_error"] = str(exc)
+
             normalized.append(item)
         return normalized
 

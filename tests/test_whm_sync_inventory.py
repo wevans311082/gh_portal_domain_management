@@ -236,7 +236,7 @@ def test_resellerclub_integration_detail_includes_domain_expiry_list(client, dja
 
     monkeypatch.setattr(
         "apps.domains.resellerclub_client.ResellerClubClient.list_domain_orders",
-        lambda self, page_no=1, no_of_records=100, status="Active": [
+        lambda self, page_no=1, no_of_records=100, status="Active", include_details=False, max_details=100: [
             {
                 "domainname": "example.com",
                 "currentstatus": "Active",
@@ -253,3 +253,62 @@ def test_resellerclub_integration_detail_includes_domain_expiry_list(client, dja
     assert response.status_code == 200
     assert response.context["resellerclub_context"]["domain_total"] == 1
     assert response.context["resellerclub_context"]["domain_orders"][0]["expiry_date"] == "2026-01-01"
+
+
+@pytest.mark.django_db
+def test_resellerclub_refresh_now_redirects_to_full_refresh(client, django_user_model):
+    staff = django_user_model.objects.create_user(
+        email="rc-refresh@example.com",
+        password="password123",
+        is_staff=True,
+    )
+    client.force_login(staff)
+
+    response = client.post(
+        reverse("admin_tools:integration_detail", kwargs={"service": "resellerclub"}),
+        {"action": "refresh_now"},
+    )
+
+    assert response.status_code == 302
+    expected = reverse("admin_tools:integration_detail", kwargs={"service": "resellerclub"}) + "?full=1"
+    assert response.url.endswith(expected)
+
+
+@pytest.mark.django_db
+def test_resellerclub_full_refresh_requests_all_fields(client, django_user_model, monkeypatch):
+    staff = django_user_model.objects.create_user(
+        email="rc-full@example.com",
+        password="password123",
+        is_staff=True,
+    )
+    client.force_login(staff)
+
+    captured = {}
+
+    def fake_list(self, page_no=1, no_of_records=100, status="Active", include_details=False, max_details=100):
+        captured["include_details"] = include_details
+        captured["max_details"] = max_details
+        return [
+            {
+                "domainname": "example.com",
+                "currentstatus": "Active",
+                "orderid": 123,
+                "creation_date": "2025-01-01",
+                "expiry_date": "2026-01-01",
+                "recurring": True,
+                "order_details": {"orderid": 123, "registrarlock": "true"},
+            }
+        ]
+
+    monkeypatch.setattr(
+        "apps.domains.resellerclub_client.ResellerClubClient.list_domain_orders",
+        fake_list,
+    )
+
+    response = client.get(reverse("admin_tools:integration_detail", kwargs={"service": "resellerclub"}) + "?full=1")
+
+    assert response.status_code == 200
+    assert captured["include_details"] is True
+    assert captured["max_details"] == 100
+    assert response.context["resellerclub_context"]["full_refresh"] is True
+    assert "registrarlock" in response.context["resellerclub_context"]["domain_orders"][0]["order_details_json"]

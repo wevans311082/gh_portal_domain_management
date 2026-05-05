@@ -637,7 +637,7 @@ def cart_builder(request):
         "cart": cart,
         "cart_items": cart.items.all() if cart else [],
         "packages": Package.objects.filter(is_active=True).prefetch_related("features").order_by("card_sort_order", "sort_order", "price_monthly"),
-        "featured_tlds": TLDPricing.objects.filter(is_active=True).order_by("registration_price", "tld")[:8],
+        "featured_tlds": TLDPricing.objects.filter(is_active=True).order_by("registration_cost", "tld")[:8],
         "contacts": selected_user.domain_contacts.order_by("-is_default", "label") if selected_user else [],
         "domains": selected_user.domains.order_by("name") if selected_user else [],
     }

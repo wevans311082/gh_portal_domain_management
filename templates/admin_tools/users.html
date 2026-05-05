@@ -22,13 +22,27 @@
 
 <!-- Search -->
 <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-4 mb-5">
-    <form method="get" class="flex flex-wrap gap-2">
-        <input type="text" name="q" value="{{ search_q }}" placeholder="Search by email or name…"
-               class="border border-slate-200 rounded-lg px-3 py-2 text-sm flex-1 min-w-[200px] focus:outline-none focus:ring-2 focus:ring-indigo-400">
-        <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700">Search</button>
-        {% if search_q %}<a href="{% url 'admin_tools:users' %}" class="border border-slate-200 text-slate-600 px-4 py-2 rounded-lg text-sm hover:bg-slate-50">Clear</a>{% endif %}
+    <div class="flex flex-wrap gap-2">
+        <form method="get" class="flex flex-wrap gap-2 flex-1 min-w-[260px]">
+            <input type="text" name="q" value="{{ search_q }}" placeholder="Search by email or name…"
+                   class="border border-slate-200 rounded-lg px-3 py-2 text-sm flex-1 min-w-[200px] focus:outline-none focus:ring-2 focus:ring-indigo-400">
+            <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700">Search</button>
+            {% if search_q %}<a href="{% url 'admin_tools:users' %}" class="border border-slate-200 text-slate-600 px-4 py-2 rounded-lg text-sm hover:bg-slate-50">Clear</a>{% endif %}
+        </form>
+        <form method="post" id="whm-sync-form" class="inline">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="sync_whm">
+            <input type="hidden" name="direction" id="whm-sync-direction">
+            <button
+                type="button"
+                class="bg-sky-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-sky-700"
+                onclick="const raw = prompt('WHM sync direction? Type import or export.', 'import'); if (!raw) { return; } const direction = raw.trim().toLowerCase(); if (direction !== 'import' && direction !== 'export') { alert('Please type import or export.'); return; } document.getElementById('whm-sync-direction').value = direction; document.getElementById('whm-sync-form').submit();"
+            >
+                Sync WHM
+            </button>
+        </form>
         <a href="{% url 'admin_tools:user_create' %}" class="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-700">+ New User</a>
-    </form>
+    </div>
 </div>
 
 <!-- User table -->

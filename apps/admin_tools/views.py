@@ -6,7 +6,9 @@ import requests
 
 from django.conf import settings
 from django.contrib import messages
+from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
+from django.core.validators import validate_email
 from django.db.models import Count, Q, Sum
 from django.db.models.functions import TruncMonth
 from django.shortcuts import redirect, render
@@ -20,7 +22,11 @@ from apps.accounts.models import User
 from apps.audit.models import AuditLog, EmailLog
 from apps.billing.models import Invoice
 from apps.domains.models import Domain, DomainPricingSettings, DomainRenewal, TLDPricing
+from apps.domains.resellerclub_client import ResellerClubClient
 from apps.payments.models import Payment
+from apps.products.models import Package
+from apps.provisioning.whm_client import WHMClient, generate_cpanel_username, generate_secure_password
+from apps.provisioning.whm_sync import WHMSyncService
 from apps.services.models import Service
 from apps.support.models import SupportTicket
 from . import wizard_views
@@ -483,6 +489,11 @@ def integration_detail(request, service):
                 messages.error(request, f"WHM refresh failed: {exc}")
             return redirect("admin_tools:integration_detail", service="whm")
 
+    if request.method == "POST" and service == "resellerclub":
+        action = (request.POST.get("action") or "").strip()
+        if action == "refresh_now":
+            return redirect(f"{reverse('admin_tools:integration_detail', kwargs={'service': 'resellerclub'})}?full=1")
+
     # Set Stripe API key before probe
     stripe_module.api_key = get_runtime_setting("STRIPE_SECRET_KEY", "")
 
@@ -542,8 +553,18 @@ def integration_detail(request, service):
         }
 
     if service == "resellerclub":
+        full_refresh = (request.GET.get("full") or "").strip() == "1"
         try:
-            domain_orders = ResellerClubClient().list_domain_orders(page_no=1, no_of_records=100, status="Active")
+            domain_orders = ResellerClubClient().list_domain_orders(
+                page_no=1,
+                no_of_records=100,
+                status="Active",
+                include_details=full_refresh,
+                max_details=100,
+            )
+            for order in domain_orders:
+                if order.get("order_details"):
+                    order["order_details_json"] = _safe_json(order.get("order_details"))
         except Exception as exc:
             domain_orders = []
             messages.error(request, f"Could not load registrar domain list: {exc}")
@@ -551,6 +572,7 @@ def integration_detail(request, service):
         resellerclub_context = {
             "domain_orders": domain_orders,
             "domain_total": len(domain_orders),
+            "full_refresh": full_refresh,
         }
 
     return render(request, "admin_tools/integration_detail.html", {
@@ -692,9 +714,243 @@ def resellerclub_debug(request):
 # Users overview
 # ---------------------------------------------------------------------------
 
+
+def _normalize_domain_name(value: str) -> str:
+    return str(value or "").strip().lower().rstrip(".")
+
+
+def _split_domain_name(domain_name: str) -> tuple[str, str]:
+    normalized = _normalize_domain_name(domain_name)
+    if "." not in normalized:
+        return normalized, ""
+    label, tld = normalized.split(".", 1)
+    return label, tld
+
+
+def _safe_import_email(raw_email: str, username: str, domain_name: str) -> str:
+    candidate = str(raw_email or "").strip().lower()
+    if not candidate and domain_name:
+        candidate = f"{username}@{domain_name}"
+    if not candidate:
+        candidate = f"whm-{username}@local.invalid"
+
+    try:
+        validate_email(candidate)
+    except ValidationError:
+        candidate = f"whm-{username}@local.invalid"
+
+    existing = User.objects.filter(email__iexact=candidate).first()
+    if existing:
+        return existing.email
+
+    if not User.objects.filter(email__iexact=candidate).exists():
+        return candidate
+
+    local, _, domain = candidate.partition("@")
+    suffix = 1
+    while True:
+        alt = f"{local}+whm{suffix}@{domain or 'local.invalid'}"
+        if not User.objects.filter(email__iexact=alt).exists():
+            return alt
+        suffix += 1
+
+
+def _sync_whm_import() -> dict:
+    sync_result = WHMSyncService().sync_all()
+    snapshots = Service._meta.apps.get_model("provisioning", "WHMAccountSnapshot").objects.filter(is_active=True)
+    default_package = Package.objects.filter(is_active=True).order_by("id").first()
+    if default_package is None:
+        raise ValueError("No active package exists. Create at least one active package before importing from WHM.")
+
+    rc_client = None
+    reseller_index = None
+    stats = {
+        "accounts_seen": snapshots.count(),
+        "users_created": 0,
+        "domains_created": 0,
+        "services_created": 0,
+        "services_updated": 0,
+        "managed_domains_linked": 0,
+        "warnings": [],
+        "sync_result": sync_result,
+    }
+
+    for acct in snapshots:
+        username = str(acct.username or "").strip()
+        domain_name = _normalize_domain_name(acct.domain)
+        if not username:
+            continue
+
+        email = _safe_import_email(acct.email, username, domain_name)
+        user = User.objects.filter(email__iexact=email).first()
+        if user is None:
+            user = User.objects.create_user(
+                email=email,
+                password=None,
+                first_name=username[:150],
+            )
+            stats["users_created"] += 1
+
+        if domain_name:
+            domain_obj = Domain.objects.filter(name__iexact=domain_name).first()
+            if domain_obj is None:
+                managed_order = None
+                label, tld = _split_domain_name(domain_name)
+                if label and tld:
+                    try:
+                        rc_client = rc_client or ResellerClubClient()
+                        availability = rc_client.check_availability([label], [tld])
+                        availability_info = availability.get(domain_name, {}) if isinstance(availability, dict) else {}
+                        availability_status = str((availability_info or {}).get("status", "")).strip().lower()
+
+                        if availability_status != "available":
+                            if reseller_index is None:
+                                reseller_index = {}
+                                orders = rc_client.list_domain_orders(page_no=1, no_of_records=500, status="All")
+                                for order in orders:
+                                    order_domain = _normalize_domain_name(order.get("domainname"))
+                                    if order_domain:
+                                        reseller_index[order_domain] = order
+                            managed_order = reseller_index.get(domain_name)
+                    except Exception as exc:
+                        stats["warnings"].append(f"{domain_name}: reseller lookup skipped ({exc})")
+
+                _, tld_value = _split_domain_name(domain_name)
+                domain_defaults = {
+                    "user": user,
+                    "tld": tld_value,
+                    "status": Domain.STATUS_ACTIVE,
+                    "dns_provider": Domain.DNS_PROVIDER_EXTERNAL,
+                    "auto_renew": True,
+                }
+                if managed_order:
+                    domain_defaults["dns_provider"] = Domain.DNS_PROVIDER_REGISTRAR
+                    order_id = managed_order.get("orderid")
+                    if order_id not in (None, ""):
+                        domain_defaults["registrar_id"] = str(order_id)
+                    stats["managed_domains_linked"] += 1
+
+                Domain.objects.create(name=domain_name, **domain_defaults)
+                stats["domains_created"] += 1
+
+        package = Package.objects.filter(is_active=True, whm_package_name__iexact=acct.plan).first() or default_package
+
+        service = Service.objects.filter(cpanel_username__iexact=username).first()
+        if service is None and domain_name:
+            service = Service.objects.filter(user=user, domain_name__iexact=domain_name).first()
+
+        defaults = {
+            "user": user,
+            "package": package,
+            "status": Service.STATUS_ACTIVE,
+            "domain_name": domain_name,
+            "cpanel_domain": domain_name,
+            "cpanel_ip": acct.ip or None,
+            "cpanel_server": acct.server or "",
+        }
+        if service is None:
+            Service.objects.create(cpanel_username=username, **defaults)
+            stats["services_created"] += 1
+        else:
+            changed_fields = []
+            for key, value in defaults.items():
+                if getattr(service, key) != value:
+                    setattr(service, key, value)
+                    changed_fields.append(key)
+            if service.cpanel_username != username:
+                service.cpanel_username = username
+                changed_fields.append("cpanel_username")
+            if changed_fields:
+                service.save(update_fields=changed_fields + ["updated_at"])
+                stats["services_updated"] += 1
+
+    return stats
+
+
+def _sync_whm_export() -> dict:
+    client = WHMClient()
+    eligible_services = (
+        Service.objects.select_related("user", "package")
+        .filter(cpanel_username="")
+        .exclude(domain_name="")
+    )
+    created = 0
+    failed = 0
+    warnings = []
+
+    for service in eligible_services:
+        package_name = service.package.whm_package_name or service.package.name
+        if not package_name:
+            failed += 1
+            warnings.append(f"Service #{service.pk}: package has no WHM package mapping")
+            continue
+
+        username = generate_cpanel_username(service.domain_name or service.user.email.split("@")[0])
+        password = generate_secure_password()
+        try:
+            client.create_account(
+                domain=service.domain_name,
+                username=username,
+                password=password,
+                package=package_name,
+                email=service.user.email,
+            )
+            service.cpanel_username = username
+            service.status = Service.STATUS_ACTIVE
+            service.save(update_fields=["cpanel_username", "status", "updated_at"])
+            created += 1
+        except Exception as exc:
+            failed += 1
+            warnings.append(f"Service #{service.pk}: {exc}")
+
+    return {
+        "eligible": eligible_services.count(),
+        "created": created,
+        "failed": failed,
+        "warnings": warnings,
+    }
+
 @staff_member_required
 def users(request):
     """Paginated user list with search."""
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+        if action == "sync_whm":
+            direction = (request.POST.get("direction") or "").strip().lower()
+            if direction not in {"import", "export"}:
+                messages.error(request, "Choose a valid sync direction: import or export.")
+                return redirect("admin_tools:users")
+
+            try:
+                if direction == "import":
+                    result = _sync_whm_import()
+                    messages.success(
+                        request,
+                        (
+                            "WHM import complete. "
+                            f"Accounts seen: {result['accounts_seen']}, users created: {result['users_created']}, "
+                            f"domains created: {result['domains_created']}, services created: {result['services_created']}, "
+                            f"services updated: {result['services_updated']}, managed domains linked: {result['managed_domains_linked']}."
+                        ),
+                    )
+                    for warning in result.get("warnings", [])[:5]:
+                        messages.warning(request, warning)
+                else:
+                    result = _sync_whm_export()
+                    messages.success(
+                        request,
+                        (
+                            "WHM export complete. "
+                            f"Eligible services: {result['eligible']}, created in WHM: {result['created']}, failed: {result['failed']}."
+                        ),
+                    )
+                    for warning in result.get("warnings", [])[:5]:
+                        messages.warning(request, warning)
+            except Exception as exc:
+                messages.error(request, f"WHM sync failed: {exc}")
+
+            return redirect("admin_tools:users")
+
     q = request.GET.get("q", "").strip()
     qs = User.objects.select_related("business_profile").order_by("-created_at")
     if q:
