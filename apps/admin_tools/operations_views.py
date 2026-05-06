@@ -3,6 +3,7 @@ from django.core.paginator import Paginator
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from apps.admin_tools.forms import (
@@ -15,6 +16,7 @@ from apps.admin_tools.forms import (
 from apps.core.models import ContactFormSettings, ContactSubmission
 from apps.domains.models import Domain
 from apps.payments.models import Payment
+from apps.provisioning.whm_client import WHMClient
 from apps.services.models import Service
 from apps.support.models import SupportTicket
 from apps.website_templates.models import WebsiteTemplate
@@ -100,9 +102,74 @@ def services_create(request):
 def services_edit(request, pk):
     obj = get_object_or_404(Service, pk=pk)
     if request.method == "POST":
+        previous_status = obj.status
+        previous_package_id = obj.package_id
         form = ServiceForm(request.POST, instance=obj)
         if form.is_valid():
-            form.save()
+            updated = form.save()
+            metadata_fields = []
+
+            def _set_whm_meta(action: str, ok: bool, message: str):
+                updated.whm_last_sync_action = action
+                updated.whm_last_sync_ok = ok
+                updated.whm_last_sync_message = message
+                updated.whm_last_sync_at = timezone.now()
+                updated.save(update_fields=[
+                    "whm_last_sync_action",
+                    "whm_last_sync_ok",
+                    "whm_last_sync_message",
+                    "whm_last_sync_at",
+                    "updated_at",
+                ])
+
+            # Reflect important hosting lifecycle edits to WHM when we know the account.
+            if updated.cpanel_username:
+                client = WHMClient()
+                try:
+                    if previous_status != updated.status:
+                        if updated.status == Service.STATUS_SUSPENDED:
+                            client.suspend_account(updated.cpanel_username, "Suspended from admin tools")
+                            _set_whm_meta("suspend", True, "Suspended in WHM successfully")
+                        elif previous_status == Service.STATUS_SUSPENDED and updated.status == Service.STATUS_ACTIVE:
+                            client.unsuspend_account(updated.cpanel_username)
+                            _set_whm_meta("unsuspend", True, "Unsuspended in WHM successfully")
+
+                    if previous_package_id != updated.package_id and updated.package.whm_package_name:
+                        client.change_package(updated.cpanel_username, updated.package.whm_package_name)
+                        _set_whm_meta("change_package", True, f"Changed WHM package to {updated.package.whm_package_name}")
+                except Exception as exc:
+                    attempted_action = updated.whm_last_sync_action or "sync"
+                    _set_whm_meta(attempted_action, False, str(exc))
+                    messages.warning(request, f"Service updated locally but WHM sync action failed: {exc}")
+            else:
+                if previous_status != updated.status:
+                    updated.whm_last_sync_action = "status_change_skipped"
+                    updated.whm_last_sync_ok = False
+                    updated.whm_last_sync_message = "No cPanel username set; cannot push status change to WHM"
+                    updated.whm_last_sync_at = timezone.now()
+                    metadata_fields.extend([
+                        "whm_last_sync_action",
+                        "whm_last_sync_ok",
+                        "whm_last_sync_message",
+                        "whm_last_sync_at",
+                        "updated_at",
+                    ])
+                if previous_package_id != updated.package_id:
+                    updated.whm_last_sync_action = "package_change_skipped"
+                    updated.whm_last_sync_ok = False
+                    updated.whm_last_sync_message = "No cPanel username set; cannot push package change to WHM"
+                    updated.whm_last_sync_at = timezone.now()
+                    metadata_fields.extend([
+                        "whm_last_sync_action",
+                        "whm_last_sync_ok",
+                        "whm_last_sync_message",
+                        "whm_last_sync_at",
+                        "updated_at",
+                    ])
+
+            if metadata_fields:
+                updated.save(update_fields=list(dict.fromkeys(metadata_fields)))
+
             messages.success(request, f"Service #{obj.pk} updated.")
             return redirect("admin_tools:services_edit", pk=obj.pk)
     else:

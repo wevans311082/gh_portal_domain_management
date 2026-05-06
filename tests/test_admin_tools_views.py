@@ -678,3 +678,93 @@ def test_staff_can_su_as_user_and_stop(client, django_user_model):
         assert result["accounts_seen"] == 1
         assert Package.objects.filter(name="starter", is_active=True).exists()
         assert Service.objects.filter(cpanel_username="acctbootstrap", domain_name="bootstrap.example.com").exists()
+
+
+    @pytest.mark.django_db
+    def test_services_list_displays_domain_column(client, django_user_model):
+        staff = django_user_model.objects.create_user(
+            email="svc-list-admin@example.com",
+            password="password123",
+            is_staff=True,
+        )
+        user = django_user_model.objects.create_user(email="svc-owner@example.com", password="password123")
+        package = Package.objects.create(
+            name="Ops Hosting",
+            slug="ops-hosting",
+            price_monthly="10.00",
+            price_annually="100.00",
+            is_active=True,
+        )
+        Service.objects.create(
+            user=user,
+            package=package,
+            status=Service.STATUS_ACTIVE,
+            domain_name="svc-example.com",
+            cpanel_username="svcacct",
+        )
+
+        client.force_login(staff)
+        response = client.get(reverse("admin_tools:services_list"))
+
+        assert response.status_code == 200
+        content = response.content.decode()
+        assert "svc-example.com" in content
+        assert "svcacct" in content
+
+
+    @pytest.mark.django_db
+    def test_services_edit_suspended_status_pushes_to_whm(client, django_user_model, monkeypatch):
+        staff = django_user_model.objects.create_user(
+            email="svc-edit-admin@example.com",
+            password="password123",
+            is_staff=True,
+        )
+        user = django_user_model.objects.create_user(email="svc-owner2@example.com", password="password123")
+        package = Package.objects.create(
+            name="Ops Hosting 2",
+            slug="ops-hosting-2",
+            price_monthly="10.00",
+            price_annually="100.00",
+            is_active=True,
+        )
+        service = Service.objects.create(
+            user=user,
+            package=package,
+            status=Service.STATUS_ACTIVE,
+            domain_name="svc2-example.com",
+            cpanel_username="svcacct2",
+            billing_period="monthly",
+        )
+
+        called = {"suspend": False}
+
+        def fake_suspend(self, username, reason=""):
+            called["suspend"] = True
+            assert username == "svcacct2"
+            return {"ok": True}
+
+        monkeypatch.setattr("apps.admin_tools.operations_views.WHMClient.suspend_account", fake_suspend)
+
+        client.force_login(staff)
+        response = client.post(
+            reverse("admin_tools:services_edit", kwargs={"pk": service.pk}),
+            {
+                "user": user.pk,
+                "package": package.pk,
+                "status": Service.STATUS_SUSPENDED,
+                "domain_name": "svc2-example.com",
+                "cpanel_username": "svcacct2",
+                "cpanel_domain": "svc2-example.com",
+                "cpanel_ip": "",
+                "cpanel_server": "",
+                "billing_period": "monthly",
+                "next_due_date": "",
+                "notes": "",
+            },
+            follow=True,
+        )
+
+        assert response.status_code == 200
+        service.refresh_from_db()
+        assert service.status == Service.STATUS_SUSPENDED
+        assert called["suspend"] is True

@@ -77,10 +77,37 @@
 </div>
 
 {% if service == 'resellerclub' and resellerclub_context %}
+<div class="mt-8 grid grid-cols-1 md:grid-cols-5 gap-4">
+    <div class="bg-white rounded-xl shadow-sm border border-sky-100 p-4">
+        <p class="text-xs text-slate-500 uppercase tracking-wide">Fetched Domains</p>
+        <p class="text-2xl font-semibold text-slate-800 mt-1">{{ resellerclub_context.domain_total }}</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm border border-emerald-100 p-4">
+        <p class="text-xs text-slate-500 uppercase tracking-wide">Updated Existing</p>
+        <p class="text-2xl font-semibold text-emerald-700 mt-1">{{ resellerclub_context.synced_existing }}</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm border border-indigo-100 p-4">
+        <p class="text-xs text-slate-500 uppercase tracking-wide">Created From Services</p>
+        <p class="text-2xl font-semibold text-indigo-700 mt-1">{{ resellerclub_context.created_from_service }}</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm border border-amber-100 p-4">
+        <p class="text-xs text-slate-500 uppercase tracking-wide">Managed In DB</p>
+        <p class="text-2xl font-semibold text-amber-700 mt-1">{{ resellerclub_context.managed_domain_total }}</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm border border-rose-100 p-4">
+        <p class="text-xs text-slate-500 uppercase tracking-wide">Expiring 30d</p>
+        <p class="text-2xl font-semibold text-rose-700 mt-1">{{ resellerclub_context.expiring_30d }}</p>
+    </div>
+</div>
+
 <div class="mt-8 bg-white rounded-xl shadow-sm border border-sky-100 overflow-hidden">
     <div class="px-5 py-3 border-b border-sky-100 bg-sky-50/50 flex items-center justify-between gap-4">
         <h3 class="text-sm font-semibold text-sky-900">Registrar Domains (All Managed)</h3>
-        <span class="text-xs text-slate-500">{{ resellerclub_context.domain_total }} domain(s){% if resellerclub_context.full_refresh %} • full field refresh{% endif %}</span>
+        <span class="text-xs text-slate-500">
+            {{ resellerclub_context.domain_total }} domain(s)
+            {% if resellerclub_context.full_refresh %} • full field refresh{% endif %}
+            {% if resellerclub_context.unmatched_external %} • {{ resellerclub_context.unmatched_external }} unmatched external{% endif %}
+        </span>
     </div>
     <div class="overflow-x-auto">
         <table class="min-w-full text-xs">
@@ -118,7 +145,7 @@
                     </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="7" class="px-4 py-4 text-slate-500">No registrar domain orders returned.</td></tr>
+                <tr><td colspan="7" class="px-4 py-4 text-slate-500">No live registrar domains returned. Use Refresh Now and confirm API credentials/connectivity.</td></tr>
                 {% endfor %}
             </tbody>
         </table>

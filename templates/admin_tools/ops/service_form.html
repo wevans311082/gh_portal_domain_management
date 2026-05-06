@@ -2,5 +2,36 @@
 {% block title %}Service · {{ SITE_NAME }}{% endblock %}
 {% block page_title %}{% if mode == 'create' %}Create Service{% else %}Edit Service{% endif %}{% endblock %}
 {% block content %}
-<form method="post" class="bg-white border rounded-xl p-6 max-w-5xl">{% csrf_token %}{{ form.as_p }}<button class="px-4 py-2 bg-sky-600 text-white rounded text-sm">Save</button></form>
+<div class="space-y-4 max-w-5xl">
+	{% if mode == 'edit' and obj %}
+	<section class="bg-white border rounded-xl p-4">
+		<div class="flex items-center justify-between gap-3">
+			<h3 class="text-sm font-semibold text-slate-800">WHM Sync Status</h3>
+			{% if obj.whm_last_sync_at %}
+				{% if obj.whm_last_sync_ok %}
+				<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">Success</span>
+				{% else %}
+				<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-rose-50 text-rose-700 border border-rose-200">Failed</span>
+				{% endif %}
+			{% else %}
+			<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">No push yet</span>
+			{% endif %}
+		</div>
+		{% if obj.whm_last_sync_at %}
+		<div class="mt-2 text-sm text-slate-700">
+			<span class="font-medium">Action:</span> {{ obj.whm_last_sync_action|default:"sync" }}
+			<span class="mx-1 text-slate-400">•</span>
+			<span class="font-medium">At:</span> {{ obj.whm_last_sync_at|date:"Y-m-d H:i" }}
+		</div>
+		{% if obj.whm_last_sync_message %}
+		<p class="mt-2 text-sm text-slate-600">{{ obj.whm_last_sync_message }}</p>
+		{% endif %}
+		{% else %}
+		<p class="mt-2 text-sm text-slate-500">This service has not pushed any status or package changes to WHM yet.</p>
+		{% endif %}
+	</section>
+	{% endif %}
+
+	<form method="post" class="bg-white border rounded-xl p-6">{% csrf_token %}{{ form.as_p }}<button class="px-4 py-2 bg-sky-600 text-white rounded text-sm">Save</button></form>
+</div>
 {% endblock %}

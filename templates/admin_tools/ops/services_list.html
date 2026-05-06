@@ -2,9 +2,66 @@
 {% block title %}Services · {{ SITE_NAME }}{% endblock %}
 {% block page_title %}Hosting Services{% endblock %}
 {% block content %}
-<div class="flex items-center justify-between mb-4"><form method="get" class="flex gap-2"><input name="q" value="{{ search_q }}" placeholder="Search service/user/package" class="border rounded px-3 py-2 text-sm w-72"><button class="px-4 py-2 bg-slate-800 text-white rounded text-sm">Search</button></form><a href="{% url 'admin_tools:services_create' %}" class="px-4 py-2 bg-sky-600 text-white rounded text-sm">New service</a></div>
-<div class="bg-white border rounded-xl overflow-hidden"><div class="overflow-x-auto">
-<table class="w-full text-sm"><thead class="bg-slate-50"><tr><th class="px-4 py-2 text-left">ID</th><th class="px-4 py-2 text-left">User</th><th class="px-4 py-2 text-left">Package</th><th class="px-4 py-2 text-left">Status</th><th class="px-4 py-2 text-right">Actions</th></tr></thead><tbody class="divide-y">{% for s in page_obj %}<tr><td class="px-4 py-2">#{{ s.pk }}</td><td class="px-4 py-2">{{ s.user.email }}</td><td class="px-4 py-2">{{ s.package.name }}</td><td class="px-4 py-2">{{ s.get_status_display }}</td><td class="px-4 py-2 text-right"><a href="{% url 'admin_tools:services_edit' s.pk %}" class="text-xs text-sky-700 mr-2">Edit</a><form method="post" action="{% url 'admin_tools:services_delete' s.pk %}" class="inline">{% csrf_token %}<button class="text-xs text-rose-600" onclick="return confirm('Delete service?')">Delete</button></form></td></tr>{% empty %}<tr><td colspan="5" class="px-4 py-8 text-center text-slate-500">No services found.</td></tr>{% endfor %}</tbody></table>
-</div></div>
+<div class="flex items-center justify-between mb-4">
+	<form method="get" class="flex gap-2">
+		<input name="q" value="{{ search_q }}" placeholder="Search service/user/package" class="border rounded px-3 py-2 text-sm w-72">
+		<button class="px-4 py-2 bg-slate-800 text-white rounded text-sm">Search</button>
+	</form>
+	<a href="{% url 'admin_tools:services_create' %}" class="px-4 py-2 bg-sky-600 text-white rounded text-sm">New service</a>
+</div>
+<div class="bg-white border rounded-xl overflow-hidden">
+	<div class="overflow-x-auto">
+		<table class="w-full text-sm">
+			<thead class="bg-slate-50">
+				<tr>
+					<th class="px-4 py-2 text-left">ID</th>
+					<th class="px-4 py-2 text-left">User</th>
+					<th class="px-4 py-2 text-left">Package</th>
+					<th class="px-4 py-2 text-left">Domain</th>
+					<th class="px-4 py-2 text-left">cPanel User</th>
+					<th class="px-4 py-2 text-left">Status</th>
+					<th class="px-4 py-2 text-left">WHM Sync</th>
+					<th class="px-4 py-2 text-right">Actions</th>
+				</tr>
+			</thead>
+			<tbody class="divide-y">
+				{% for s in page_obj %}
+				<tr>
+					<td class="px-4 py-2">#{{ s.pk }}</td>
+					<td class="px-4 py-2">{{ s.user.email }}</td>
+					<td class="px-4 py-2">{{ s.package.name }}</td>
+					<td class="px-4 py-2">{{ s.domain_name|default:s.cpanel_domain|default:"—" }}</td>
+					<td class="px-4 py-2">{{ s.cpanel_username|default:"—" }}</td>
+					<td class="px-4 py-2">{{ s.get_status_display }}</td>
+					<td class="px-4 py-2">
+						{% if s.whm_last_sync_at %}
+							{% if s.whm_last_sync_ok %}
+							<span class="inline-flex items-center rounded-full bg-emerald-100 text-emerald-700 px-2 py-0.5 text-xs font-medium">OK</span>
+							{% else %}
+							<span class="inline-flex items-center rounded-full bg-rose-100 text-rose-700 px-2 py-0.5 text-xs font-medium">Failed</span>
+							{% endif %}
+							<div class="text-[11px] text-slate-600 mt-1">{{ s.whm_last_sync_action|default:"sync" }} · {{ s.whm_last_sync_at|date:"Y-m-d H:i" }}</div>
+							{% if s.whm_last_sync_message %}
+							<div class="text-[11px] text-slate-500 truncate max-w-[240px]" title="{{ s.whm_last_sync_message }}">{{ s.whm_last_sync_message }}</div>
+							{% endif %}
+						{% else %}
+							<span class="text-xs text-slate-400">No push yet</span>
+						{% endif %}
+					</td>
+					<td class="px-4 py-2 text-right">
+						<a href="{% url 'admin_tools:services_edit' s.pk %}" class="text-xs text-sky-700 mr-2">Edit</a>
+						<form method="post" action="{% url 'admin_tools:services_delete' s.pk %}" class="inline">
+							{% csrf_token %}
+							<button class="text-xs text-rose-600" onclick="return confirm('Delete service?')">Delete</button>
+						</form>
+					</td>
+				</tr>
+				{% empty %}
+				<tr><td colspan="8" class="px-4 py-8 text-center text-slate-500">No services found.</td></tr>
+				{% endfor %}
+			</tbody>
+		</table>
+	</div>
+</div>
 {% include "admin_tools/_pagination.html" with page_obj=page_obj %}
 {% endblock %}

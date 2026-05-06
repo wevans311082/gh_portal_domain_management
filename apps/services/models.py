@@ -38,6 +38,10 @@ class Service(TimeStampedModel):
     cpanel_domain = models.CharField(max_length=255, blank=True)
     cpanel_ip = models.GenericIPAddressField(null=True, blank=True)
     cpanel_server = models.CharField(max_length=255, blank=True)
+    whm_last_sync_action = models.CharField(max_length=50, blank=True)
+    whm_last_sync_at = models.DateTimeField(null=True, blank=True)
+    whm_last_sync_ok = models.BooleanField(null=True, blank=True)
+    whm_last_sync_message = models.TextField(blank=True)
     billing_period = models.CharField(
         max_length=20,
         choices=[("monthly", "Monthly"), ("annually", "Annually")],

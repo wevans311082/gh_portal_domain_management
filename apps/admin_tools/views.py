@@ -1,7 +1,7 @@
 import json
 import time
 from decimal import Decimal, InvalidOperation
-from datetime import timedelta
+from datetime import date, timedelta
 import requests
 
 from django.conf import settings
@@ -419,6 +419,131 @@ def _probe_summary(service: str, label: str, data):
     return ""
 
 
+def _resellerclub_status_to_domain_status(raw_status: str) -> str:
+    value = str(raw_status or "").strip().lower()
+    if "expir" in value:
+        return Domain.STATUS_EXPIRED
+    if "suspend" in value or "hold" in value:
+        return Domain.STATUS_SUSPENDED
+    if "cancel" in value or "delet" in value:
+        return Domain.STATUS_CANCELLED
+    if "transfer" in value:
+        return Domain.STATUS_TRANSFERRED
+    return Domain.STATUS_ACTIVE
+
+
+def _parse_iso_date(value: str):
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        return date.fromisoformat(text)
+    except ValueError:
+        return None
+
+
+def _sync_resellerclub_inventory(include_details: bool = False, max_details: int = 100) -> dict:
+    client = ResellerClubClient()
+    orders = client.list_all_domain_orders(
+        no_of_records=100,
+        status="All",
+        include_details=include_details,
+        max_details=max_details,
+        max_pages=50,
+    )
+
+    order_names = [str((o or {}).get("domainname") or "").strip().lower() for o in orders if isinstance(o, dict)]
+    order_names = [n for n in order_names if n]
+    existing_domains = {
+        d.name.strip().lower(): d
+        for d in Domain.objects.filter(name__in=order_names)
+    }
+
+    synced_existing = 0
+    created_from_service = 0
+    unmatched_external = 0
+
+    for order in orders:
+        if not isinstance(order, dict):
+            continue
+        if include_details and order.get("order_details"):
+            order["order_details_json"] = _safe_json(order.get("order_details"))
+
+        domain_name = str(order.get("domainname") or "").strip().lower()
+        if not domain_name:
+            continue
+
+        registrar_order_id = str(order.get("orderid") or "").strip()
+        expiry_dt = _parse_iso_date(order.get("expiry_date"))
+        created_dt = _parse_iso_date(order.get("creation_date"))
+        auto_renew = bool(order.get("recurring"))
+        mapped_status = _resellerclub_status_to_domain_status(order.get("currentstatus"))
+
+        domain_obj = existing_domains.get(domain_name)
+        if domain_obj is None:
+            linked_service = Service.objects.select_related("user").filter(domain_name__iexact=domain_name).first()
+            if linked_service and linked_service.user:
+                label, _, tld = domain_name.partition(".")
+                domain_obj = Domain.objects.create(
+                    user=linked_service.user,
+                    name=domain_name,
+                    tld=tld or label,
+                    status=mapped_status,
+                    registrar_id=registrar_order_id,
+                    registered_at=created_dt,
+                    expires_at=expiry_dt,
+                    auto_renew=auto_renew,
+                    dns_provider=Domain.DNS_PROVIDER_REGISTRAR,
+                )
+                existing_domains[domain_name] = domain_obj
+                created_from_service += 1
+            else:
+                unmatched_external += 1
+                continue
+        else:
+            changed_fields = []
+            if registrar_order_id and domain_obj.registrar_id != registrar_order_id:
+                domain_obj.registrar_id = registrar_order_id
+                changed_fields.append("registrar_id")
+            if expiry_dt and domain_obj.expires_at != expiry_dt:
+                domain_obj.expires_at = expiry_dt
+                changed_fields.append("expires_at")
+            if created_dt and domain_obj.registered_at != created_dt:
+                domain_obj.registered_at = created_dt
+                changed_fields.append("registered_at")
+            if domain_obj.status != mapped_status:
+                domain_obj.status = mapped_status
+                changed_fields.append("status")
+            if domain_obj.auto_renew != auto_renew:
+                domain_obj.auto_renew = auto_renew
+                changed_fields.append("auto_renew")
+            if domain_obj.dns_provider != Domain.DNS_PROVIDER_REGISTRAR:
+                domain_obj.dns_provider = Domain.DNS_PROVIDER_REGISTRAR
+                changed_fields.append("dns_provider")
+            if changed_fields:
+                domain_obj.save(update_fields=changed_fields + ["updated_at"])
+            synced_existing += 1
+
+        if registrar_order_id:
+            DomainOrder.objects.filter(domain_name__iexact=domain_name).update(registrar_order_id=registrar_order_id)
+
+    managed_domains_qs = Domain.objects.filter(dns_provider=Domain.DNS_PROVIDER_REGISTRAR)
+    expiring_30d = managed_domains_qs.filter(
+        expires_at__isnull=False,
+        expires_at__lte=timezone.now().date() + timedelta(days=30),
+    ).count()
+
+    return {
+        "domain_orders": orders,
+        "domain_total": len(orders),
+        "synced_existing": synced_existing,
+        "created_from_service": created_from_service,
+        "unmatched_external": unmatched_external,
+        "managed_domain_total": managed_domains_qs.count(),
+        "expiring_30d": expiring_30d,
+    }
+
+
 @staff_member_required
 def integration_detail(request, service):
     """Detailed test view for a single integration."""
@@ -548,7 +673,19 @@ def integration_detail(request, service):
     if request.method == "POST" and service == "resellerclub":
         action = (request.POST.get("action") or "").strip()
         if action == "refresh_now":
-            return redirect(f"{reverse('admin_tools:integration_detail', kwargs={'service': 'resellerclub'})}?full=1")
+            try:
+                sync_info = _sync_resellerclub_inventory(include_details=True, max_details=100)
+                messages.success(
+                    request,
+                    "ResellerClub sync complete: "
+                    f"{sync_info['domain_total']} fetched, "
+                    f"{sync_info['synced_existing']} updated, "
+                    f"{sync_info['created_from_service']} created from service mapping, "
+                    f"{sync_info['unmatched_external']} unmatched external.",
+                )
+            except Exception as exc:
+                messages.error(request, f"ResellerClub refresh failed: {exc}")
+            return redirect("admin_tools:integration_detail", service="resellerclub")
 
     # Set Stripe API key before probe
     stripe_module.api_key = get_runtime_setting("STRIPE_SECRET_KEY", "")
@@ -658,23 +795,32 @@ def integration_detail(request, service):
     if service == "resellerclub":
         full_refresh = (request.GET.get("full") or "").strip() == "1"
         try:
-            domain_orders = ResellerClubClient().list_all_domain_orders(
-                no_of_records=100,
-                status="All",
-                include_details=full_refresh,
-                max_details=100,
-                max_pages=50,
-            )
-            for order in domain_orders:
-                if order.get("order_details"):
-                    order["order_details_json"] = _safe_json(order.get("order_details"))
+            sync_info = _sync_resellerclub_inventory(include_details=full_refresh, max_details=100)
+            domain_orders = sync_info["domain_orders"]
         except Exception as exc:
+            sync_info = {
+                "domain_total": 0,
+                "synced_existing": 0,
+                "created_from_service": 0,
+                "unmatched_external": 0,
+                "managed_domain_total": Domain.objects.filter(dns_provider=Domain.DNS_PROVIDER_REGISTRAR).count(),
+                "expiring_30d": Domain.objects.filter(
+                    dns_provider=Domain.DNS_PROVIDER_REGISTRAR,
+                    expires_at__isnull=False,
+                    expires_at__lte=timezone.now().date() + timedelta(days=30),
+                ).count(),
+            }
             domain_orders = []
             messages.error(request, f"Could not load registrar domain list: {exc}")
 
         resellerclub_context = {
             "domain_orders": domain_orders,
-            "domain_total": len(domain_orders),
+            "domain_total": sync_info["domain_total"],
+            "synced_existing": sync_info["synced_existing"],
+            "created_from_service": sync_info["created_from_service"],
+            "unmatched_external": sync_info["unmatched_external"],
+            "managed_domain_total": sync_info["managed_domain_total"],
+            "expiring_30d": sync_info["expiring_30d"],
             "full_refresh": full_refresh,
         }
 

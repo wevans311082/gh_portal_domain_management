@@ -333,10 +333,11 @@ def test_resellerclub_integration_detail_includes_domain_expiry_list(client, dja
     assert response.status_code == 200
     assert response.context["resellerclub_context"]["domain_total"] == 1
     assert response.context["resellerclub_context"]["domain_orders"][0]["expiry_date"] == "2026-01-01"
+    assert "managed_domain_total" in response.context["resellerclub_context"]
 
 
 @pytest.mark.django_db
-def test_resellerclub_refresh_now_redirects_to_full_refresh(client, django_user_model):
+def test_resellerclub_refresh_now_redirects_to_full_refresh(client, django_user_model, monkeypatch):
     staff = django_user_model.objects.create_user(
         email="rc-refresh@example.com",
         password="password123",
@@ -344,14 +345,30 @@ def test_resellerclub_refresh_now_redirects_to_full_refresh(client, django_user_
     )
     client.force_login(staff)
 
+    called = {"ok": False}
+
+    def fake_sync(include_details=False, max_details=100):
+        called["ok"] = True
+        return {
+            "domain_orders": [],
+            "domain_total": 0,
+            "synced_existing": 0,
+            "created_from_service": 0,
+            "unmatched_external": 0,
+            "managed_domain_total": 0,
+            "expiring_30d": 0,
+        }
+
+    monkeypatch.setattr("apps.admin_tools.views._sync_resellerclub_inventory", fake_sync)
+
     response = client.post(
         reverse("admin_tools:integration_detail", kwargs={"service": "resellerclub"}),
         {"action": "refresh_now"},
     )
 
     assert response.status_code == 302
-    expected = reverse("admin_tools:integration_detail", kwargs={"service": "resellerclub"}) + "?full=1"
-    assert response.url.endswith(expected)
+    assert response.url == reverse("admin_tools:integration_detail", kwargs={"service": "resellerclub"})
+    assert called["ok"] is True
 
 
 @pytest.mark.django_db
