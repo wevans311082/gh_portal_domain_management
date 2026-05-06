@@ -9,7 +9,9 @@ from apps.billing.models import Invoice
 from apps.companies.models import BusinessProfile
 from apps.domains.models import DomainPricingSettings, TLDPricing
 from apps.portal.models import PortalCart
+from apps.provisioning.models import WHMAccountSnapshot, WHMPackageSnapshot
 from apps.products.models import Package
+from apps.services.models import Service
 
 
 @pytest.mark.django_db
@@ -619,3 +621,60 @@ def test_staff_can_su_as_user_and_stop(client, django_user_model):
         assert response.status_code == 302
         assert response.url == reverse("admin_tools:users")
         assert called["export"] is True
+
+
+    @pytest.mark.django_db
+    def test_sync_whm_import_creates_user_and_service_from_snapshots(django_user_model, monkeypatch):
+        Package.objects.create(
+            name="Starter",
+            slug="starter-import",
+            price_monthly="10.00",
+            price_annually="100.00",
+            is_active=True,
+        )
+        WHMAccountSnapshot.objects.create(
+            username="acctdemo",
+            domain="example.com",
+            email="owner@example.com",
+            plan="starter",
+            is_active=True,
+        )
+
+        monkeypatch.setattr("apps.provisioning.whm_sync.WHMSyncService.sync_all", lambda self: {"ok": True})
+
+        from apps.admin_tools.views import _sync_whm_import
+
+        result = _sync_whm_import()
+
+        assert result["accounts_seen"] == 1
+        assert django_user_model.objects.filter(email="owner@example.com").exists()
+        assert Service.objects.filter(cpanel_username="acctdemo", domain_name="example.com").exists()
+
+
+    @pytest.mark.django_db
+    def test_sync_whm_import_bootstraps_active_package_from_whm_snapshot(django_user_model, monkeypatch):
+        WHMPackageSnapshot.objects.create(
+            name="starter",
+            disk_quota_mb="2048",
+            bandwidth_quota_mb="51200",
+            max_email_accounts="50",
+            max_databases="20",
+            is_active=True,
+        )
+        WHMAccountSnapshot.objects.create(
+            username="acctbootstrap",
+            domain="bootstrap.example.com",
+            email="bootstrap@example.com",
+            plan="starter",
+            is_active=True,
+        )
+
+        monkeypatch.setattr("apps.provisioning.whm_sync.WHMSyncService.sync_all", lambda self: {"ok": True})
+
+        from apps.admin_tools.views import _sync_whm_import
+
+        result = _sync_whm_import()
+
+        assert result["accounts_seen"] == 1
+        assert Package.objects.filter(name="starter", is_active=True).exists()
+        assert Service.objects.filter(cpanel_username="acctbootstrap", domain_name="bootstrap.example.com").exists()

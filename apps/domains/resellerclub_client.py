@@ -672,6 +672,46 @@ class ResellerClubClient:
             normalized.append(item)
         return normalized
 
+    def list_all_domain_orders(
+        self,
+        no_of_records: int = 100,
+        status: str = "All",
+        include_details: bool = False,
+        max_details: int = 100,
+        max_pages: int = 50,
+    ) -> list[dict]:
+        """Return all registrar domain orders across pages with best-effort dedupe."""
+        all_rows: list[dict] = []
+        seen_keys: set[str] = set()
+        details_budget = max_details
+
+        for page_no in range(1, max_pages + 1):
+            rows = self.list_domain_orders(
+                page_no=page_no,
+                no_of_records=no_of_records,
+                status=status,
+                include_details=include_details and details_budget > 0,
+                max_details=max(0, details_budget),
+            )
+            if not rows:
+                break
+
+            if include_details:
+                details_budget = max(0, details_budget - len(rows))
+
+            for row in rows:
+                key = str(row.get("orderid") or row.get("domainname") or "").strip().lower()
+                if key and key in seen_keys:
+                    continue
+                if key:
+                    seen_keys.add(key)
+                all_rows.append(row)
+
+            if len(rows) < no_of_records:
+                break
+
+        return all_rows
+
     def modify_nameservers(self, order_id: str, nameservers: list) -> dict:
         """Update the nameservers for a domain."""
         data = {

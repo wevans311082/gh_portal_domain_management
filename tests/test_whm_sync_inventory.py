@@ -108,6 +108,28 @@ class _NestedShapeWHMClient:
         return {"data": {"limit": "4096", "used": "700", "percent_used": "17"}}
 
 
+class _ByteUsageWHMClient:
+    def _call(self, function: str, params: dict = None):
+        if function == "version":
+            return {"version": "11.124.0.2"}
+        if function == "listpkgs":
+            return {"package": [{"name": "starter", "quota": "2048", "bwlimit": "10240"}]}
+        if function == "listaccts":
+            return {"acct": [{"user": "acctdemo", "domain": "example.com", "plan": "starter"}]}
+        raise AssertionError(f"Unexpected WHM function: {function}")
+
+    def get_account_summary(self, username: str):
+        return {"data": {"acct": [{"user": username}]}}
+
+    def get_disk_usage(self, username: str):
+        # 1 GiB in bytes
+        return {"data": {"totalbytes": str(1024 * 1024 * 1024)}}
+
+    def get_quota(self, username: str):
+        # 256 MiB used and 1 GiB limit in bytes
+        return {"used_bytes": str(256 * 1024 * 1024), "limit_bytes": str(1024 * 1024 * 1024)}
+
+
 @pytest.mark.django_db
 def test_whm_sync_service_persists_inventory(django_user_model):
     user = django_user_model.objects.create_user(email="sync-owner@example.com", password="password123")
@@ -175,6 +197,32 @@ def test_whm_sync_service_parses_nested_live_like_response_shapes(django_user_mo
 
 
 @pytest.mark.django_db
+def test_whm_sync_service_converts_byte_usage_to_mb(django_user_model):
+    user = django_user_model.objects.create_user(email="bytes-sync@example.com", password="password123")
+    package = Package.objects.create(
+        name="Starter Bytes",
+        slug="starter-bytes",
+        price_monthly="9.99",
+        price_annually="99.99",
+    )
+    Service.objects.create(
+        user=user,
+        package=package,
+        domain_name="example.com",
+        cpanel_username="acctdemo",
+        status=Service.STATUS_ACTIVE,
+    )
+
+    result = WHMSyncService(client=_ByteUsageWHMClient()).sync_all()
+
+    assert result["ok"] is True
+    usage_snapshot = WHMAccountUsageSnapshot.objects.get(account__username="acctdemo")
+    assert usage_snapshot.disk_used_mb == "256.0"
+    assert usage_snapshot.disk_limit_mb == "1024.0"
+    assert usage_snapshot.monthly_bandwidth_used_mb == "1024.0"
+
+
+@pytest.mark.django_db
 def test_whm_integration_detail_refresh_now_runs_sync_immediately(client, django_user_model, monkeypatch):
     staff = django_user_model.objects.create_user(
         email="whm-admin@example.com",
@@ -201,6 +249,38 @@ def test_whm_integration_detail_refresh_now_runs_sync_immediately(client, django
 
     assert response.status_code == 302
     assert called["result"]["account_count"] == 2
+
+
+@pytest.mark.django_db
+def test_whm_integration_detail_package_create_runs_whm_and_sync(client, django_user_model, monkeypatch):
+    staff = django_user_model.objects.create_user(
+        email="whm-pkg-admin@example.com",
+        password="password123",
+        is_staff=True,
+    )
+    client.force_login(staff)
+
+    called = {"created": False, "synced": False}
+
+    def fake_create(self, name, options=None):
+        called["created"] = True
+        assert name == "starter"
+        return {"ok": True}
+
+    monkeypatch.setattr("apps.provisioning.whm_client.WHMClient.create_package", fake_create)
+    monkeypatch.setattr(
+        "apps.provisioning.whm_sync.WHMSyncService.sync_all",
+        lambda self: called.__setitem__("synced", True) or {"package_count": 1, "account_count": 0, "usage_count": 0},
+    )
+
+    response = client.post(
+        reverse("admin_tools:integration_detail", kwargs={"service": "whm"}),
+        {"action": "package_create", "name": "starter", "quota": "2048", "bwlimit": "51200"},
+    )
+
+    assert response.status_code == 302
+    assert called["created"] is True
+    assert called["synced"] is True
 
 
 @pytest.mark.django_db
@@ -235,8 +315,8 @@ def test_resellerclub_integration_detail_includes_domain_expiry_list(client, dja
     client.force_login(staff)
 
     monkeypatch.setattr(
-        "apps.domains.resellerclub_client.ResellerClubClient.list_domain_orders",
-        lambda self, page_no=1, no_of_records=100, status="Active", include_details=False, max_details=100: [
+        "apps.domains.resellerclub_client.ResellerClubClient.list_all_domain_orders",
+        lambda self, no_of_records=100, status="All", include_details=False, max_details=100, max_pages=50: [
             {
                 "domainname": "example.com",
                 "currentstatus": "Active",
@@ -285,9 +365,10 @@ def test_resellerclub_full_refresh_requests_all_fields(client, django_user_model
 
     captured = {}
 
-    def fake_list(self, page_no=1, no_of_records=100, status="Active", include_details=False, max_details=100):
+    def fake_list(self, no_of_records=100, status="All", include_details=False, max_details=100, max_pages=50):
         captured["include_details"] = include_details
         captured["max_details"] = max_details
+        captured["status"] = status
         return [
             {
                 "domainname": "example.com",
@@ -301,7 +382,7 @@ def test_resellerclub_full_refresh_requests_all_fields(client, django_user_model
         ]
 
     monkeypatch.setattr(
-        "apps.domains.resellerclub_client.ResellerClubClient.list_domain_orders",
+        "apps.domains.resellerclub_client.ResellerClubClient.list_all_domain_orders",
         fake_list,
     )
 
@@ -310,5 +391,6 @@ def test_resellerclub_full_refresh_requests_all_fields(client, django_user_model
     assert response.status_code == 200
     assert captured["include_details"] is True
     assert captured["max_details"] == 100
+    assert captured["status"] == "All"
     assert response.context["resellerclub_context"]["full_refresh"] is True
     assert "registrarlock" in response.context["resellerclub_context"]["domain_orders"][0]["order_details_json"]

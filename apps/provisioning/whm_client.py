@@ -17,6 +17,10 @@ class WHMClientError(Exception):
 class WHMClient:
     """Client for the WHM JSON API v1."""
 
+    # Cache endpoint support across client instances in this process to avoid
+    # repeatedly calling known-missing UAPI routes (for example 404 fallbacks).
+    _uapi_support_cache: dict[tuple[str, int, str, str], bool] = {}
+
     def __init__(self):
         self.host = get_runtime_setting("WHM_HOST", "")
         self.port = get_runtime_int("WHM_PORT", 2087)
@@ -103,14 +107,108 @@ class WHMClient:
         """Get disk usage for a cPanel account."""
         return self._call("showbw", {"searchtype": "user", "search": username})
 
-    def list_accounts(self) -> list:
-        """List all cPanel accounts."""
-        data = self._call("listaccts")
+    def list_accounts(self, columns: list[str] | None = None) -> list:
+        """List cPanel accounts, optionally requesting only specific columns."""
+        params = None
+        if columns:
+            params = {f"api.columns.{chr(97 + idx)}": col for idx, col in enumerate(columns)}
+            params["api.columns.enable"] = 1
+
+        data = self._call("listaccts", params=params)
         if isinstance(data.get("acct"), list):
             return data.get("acct", [])
         if isinstance(data.get("data"), dict) and isinstance(data["data"].get("acct"), list):
             return data["data"].get("acct", [])
         return []
+
+    def list_users(self) -> list[str]:
+        """List WHM users (account usernames)."""
+        data = self._call("list_users")
+        users = data.get("data", {}).get("users") if isinstance(data.get("data"), dict) else None
+        return users if isinstance(users, list) else []
+
+    def modify_account(self, username: str, domain: str = "", contact_email: str = "") -> dict:
+        """Modify an existing cPanel account (domain/contact email)."""
+        params = {"user": username}
+        if domain:
+            params["domain"] = domain
+        if contact_email:
+            params["contactemail"] = contact_email
+        return self._call("modifyacct", params)
+
+    def change_password(self, username: str, password: str) -> dict:
+        """Change a cPanel account password via WHM passwd endpoint."""
+        return self._call("passwd", {"user": username, "password": password})
+
+    def add_zone_record(
+        self,
+        domain: str,
+        name: str,
+        record_type: str,
+        address: str,
+        ttl: int = 3600,
+        dns_class: str = "IN",
+    ) -> dict:
+        """Add a DNS zone record in WHM."""
+        return self._call(
+            "addzonerecord",
+            {
+                "domain": domain,
+                "name": name,
+                "type": record_type,
+                "address": address,
+                "ttl": ttl,
+                "dnsclass": dns_class,
+            },
+        )
+
+    def edit_zone_record(
+        self,
+        domain: str,
+        line: int,
+        name: str,
+        record_type: str,
+        address: str,
+        ttl: int = 3600,
+        dns_class: str = "IN",
+    ) -> dict:
+        """Edit an existing DNS zone record in WHM."""
+        return self._call(
+            "editzonerecord",
+            {
+                "domain": domain,
+                "line": line,
+                "name": name,
+                "type": record_type,
+                "address": address,
+                "ttl": ttl,
+                "dnsclass": dns_class,
+            },
+        )
+
+    def remove_zone_record(self, zone: str, line: int) -> dict:
+        """Remove a DNS zone record in WHM."""
+        return self._call("removezonerecord", {"zone": zone, "line": line})
+
+    # ── WHM package management ──────────────────────────────────────────────
+
+    def create_package(self, name: str, options: dict | None = None) -> dict:
+        """Create a WHM hosting package via addpkg."""
+        params = {"name": name}
+        if options:
+            params.update({k: v for k, v in options.items() if v not in (None, "")})
+        return self._call("addpkg", params)
+
+    def update_package(self, name: str, options: dict | None = None) -> dict:
+        """Update a WHM hosting package via editpkg."""
+        params = {"name": name}
+        if options:
+            params.update({k: v for k, v in options.items() if v not in (None, "")})
+        return self._call("editpkg", params)
+
+    def delete_package(self, name: str) -> dict:
+        """Delete a WHM hosting package via killpkg."""
+        return self._call("killpkg", {"pkg": name})
 
     def list_packages(self) -> list:
         """List WHM packages."""
@@ -219,10 +317,18 @@ class WHMClient:
         """
         errors = []
         for module, function in (("Quota", "get_quota_info"), ("DiskUsage", "get_quota")):
+            cache_key = (self.host, self.port, module, function)
+            if self._uapi_support_cache.get(cache_key) is False:
+                continue
             try:
                 data = self._cpanel_call(cpanel_username, module, function)
+                self._uapi_support_cache[cache_key] = True
                 return data.get("data", {}) if isinstance(data, dict) else {}
             except WHMClientError as exc:
+                # If endpoint is missing on this server, mark unsupported to
+                # prevent repeated noisy 404 calls on future sync runs.
+                if "404" in str(exc):
+                    self._uapi_support_cache[cache_key] = False
                 errors.append(f"{module}/{function}: {exc}")
 
         raise WHMClientError(

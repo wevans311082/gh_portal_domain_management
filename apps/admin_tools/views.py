@@ -13,6 +13,7 @@ from django.db.models import Count, Q, Sum
 from django.db.models.functions import TruncMonth
 from django.shortcuts import redirect, render
 from django.urls import reverse
+from django.utils.text import slugify
 from django.utils import timezone
 from django_celery_beat.models import CrontabSchedule, IntervalSchedule, PeriodicTask
 from django_celery_results.models import TaskResult
@@ -488,6 +489,61 @@ def integration_detail(request, service):
             except Exception as exc:
                 messages.error(request, f"WHM refresh failed: {exc}")
             return redirect("admin_tools:integration_detail", service="whm")
+        if action == "package_create":
+            try:
+                name = (request.POST.get("name") or "").strip()
+                if not name:
+                    raise ValueError("Package name is required.")
+                options = {
+                    "featurelist": (request.POST.get("featurelist") or "").strip(),
+                    "quota": (request.POST.get("quota") or "").strip(),
+                    "bwlimit": (request.POST.get("bwlimit") or "").strip(),
+                    "maxpop": (request.POST.get("maxpop") or "").strip(),
+                    "maxftp": (request.POST.get("maxftp") or "").strip(),
+                    "maxsql": (request.POST.get("maxsql") or "").strip(),
+                    "maxsub": (request.POST.get("maxsub") or "").strip(),
+                    "maxpark": (request.POST.get("maxpark") or "").strip(),
+                    "maxaddon": (request.POST.get("maxaddon") or "").strip(),
+                }
+                WHMClient().create_package(name=name, options=options)
+                WHMSyncService().sync_all()
+                messages.success(request, f"WHM package '{name}' created and synced.")
+            except Exception as exc:
+                messages.error(request, f"WHM package create failed: {exc}")
+            return redirect("admin_tools:integration_detail", service="whm")
+        if action == "package_update":
+            try:
+                name = (request.POST.get("name") or "").strip()
+                if not name:
+                    raise ValueError("Package name is required.")
+                options = {
+                    "featurelist": (request.POST.get("featurelist") or "").strip(),
+                    "quota": (request.POST.get("quota") or "").strip(),
+                    "bwlimit": (request.POST.get("bwlimit") or "").strip(),
+                    "maxpop": (request.POST.get("maxpop") or "").strip(),
+                    "maxftp": (request.POST.get("maxftp") or "").strip(),
+                    "maxsql": (request.POST.get("maxsql") or "").strip(),
+                    "maxsub": (request.POST.get("maxsub") or "").strip(),
+                    "maxpark": (request.POST.get("maxpark") or "").strip(),
+                    "maxaddon": (request.POST.get("maxaddon") or "").strip(),
+                }
+                WHMClient().update_package(name=name, options=options)
+                WHMSyncService().sync_all()
+                messages.success(request, f"WHM package '{name}' updated and synced.")
+            except Exception as exc:
+                messages.error(request, f"WHM package update failed: {exc}")
+            return redirect("admin_tools:integration_detail", service="whm")
+        if action == "package_delete":
+            try:
+                name = (request.POST.get("name") or "").strip()
+                if not name:
+                    raise ValueError("Package name is required.")
+                WHMClient().delete_package(name)
+                WHMSyncService().sync_all()
+                messages.success(request, f"WHM package '{name}' deleted and synced.")
+            except Exception as exc:
+                messages.error(request, f"WHM package delete failed: {exc}")
+            return redirect("admin_tools:integration_detail", service="whm")
 
     if request.method == "POST" and service == "resellerclub":
         action = (request.POST.get("action") or "").strip()
@@ -518,9 +574,18 @@ def integration_detail(request, service):
         account_query = (request.GET.get("q") or "").strip().lower()
         suspended_filter = (request.GET.get("suspended") or "all").strip().lower()
 
+        def _to_float(value):
+            try:
+                text = str(value or "").strip().lower().replace("mb", "").replace(",", "")
+                if text in {"", "unlimited", "inf", "infinity"}:
+                    return None
+                return float(text)
+            except Exception:
+                return None
+
         latest_run = WHMSyncRun.objects.order_by("-started_at").first()
         latest_server = WHMServerSnapshot.objects.order_by("-synced_at").first()
-        packages = WHMPackageSnapshot.objects.filter(is_active=True).order_by("name")[:100]
+        packages = list(WHMPackageSnapshot.objects.filter(is_active=True).order_by("name")[:100])
         accounts_qs = WHMAccountSnapshot.objects.filter(is_active=True).select_related("service").order_by("username")
         if account_query:
             accounts_qs = accounts_qs.filter(Q(username__icontains=account_query) | Q(domain__icontains=account_query))
@@ -537,6 +602,44 @@ def integration_detail(request, service):
         for account in accounts:
             account.usage_snapshot = usage_map.get(account.id)
             account.status_label = "Suspended" if account.suspended else "Active"
+
+        accounts_by_plan = {}
+        for account in WHMAccountSnapshot.objects.filter(is_active=True).only("plan"):
+            plan_key = str(account.plan or "").strip()
+            if not plan_key:
+                continue
+            accounts_by_plan[plan_key] = accounts_by_plan.get(plan_key, 0) + 1
+
+        usage_by_plan = {}
+        active_usage = WHMAccountUsageSnapshot.objects.select_related("account").filter(account__is_active=True)
+        for usage in active_usage:
+            plan_key = str(getattr(usage.account, "plan", "") or "").strip()
+            if not plan_key:
+                continue
+            stats = usage_by_plan.setdefault(plan_key, {"disk_used": 0.0, "bw_used": 0.0})
+            disk_val = _to_float(usage.disk_used_mb)
+            bw_val = _to_float(usage.monthly_bandwidth_used_mb)
+            if disk_val is not None:
+                stats["disk_used"] += disk_val
+            if bw_val is not None:
+                stats["bw_used"] += bw_val
+
+        for pkg in packages:
+            sold = accounts_by_plan.get(pkg.name, 0)
+            pkg.accounts_sold = sold
+            disk_quota = _to_float(pkg.disk_quota_mb)
+            bw_quota = _to_float(pkg.bandwidth_quota_mb)
+            pkg.total_allocated_disk_mb = round((disk_quota or 0.0) * sold, 2) if disk_quota is not None else None
+            pkg.total_allocated_bw_mb = round((bw_quota or 0.0) * sold, 2) if bw_quota is not None else None
+            usage_stats = usage_by_plan.get(pkg.name, {"disk_used": 0.0, "bw_used": 0.0})
+            pkg.total_actual_disk_used_mb = round(usage_stats["disk_used"], 2)
+            pkg.total_actual_bw_used_mb = round(usage_stats["bw_used"], 2)
+            pkg.disk_over_allocated = bool(
+                pkg.total_allocated_disk_mb is not None and pkg.total_actual_disk_used_mb > pkg.total_allocated_disk_mb
+            )
+            pkg.bw_over_allocated = bool(
+                pkg.total_allocated_bw_mb is not None and pkg.total_actual_bw_used_mb > pkg.total_allocated_bw_mb
+            )
 
         whm_context = {
             "latest_run": latest_run,
@@ -555,12 +658,12 @@ def integration_detail(request, service):
     if service == "resellerclub":
         full_refresh = (request.GET.get("full") or "").strip() == "1"
         try:
-            domain_orders = ResellerClubClient().list_domain_orders(
-                page_no=1,
+            domain_orders = ResellerClubClient().list_all_domain_orders(
                 no_of_records=100,
-                status="Active",
+                status="All",
                 include_details=full_refresh,
                 max_details=100,
+                max_pages=50,
             )
             for order in domain_orders:
                 if order.get("order_details"):
@@ -755,12 +858,58 @@ def _safe_import_email(raw_email: str, username: str, domain_name: str) -> str:
         suffix += 1
 
 
+def _ensure_import_packages_from_whm_snapshots() -> list[Package]:
+    """Ensure there are active local packages available for WHM import mapping."""
+    def _to_int(value) -> int:
+        try:
+            return int(str(value or "0").strip())
+        except Exception:
+            return 0
+
+    active_packages = list(Package.objects.filter(is_active=True).order_by("id"))
+    if active_packages:
+        return active_packages
+
+    whm_pkg_model = Service._meta.apps.get_model("provisioning", "WHMPackageSnapshot")
+    snapshots = list(whm_pkg_model.objects.filter(is_active=True).order_by("name"))
+    for snap in snapshots:
+        raw_name = str(getattr(snap, "name", "") or "").strip()
+        if not raw_name:
+            continue
+        base_slug = slugify(raw_name) or f"whm-{raw_name.lower()}"
+        slug = base_slug
+        suffix = 2
+        while Package.objects.filter(slug=slug).exists():
+            slug = f"{base_slug}-{suffix}"
+            suffix += 1
+
+        package_obj = Package.objects.create(
+            name=raw_name,
+            slug=slug[:50],
+            price_monthly="0.00",
+            price_annually="0.00",
+            whm_package_name=raw_name,
+            disk_quota_mb=_to_int(getattr(snap, "disk_quota_mb", "0")),
+            bandwidth_mb=_to_int(getattr(snap, "bandwidth_quota_mb", "0")),
+            email_accounts=_to_int(getattr(snap, "max_email_accounts", "0")),
+            databases=_to_int(getattr(snap, "max_databases", "0")),
+            is_active=True,
+        )
+        active_packages.append(package_obj)
+
+    if not active_packages:
+        raise ValueError(
+            "No active packages and no WHM package snapshots available. Run WHM refresh first or create a package manually."
+        )
+
+    return active_packages
+
+
 def _sync_whm_import() -> dict:
     sync_result = WHMSyncService().sync_all()
     snapshots = Service._meta.apps.get_model("provisioning", "WHMAccountSnapshot").objects.filter(is_active=True)
-    default_package = Package.objects.filter(is_active=True).order_by("id").first()
-    if default_package is None:
-        raise ValueError("No active package exists. Create at least one active package before importing from WHM.")
+    active_packages = _ensure_import_packages_from_whm_snapshots()
+    default_package = active_packages[0]
 
     rc_client = None
     reseller_index = None
@@ -806,7 +955,7 @@ def _sync_whm_import() -> dict:
                         if availability_status != "available":
                             if reseller_index is None:
                                 reseller_index = {}
-                                orders = rc_client.list_domain_orders(page_no=1, no_of_records=500, status="All")
+                                orders = rc_client.list_all_domain_orders(no_of_records=100, status="All", max_pages=50)
                                 for order in orders:
                                     order_domain = _normalize_domain_name(order.get("domainname"))
                                     if order_domain:
@@ -833,7 +982,9 @@ def _sync_whm_import() -> dict:
                 Domain.objects.create(name=domain_name, **domain_defaults)
                 stats["domains_created"] += 1
 
-        package = Package.objects.filter(is_active=True, whm_package_name__iexact=acct.plan).first() or default_package
+        package = Package.objects.filter(is_active=True, whm_package_name__iexact=acct.plan).first()
+        if package is None:
+            package = Package.objects.filter(is_active=True, name__iexact=acct.plan).first() or default_package
 
         service = Service.objects.filter(cpanel_username__iexact=username).first()
         if service is None and domain_name:

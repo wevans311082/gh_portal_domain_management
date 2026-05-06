@@ -120,6 +120,16 @@ class WHMSyncService:
             return value
         return default
 
+    @staticmethod
+    def _bytes_to_mb(value) -> str:
+        try:
+            raw = float(str(value).strip())
+        except Exception:
+            return ""
+        if raw < 0:
+            return ""
+        return str(round(raw / (1024 * 1024), 2))
+
     def sync_all(self) -> dict:
         sync_run = WHMSyncRun.objects.create(status=WHMSyncRun.STATUS_RUNNING)
         errors: list[str] = []
@@ -151,23 +161,43 @@ class WHMSyncService:
                 WHMPackageSnapshot.objects.update_or_create(
                     name=name,
                     defaults={
-                        "owner": str(self._pick_value(pkg, "owner", "reseller", default="")),
-                        "feature_list": str(self._pick_value(pkg, "featurelist", "feature_list", "featurelistname", default="")),
-                        "disk_quota_mb": str(self._pick_value(pkg, "quota", "diskquota", "disk_limit", default="")),
-                        "bandwidth_quota_mb": str(self._pick_value(pkg, "bwlimit", "bandwidth", "bandwidth_limit", default="")),
-                        "max_email_accounts": str(self._pick_value(pkg, "maxpop", "max_emailacct_quota", "max_email_accounts", default="")),
-                        "max_ftp_accounts": str(self._first_non_empty(pkg.get("maxftp"), default="")),
-                        "max_databases": str(self._first_non_empty(pkg.get("maxsql"), default="")),
-                        "max_subdomains": str(self._first_non_empty(pkg.get("maxsub"), default="")),
-                        "max_parked_domains": str(self._first_non_empty(pkg.get("maxpark"), default="")),
-                        "max_addon_domains": str(self._first_non_empty(pkg.get("maxaddon"), default="")),
+                        "owner": str(self._pick_value(pkg, "owner", "reseller", "OWNER", "CREATOR", default="")),
+                        "feature_list": str(self._pick_value(pkg, "featurelist", "feature_list", "featurelistname", "FEATURELIST", default="")),
+                        "disk_quota_mb": str(self._pick_value(pkg, "quota", "diskquota", "disk_limit", "QUOTA", default="")),
+                        "bandwidth_quota_mb": str(self._pick_value(pkg, "bwlimit", "bandwidth", "bandwidth_limit", "BWLIMIT", "MAXBW", default="")),
+                        "max_email_accounts": str(self._pick_value(pkg, "maxpop", "max_emailacct_quota", "max_email_accounts", "MAXPOP", default="")),
+                        "max_ftp_accounts": str(self._pick_value(pkg, "maxftp", "MAXFTP", default="")),
+                        "max_databases": str(self._pick_value(pkg, "maxsql", "MAXSQL", default="")),
+                        "max_subdomains": str(self._pick_value(pkg, "maxsub", "MAXSUB", default="")),
+                        "max_parked_domains": str(self._pick_value(pkg, "maxpark", "MAXPARK", default="")),
+                        "max_addon_domains": str(self._pick_value(pkg, "maxaddon", "MAXADDON", default="")),
                         "payload": pkg,
                         "is_active": True,
                     },
                 )
 
-            account_payload = self.client._call("listaccts")
-            accounts = self._extract_accounts(account_payload)
+            try:
+                accounts = self.client.list_accounts(
+                    columns=[
+                        "user",
+                        "domain",
+                        "email",
+                        "owner",
+                        "plan",
+                        "ip",
+                        "partition",
+                        "unix_startdate",
+                        "suspended",
+                        "suspendreason",
+                        "diskused",
+                        "disklimit",
+                        "bandwidthused",
+                        "maxbw",
+                    ]
+                )
+            except Exception:
+                account_payload = self.client._call("listaccts")
+                accounts = self._extract_accounts(account_payload)
 
             WHMAccountSnapshot.objects.update(is_active=False)
             for acct in accounts:
@@ -223,12 +253,14 @@ class WHMSyncService:
                     defaults={
                         "disk_used_mb": str(self._first_non_empty(
                             self._pick_value(quota, "used", "disk_used", "usage", default=""),
+                            self._bytes_to_mb(self._pick_value(quota, "used_bytes", "usedbytes", default="")),
                             self._pick_value(summary, "diskused", "disk_used", default=""),
                             self._pick_value(acct, "diskused", "disk_used", default=""),
                             default="",
                         )),
                         "disk_limit_mb": str(self._first_non_empty(
                             self._pick_value(quota, "limit", "disk_limit", default=""),
+                            self._bytes_to_mb(self._pick_value(quota, "limit_bytes", "limitbytes", default="")),
                             self._pick_value(summary, "disklimit", "disk_limit", default=""),
                             self._pick_value(acct, "disklimit", "disk_limit", default=""),
                             default="",
@@ -243,13 +275,16 @@ class WHMSyncService:
                         "inode_used_percent": str(self._pick_value(quota, "inode_percent_used", "file_usage_percent", default="")),
                         "monthly_bandwidth_used_mb": str(self._first_non_empty(
                             self._pick_value(showbw, "bandwidthused", "bwused", default=""),
+                            self._bytes_to_mb(self._pick_value(showbw, "totalbytes", "total_bytes", default="")),
                             self._pick_value(summary, "bandwidthused", default=""),
                             self._pick_value(acct, "bandwidthused", "bwused", default=""),
                             default="",
                         )),
                         "monthly_bandwidth_limit_mb": str(self._first_non_empty(
                             self._pick_value(showbw, "bandwidthlimit", "bwlimit", default=""),
+                            self._bytes_to_mb(self._pick_value(showbw, "bandwidthlimitbytes", "bwlimitbytes", default="")),
                             self._pick_value(summary, "maxbw", default=""),
+                            self._pick_value(acct, "maxbw", default=""),
                             default="",
                         )),
                         "payload": usage_payload,

@@ -79,7 +79,7 @@
 {% if service == 'resellerclub' and resellerclub_context %}
 <div class="mt-8 bg-white rounded-xl shadow-sm border border-sky-100 overflow-hidden">
     <div class="px-5 py-3 border-b border-sky-100 bg-sky-50/50 flex items-center justify-between gap-4">
-        <h3 class="text-sm font-semibold text-sky-900">Registrar Domains (Top 100 Active)</h3>
+        <h3 class="text-sm font-semibold text-sky-900">Registrar Domains (All Managed)</h3>
         <span class="text-xs text-slate-500">{{ resellerclub_context.domain_total }} domain(s){% if resellerclub_context.full_refresh %} • full field refresh{% endif %}</span>
     </div>
     <div class="overflow-x-auto">
@@ -164,6 +164,35 @@
         <div class="px-5 py-3 border-b border-sky-100 bg-sky-50/50">
             <h3 class="text-sm font-semibold text-sky-900">Packages (Top 100)</h3>
         </div>
+        <div class="px-5 py-3 border-b border-slate-100 bg-white">
+            <form method="post" class="grid grid-cols-1 md:grid-cols-6 gap-2 items-end">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="package_create">
+                <div>
+                    <label class="block text-[11px] text-slate-500 mb-1">Name</label>
+                    <input name="name" class="w-full border border-slate-200 rounded px-2 py-1.5 text-xs" placeholder="starter">
+                </div>
+                <div>
+                    <label class="block text-[11px] text-slate-500 mb-1">Feature List</label>
+                    <input name="featurelist" class="w-full border border-slate-200 rounded px-2 py-1.5 text-xs" placeholder="default">
+                </div>
+                <div>
+                    <label class="block text-[11px] text-slate-500 mb-1">Disk MB</label>
+                    <input name="quota" class="w-full border border-slate-200 rounded px-2 py-1.5 text-xs" placeholder="2048">
+                </div>
+                <div>
+                    <label class="block text-[11px] text-slate-500 mb-1">Bandwidth MB</label>
+                    <input name="bwlimit" class="w-full border border-slate-200 rounded px-2 py-1.5 text-xs" placeholder="51200">
+                </div>
+                <div>
+                    <label class="block text-[11px] text-slate-500 mb-1">Max Email</label>
+                    <input name="maxpop" class="w-full border border-slate-200 rounded px-2 py-1.5 text-xs" placeholder="50">
+                </div>
+                <div>
+                    <button type="submit" class="w-full px-3 py-1.5 rounded bg-emerald-600 text-white text-xs font-medium">Create Package</button>
+                </div>
+            </form>
+        </div>
         <div class="overflow-x-auto">
             <table class="min-w-full text-xs">
                 <thead class="bg-slate-50 text-slate-600">
@@ -173,6 +202,10 @@
                         <th class="px-4 py-2 text-left">Disk (MB)</th>
                         <th class="px-4 py-2 text-left">Bandwidth (MB)</th>
                         <th class="px-4 py-2 text-left">Feature List</th>
+                        <th class="px-4 py-2 text-left">Sold</th>
+                        <th class="px-4 py-2 text-left">Allocated vs Used (Disk)</th>
+                        <th class="px-4 py-2 text-left">Allocated vs Used (BW)</th>
+                        <th class="px-4 py-2 text-left">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -183,9 +216,49 @@
                         <td class="px-4 py-2 text-slate-600">{{ pkg.disk_quota_mb|default:"—" }}</td>
                         <td class="px-4 py-2 text-slate-600">{{ pkg.bandwidth_quota_mb|default:"—" }}</td>
                         <td class="px-4 py-2 text-slate-600">{{ pkg.feature_list|default:"—" }}</td>
+                        <td class="px-4 py-2 text-slate-600">{{ pkg.accounts_sold }}</td>
+                        <td class="px-4 py-2 text-slate-600">
+                            {% if pkg.total_allocated_disk_mb is not None %}
+                            {{ pkg.total_allocated_disk_mb }} / {{ pkg.total_actual_disk_used_mb }} MB
+                            {% if pkg.disk_over_allocated %}<span class="ml-1 text-red-600 font-medium">Over</span>{% endif %}
+                            {% else %}
+                            — / {{ pkg.total_actual_disk_used_mb }} MB
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-2 text-slate-600">
+                            {% if pkg.total_allocated_bw_mb is not None %}
+                            {{ pkg.total_allocated_bw_mb }} / {{ pkg.total_actual_bw_used_mb }} MB
+                            {% if pkg.bw_over_allocated %}<span class="ml-1 text-red-600 font-medium">Over</span>{% endif %}
+                            {% else %}
+                            — / {{ pkg.total_actual_bw_used_mb }} MB
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-2 text-slate-600">
+                            <div class="flex items-center gap-2">
+                                <details>
+                                    <summary class="cursor-pointer text-sky-700">Edit</summary>
+                                    <form method="post" class="mt-2 grid grid-cols-2 gap-2 min-w-[220px]">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="package_update">
+                                        <input type="hidden" name="name" value="{{ pkg.name }}">
+                                        <input name="featurelist" value="{{ pkg.feature_list }}" placeholder="feature list" class="border border-slate-200 rounded px-2 py-1">
+                                        <input name="quota" value="{{ pkg.disk_quota_mb }}" placeholder="disk MB" class="border border-slate-200 rounded px-2 py-1">
+                                        <input name="bwlimit" value="{{ pkg.bandwidth_quota_mb }}" placeholder="bw MB" class="border border-slate-200 rounded px-2 py-1">
+                                        <input name="maxpop" value="{{ pkg.max_email_accounts }}" placeholder="max email" class="border border-slate-200 rounded px-2 py-1">
+                                        <button type="submit" class="col-span-2 px-2 py-1 rounded bg-sky-600 text-white">Update</button>
+                                    </form>
+                                </details>
+                                <form method="post" class="inline" onsubmit="return confirm('Delete package {{ pkg.name }} in WHM?')">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="package_delete">
+                                    <input type="hidden" name="name" value="{{ pkg.name }}">
+                                    <button type="submit" class="text-red-700 hover:underline">Delete</button>
+                                </form>
+                            </div>
+                        </td>
                     </tr>
                     {% empty %}
-                    <tr><td colspan="5" class="px-4 py-4 text-slate-500">No package snapshots yet.</td></tr>
+                    <tr><td colspan="9" class="px-4 py-4 text-slate-500">No package snapshots yet.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
@@ -257,7 +330,7 @@
                         <td class="px-4 py-2 text-slate-600">{% if acct.usage_snapshot %}{{ acct.usage_snapshot.monthly_bandwidth_limit_mb|default:"—" }}{% else %}—{% endif %}</td>
                     </tr>
                     {% empty %}
-                    <tr><td colspan="13" class="px-4 py-4 text-slate-500">No account snapshots yet.</td></tr>
+                    <tr><td colspan="14" class="px-4 py-4 text-slate-500">No account snapshots yet.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
