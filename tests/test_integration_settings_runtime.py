@@ -66,3 +66,28 @@ def test_list_available_tlds_returns_curated_list_without_api_call(monkeypatch):
     assert "net" in tlds
     assert "co.uk" in tlds
     assert "io" in tlds
+
+
+def test_list_domain_orders_parses_orderid_keyed_payload(monkeypatch):
+    client = ResellerClubClient()
+
+    def fake_get(endpoint, params=None):
+        assert endpoint == "domains/search"
+        return {
+            "12345": {
+                "domainname": "example.com",
+                "currentstatus": "Active",
+                "creationtime": 1735689600,
+                "endtime": 1767225600,
+                "recurring": True,
+            }
+        }
+
+    monkeypatch.setattr(client, "_get", fake_get)
+
+    rows = client.list_domain_orders(page_no=1, no_of_records=25, status="All")
+
+    assert len(rows) == 1
+    assert rows[0]["orderid"] == "12345"
+    assert rows[0]["domainname"] == "example.com"
+    assert rows[0]["expiry_date"] == "2026-01-01"

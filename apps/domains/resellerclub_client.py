@@ -639,7 +639,27 @@ class ResellerClubClient:
         if isinstance(payload, list):
             records = payload
         elif isinstance(payload, dict):
-            records = payload.get("orders") or payload.get("data") or payload.get("results") or []
+            extracted = payload.get("orders") or payload.get("data") or payload.get("results")
+            if isinstance(extracted, list):
+                records = extracted
+            elif isinstance(extracted, dict):
+                # Some LogicBoxes responses return a map keyed by order id.
+                records = [v for v in extracted.values() if isinstance(v, dict)]
+            else:
+                # Fallback for payloads that are themselves an order-id keyed map.
+                records = []
+                for key, value in payload.items():
+                    if not isinstance(value, dict):
+                        continue
+                    if not any(
+                        marker in value
+                        for marker in ("domainname", "orderid", "currentstatus", "endtime", "creationtime")
+                    ):
+                        continue
+                    row = dict(value)
+                    if not row.get("orderid") and str(key).isdigit():
+                        row["orderid"] = str(key)
+                    records.append(row)
         else:
             records = []
 
