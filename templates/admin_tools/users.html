@@ -29,19 +29,21 @@
             <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700">Search</button>
             {% if search_q %}<a href="{% url 'admin_tools:users' %}" class="border border-slate-200 text-slate-600 px-4 py-2 rounded-lg text-sm hover:bg-slate-50">Clear</a>{% endif %}
         </form>
-        <form method="post" id="whm-sync-form" class="inline">
+        <form method="post" class="flex flex-wrap items-center gap-2">
             {% csrf_token %}
             <input type="hidden" name="action" value="sync_whm">
-            <input type="hidden" name="direction" id="whm-sync-direction">
-            <button
-                type="button"
-                class="bg-sky-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-sky-700"
-                onclick="const raw = prompt('WHM sync direction? Type import or export.', 'import'); if (!raw) { return; } const direction = raw.trim().toLowerCase(); if (direction !== 'import' && direction !== 'export') { alert('Please type import or export.'); return; } document.getElementById('whm-sync-direction').value = direction; document.getElementById('whm-sync-form').submit();"
+            <label for="whm-sync-direction" class="text-sm text-slate-600 font-medium">Direction</label>
+            <select
+                name="direction"
+                id="whm-sync-direction"
+                class="h-10 border border-slate-200 rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400"
             >
-                Sync WHM
-            </button>
+                <option value="import">Import from WHM</option>
+                <option value="export">Export to WHM</option>
+            </select>
+            <button type="submit" class="inline-flex items-center justify-center h-10 bg-sky-600 text-white px-4 rounded-lg text-sm font-medium hover:bg-sky-700">Sync WHM</button>
         </form>
-        <a href="{% url 'admin_tools:user_create' %}" class="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-700">+ New User</a>
+        <a href="{% url 'admin_tools:user_create' %}" class="inline-flex items-center justify-center h-10 bg-emerald-600 text-white px-4 rounded-lg text-sm font-medium hover:bg-emerald-700">+ New User</a>
     </div>
 </div>
 

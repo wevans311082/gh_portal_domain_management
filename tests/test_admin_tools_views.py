@@ -557,9 +557,12 @@ def test_staff_can_su_as_user_and_stop(client, django_user_model):
         client.force_login(staff)
 
         response = client.get(reverse("admin_tools:users"))
+        content = response.content.decode()
 
         assert response.status_code == 200
-        assert "Sync WHM" in response.content.decode()
+        assert "Sync WHM" in content
+        assert 'name="direction"' in content
+        assert '+ New User' in content
 
 
     @pytest.mark.django_db
