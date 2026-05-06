@@ -897,7 +897,9 @@ def resellerclub_debug(request):
             params.update(
                 {
                     "domain-name": domain_label.split(".", 1)[0],
-                    "tlds": ",".join(tld_list),
+                    # LogicBoxes expects repeated tlds params (tlds=com&tlds=net),
+                    # not a single comma-joined value.
+                    "tlds": tld_list,
                 }
             )
 

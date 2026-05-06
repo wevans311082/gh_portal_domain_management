@@ -421,7 +421,7 @@ def _test_connection(step_key: str, data: dict):
                 "auth-userid": reseller_id,
                 "api-key": api_key,
                 "domain-name": "example",
-                "tlds": "com",
+                "tlds": ["com"],
             },
             timeout=12,
         )
