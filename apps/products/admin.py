@@ -9,8 +9,8 @@ class PackageFeatureInline(admin.TabularInline):
 
 @admin.register(Package)
 class PackageAdmin(admin.ModelAdmin):
-    list_display = ["name", "price_monthly", "price_annually", "is_active", "is_featured"]
-    list_filter = ["is_active", "is_featured"]
+    list_display = ["name", "price_monthly", "price_annually", "provisioning_provider", "is_active", "is_featured"]
+    list_filter = ["provisioning_provider", "is_active", "is_featured"]
     search_fields = ["name"]
     prepopulated_fields = {"slug": ("name",)}
     inlines = [PackageFeatureInline]

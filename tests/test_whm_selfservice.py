@@ -374,3 +374,53 @@ def test_create_email_account_task_missing_service():
 def test_create_database_task_missing_service():
     from apps.provisioning.tasks import create_database_task
     create_database_task(999999, "mydb")
+
+
+@pytest.mark.django_db
+@patch("apps.notifications.services.send_notification")
+@patch("apps.provisioning.tasks.get_provider_for_service")
+def test_provision_hosting_account_uses_selected_provider(mock_get_provider, mock_send_notification, django_user_model):
+    from apps.provisioning.tasks import provision_hosting_account
+
+    mock_provider = MagicMock()
+    mock_provider.provider_key = "docker_node"
+    mock_provider.create_site.return_value = {"id": "site-123"}
+    mock_get_provider.return_value = mock_provider
+
+    user = make_user(django_user_model, email="provision@example.com")
+    package = make_package()
+    package.provisioning_provider = "docker_node"
+    package.provisioning_config = {"daemon_url": "https://node.example.test"}
+    package.save(update_fields=["provisioning_provider", "provisioning_config"])
+    service = Service.objects.create(
+        user=user,
+        package=package,
+        domain_name="provision.example.com",
+        status=Service.STATUS_PENDING,
+    )
+    job = ProvisioningJob.objects.create(
+        service=service,
+        idempotency_key="provision-provider-test",
+        status=ProvisioningJob.STATUS_QUEUED,
+    )
+
+    provision_hosting_account.run(service.id, job.id)
+
+    mock_get_provider.assert_called_once()
+    selected_service = mock_get_provider.call_args.args[0]
+    assert selected_service.id == service.id
+    mock_provider.create_site.assert_called_once_with(
+        domain="provision.example.com",
+        username="provisio",
+        password=mock_provider.create_site.call_args.kwargs["password"],
+        package="starter_pkg",
+        email="provision@example.com",
+        service=selected_service,
+    )
+    service.refresh_from_db()
+    job.refresh_from_db()
+    assert service.status == Service.STATUS_ACTIVE
+    assert service.cpanel_username == "provisio"
+    assert job.status == ProvisioningJob.STATUS_COMPLETED
+    assert job.result_data["provider"] == "docker_node"
+    mock_send_notification.assert_called_once()
