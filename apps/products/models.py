@@ -1,5 +1,6 @@
 from django.db import models
 from apps.core.models import TimeStampedModel
+from apps.provisioning.providers import PROVIDER_CHOICES, PROVIDER_WHM
 
 
 class Package(TimeStampedModel):
@@ -10,6 +11,17 @@ class Package(TimeStampedModel):
     price_annually = models.DecimalField(max_digits=10, decimal_places=2)
     setup_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     whm_package_name = models.CharField(max_length=100, blank=True)
+    provisioning_provider = models.CharField(
+        max_length=50,
+        choices=PROVIDER_CHOICES,
+        default=PROVIDER_WHM,
+        help_text="Default backend used to provision services for this package.",
+    )
+    provisioning_config = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Provider-specific configuration merged into service provisioning jobs.",
+    )
     disk_quota_mb = models.PositiveIntegerField(default=0)
     bandwidth_mb = models.PositiveIntegerField(default=0)
     email_accounts = models.PositiveIntegerField(default=0)
