@@ -1,5 +1,8 @@
 from django.contrib import admin
 from .models import (
+    HostingNode,
+    WebsiteContainer,
+    WebsiteRuntime,
     ProvisioningJob,
     WHMAccountSnapshot,
     WHMAccountUsageSnapshot,
@@ -52,3 +55,58 @@ class WHMAccountUsageSnapshotAdmin(admin.ModelAdmin):
     list_display = ["account", "disk_used_mb", "disk_limit_mb", "inode_used", "monthly_bandwidth_used_mb", "synced_at"]
     search_fields = ["account__username", "account__domain"]
     readonly_fields = ["payload", "synced_at", "created_at", "updated_at"]
+
+
+@admin.register(HostingNode)
+class HostingNodeAdmin(admin.ModelAdmin):
+    list_display = ["name", "hostname", "ip_address", "status", "updated_at"]
+    list_filter = ["status"]
+    search_fields = ["name", "hostname", "ip_address", "daemon_url"]
+    readonly_fields = ["created_at", "updated_at"]
+
+
+@admin.register(WebsiteRuntime)
+class WebsiteRuntimeAdmin(admin.ModelAdmin):
+    list_display = [
+        "service",
+        "node",
+        "runtime_type",
+        "image",
+        "image_tag",
+        "status",
+        "last_deployed_at",
+    ]
+    list_filter = ["runtime_type", "status", "node"]
+    search_fields = [
+        "service__user__email",
+        "service__domain_name",
+        "node__name",
+        "image",
+        "image_tag",
+        "document_root",
+    ]
+    readonly_fields = ["created_at", "updated_at"]
+
+
+@admin.register(WebsiteContainer)
+class WebsiteContainerAdmin(admin.ModelAdmin):
+    list_display = [
+        "container_name",
+        "domain",
+        "service",
+        "node",
+        "runtime",
+        "internal_port",
+        "status",
+        "last_deployed_at",
+    ]
+    list_filter = ["status", "node", "runtime__runtime_type"]
+    search_fields = [
+        "container_name",
+        "domain",
+        "service__user__email",
+        "service__domain_name",
+        "node__name",
+        "healthcheck_url",
+    ]
+    readonly_fields = ["created_at", "updated_at"]
