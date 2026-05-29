@@ -96,6 +96,7 @@ services:
       - "80:80"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/conf.d/sites:/etc/nginx/conf.d/sites:ro
       - static_files:/app/staticfiles:ro
       - media_files:/app/media:ro
     depends_on:

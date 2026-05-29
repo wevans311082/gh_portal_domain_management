@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from apps.provisioning.nginx import NginxSiteConfigError, NginxSiteConfigService, NginxTlsOptions
 from apps.provisioning.providers.base import ProvisioningProvider, ProvisioningProviderError
 
 
@@ -42,6 +43,45 @@ class DockerNodeProvider(ProvisioningProvider):
 
     def create_backup(self, *, username: str) -> dict[str, Any]:
         self._not_ready()
+
+    def configure_site_vhost(
+        self,
+        *,
+        domain: str,
+        container_name: str,
+        internal_port: int,
+        tls_enabled: bool = False,
+        tls_certificate_path: str = "",
+        tls_certificate_key_path: str = "",
+        force_https: bool = False,
+    ) -> dict[str, Any]:
+        """Render, validate, and activate nginx routing for a Docker-hosted site."""
+        service = NginxSiteConfigService(
+            template_path=self.config.get("nginx_template_path"),
+            sites_dir=self.config.get("nginx_sites_dir"),
+            validate_command=self.config.get("nginx_validate_command"),
+            reload_command=self.config.get("nginx_reload_command"),
+        )
+        try:
+            destination = service.apply_site_config(
+                domain=domain,
+                container_name=container_name,
+                internal_port=internal_port,
+                tls=NginxTlsOptions(
+                    enabled=tls_enabled,
+                    certificate_path=tls_certificate_path,
+                    certificate_key_path=tls_certificate_key_path,
+                    force_https=force_https,
+                ),
+            )
+        except NginxSiteConfigError as exc:
+            raise ProvisioningProviderError(str(exc)) from exc
+        return {
+            "ok": True,
+            "provider": self.provider_key,
+            "domain": domain,
+            "config_path": str(destination),
+        }
 
     def health_check(self) -> dict[str, Any]:
         return {"ok": False, "provider": self.provider_key, "ready": False}
