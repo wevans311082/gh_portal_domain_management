@@ -70,6 +70,16 @@ NOTIFICATION_TEMPLATES = {
 }
 
 
+def _mailbox_purpose(template_name: str) -> str:
+    if template_name in {"invoice_issued", "invoice_paid", "invoice_overdue", "quote_sent", "quote_accepted", "quote_expired", "payment_failed"}:
+        return "billing"
+    if template_name in {"support_ticket_opened", "support_ticket_reply"}:
+        return "support"
+    if template_name in {"domain_expiry_reminder"}:
+        return "domains"
+    return "notifications"
+
+
 def send_notification(
     template_name: str,
     user,
@@ -144,6 +154,7 @@ def send_notification(
             from_email=settings.DEFAULT_FROM_EMAIL,
             to=[recipient],
             cc=list(cc) if cc else None,
+            headers={"X-CyberAsk-Mailbox-Purpose": _mailbox_purpose(template_name)},
         )
         msg.attach_alternative(html_content, "text/html")
 

@@ -31,6 +31,7 @@ from apps.provisioning.whm_sync import WHMSyncService
 from apps.services.models import Service
 from apps.support.models import SupportTicket
 from . import wizard_views
+from .forms import Microsoft365GraphSettingsForm
 from .decorators import staff_member_required
 
 
@@ -362,8 +363,86 @@ def integrations_overview(request):
         return stripe_module.Balance.retrieve()
 
     probes.append(_probe("Stripe", _stripe))
+    def _m365():
+        from apps.notifications.m365_graph import MicrosoftGraphMailClient, MicrosoftGraphMailConfig
+
+        config = MicrosoftGraphMailConfig.load()
+        if not config.enabled:
+            return {"enabled": False, "status": "disabled"}
+        mailbox = config.default_mailbox or config.billing_mailbox or config.support_mailbox or config.domains_mailbox
+        return MicrosoftGraphMailClient(config).test_mailbox(mailbox)
+    probes.append(_probe("Microsoft 365 Graph Mail", _m365))
 
     return render(request, "admin_tools/integrations.html", {"probes": probes})
+
+
+@staff_member_required
+def m365_graph_config(request):
+    """Configure Microsoft Graph outbound mail and test shared mailboxes."""
+    from apps.notifications.m365_graph import MicrosoftGraphMailClient, MicrosoftGraphMailConfig
+
+    test_result = None
+    if request.method == "POST":
+        action = request.POST.get("action", "save")
+        form = Microsoft365GraphSettingsForm(request.POST)
+        if form.is_valid():
+            form.save_settings()
+            messages.success(request, "Microsoft 365 Graph mail settings saved.")
+            config = MicrosoftGraphMailConfig.load()
+            client = MicrosoftGraphMailClient(config)
+
+            if action == "test_connectivity":
+                try:
+                    mailbox = (
+                        config.default_mailbox
+                        or config.billing_mailbox
+                        or config.support_mailbox
+                        or config.domains_mailbox
+                        or config.notifications_mailbox
+                    )
+                    test_result = {"ok": True, "data": client.test_mailbox(mailbox)}
+                    messages.success(request, f"Connected to Microsoft Graph mailbox: {mailbox}")
+                except Exception as exc:
+                    test_result = {"ok": False, "error": str(exc)}
+                    messages.error(request, f"Microsoft Graph connectivity failed: {exc}")
+            elif action == "send_test":
+                recipient = form.cleaned_data.get("test_recipient")
+                if not recipient:
+                    messages.error(request, "Enter a test recipient before sending a test message.")
+                else:
+                    try:
+                        mailbox = config.mailbox_for("notifications")
+                        client.send_mail(
+                            mailbox=mailbox,
+                            message={
+                                "subject": "CyberAsk Microsoft 365 Graph mail test",
+                                "body": {
+                                    "contentType": "HTML",
+                                    "content": "<p>This is a test email from the CyberAsk portal Microsoft Graph integration.</p>",
+                                },
+                                "toRecipients": [{"emailAddress": {"address": recipient}}],
+                            },
+                        )
+                        test_result = {"ok": True, "data": {"mailbox": mailbox, "recipient": recipient}}
+                        messages.success(request, f"Test email sent to {recipient} from {mailbox}.")
+                    except Exception as exc:
+                        test_result = {"ok": False, "error": str(exc)}
+                        messages.error(request, f"Microsoft Graph test email failed: {exc}")
+            if action == "save":
+                return redirect("admin_tools:m365_graph_config")
+    else:
+        form = Microsoft365GraphSettingsForm(initial=Microsoft365GraphSettingsForm.initial_from_settings())
+
+    return render(
+        request,
+        "admin_tools/m365_graph_config.html",
+        {
+            "form": form,
+            "test_result": test_result,
+            "graph_docs_url": "https://learn.microsoft.com/en-us/graph/api/user-sendmail?view=graph-rest-1.0",
+            "mailbox_scope_docs_url": "https://learn.microsoft.com/graph/auth-limit-mailbox-access",
+        },
+    )
 
 
 def _safe_json(obj):
@@ -1771,6 +1850,11 @@ def settings_overview(request):
         },
         "Email": {
             "EMAIL_BACKEND": settings.EMAIL_BACKEND,
+            "M365_GRAPH_ENABLED": get_runtime_setting("M365_GRAPH_ENABLED", getattr(settings, "M365_GRAPH_ENABLED", False)),
+            "M365_GRAPH_DEFAULT_MAILBOX": get_runtime_setting("M365_GRAPH_DEFAULT_MAILBOX", ""),
+            "M365_GRAPH_BILLING_MAILBOX": get_runtime_setting("M365_GRAPH_BILLING_MAILBOX", ""),
+            "M365_GRAPH_SUPPORT_MAILBOX": get_runtime_setting("M365_GRAPH_SUPPORT_MAILBOX", ""),
+            "M365_GRAPH_DOMAINS_MAILBOX": get_runtime_setting("M365_GRAPH_DOMAINS_MAILBOX", ""),
             "EMAIL_HOST": settings.EMAIL_HOST or "(not set)",
             "EMAIL_PORT": settings.EMAIL_PORT,
             "EMAIL_USE_TLS": settings.EMAIL_USE_TLS,

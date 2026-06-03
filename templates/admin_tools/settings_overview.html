@@ -28,6 +28,16 @@
     </div>
 </div>
 
+<div class="mb-5 rounded-xl border border-cyan-200 bg-cyan-50 p-4 flex items-center justify-between gap-4">
+    <div>
+        <p class="text-sm font-semibold text-cyan-950">Microsoft 365 Graph Mail</p>
+        <p class="text-xs text-cyan-800">
+            Configure outbound email through CyberAsk's Microsoft 365 shared mailboxes.
+        </p>
+    </div>
+    <a href="{% url 'admin_tools:m365_graph_config' %}" class="px-4 py-2 rounded-lg bg-cyan-600 text-white text-sm font-semibold hover:bg-cyan-700">Open M365 Mail Config</a>
+</div>
+
 <div class="mb-5 rounded-xl border {% if has_companies_house_key %}border-emerald-200 bg-emerald-50{% else %}border-amber-200 bg-amber-50{% endif %} p-4 flex items-center justify-between gap-4">
     <div>
         <p class="text-sm font-semibold {% if has_companies_house_key %}text-emerald-800{% else %}text-amber-800{% endif %}">UK Companies House API</p>

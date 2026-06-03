@@ -208,7 +208,22 @@ WEBSITE_TEMPLATES_EXTRACTED_ROOT = env(
     default=str(BASE_DIR / "website_templates" / "extracted"),
 )
 
-EMAIL_BACKEND = env("EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")
+EMAIL_BACKEND = env("EMAIL_BACKEND", default="apps.notifications.email_backend.MicrosoftGraphEmailBackend")
+M365_GRAPH_FALLBACK_EMAIL_BACKEND = env(
+    "M365_GRAPH_FALLBACK_EMAIL_BACKEND",
+    default="django.core.mail.backends.console.EmailBackend",
+)
+M365_GRAPH_ENABLED = env.bool("M365_GRAPH_ENABLED", default=False)
+M365_GRAPH_TENANT_ID = env("M365_GRAPH_TENANT_ID", default="")
+M365_GRAPH_CLIENT_ID = env("M365_GRAPH_CLIENT_ID", default="")
+M365_GRAPH_CLIENT_SECRET = env("M365_GRAPH_CLIENT_SECRET", default="")
+M365_GRAPH_DEFAULT_MAILBOX = env("M365_GRAPH_DEFAULT_MAILBOX", default="")
+M365_GRAPH_BILLING_MAILBOX = env("M365_GRAPH_BILLING_MAILBOX", default="")
+M365_GRAPH_SUPPORT_MAILBOX = env("M365_GRAPH_SUPPORT_MAILBOX", default="")
+M365_GRAPH_DOMAINS_MAILBOX = env("M365_GRAPH_DOMAINS_MAILBOX", default="")
+M365_GRAPH_NOTIFICATIONS_MAILBOX = env("M365_GRAPH_NOTIFICATIONS_MAILBOX", default="")
+M365_GRAPH_SAVE_TO_SENT_ITEMS = env.bool("M365_GRAPH_SAVE_TO_SENT_ITEMS", default=True)
+M365_GRAPH_TIMEOUT_SECONDS = env.int("M365_GRAPH_TIMEOUT_SECONDS", default=15)
 EMAIL_HOST = env("EMAIL_HOST", default="")
 EMAIL_PORT = env.int("EMAIL_PORT", default=587)
 EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=True)

@@ -21,6 +21,64 @@ from apps.services.models import Service
 from apps.support.models import SupportTicket
 from apps.payments.models import Payment
 from apps.website_templates.models import WebsiteTemplate
+from apps.admin_tools.models import IntegrationSetting
+
+
+class Microsoft365GraphSettingsForm(forms.Form):
+    enabled = forms.BooleanField(required=False, label="Enable Microsoft Graph outbound mail")
+    tenant_id = forms.CharField(required=False, label="Tenant ID")
+    client_id = forms.CharField(required=False, label="Application client ID")
+    client_secret = forms.CharField(
+        required=False,
+        label="Client secret",
+        widget=forms.PasswordInput(render_value=False),
+        help_text="Leave blank to keep the stored secret.",
+    )
+    default_mailbox = forms.EmailField(required=False, label="Default shared mailbox")
+    billing_mailbox = forms.EmailField(required=False, label="Billing shared mailbox")
+    support_mailbox = forms.EmailField(required=False, label="Support shared mailbox")
+    domains_mailbox = forms.EmailField(required=False, label="Domains shared mailbox")
+    notifications_mailbox = forms.EmailField(required=False, label="General notifications shared mailbox")
+    save_to_sent_items = forms.BooleanField(required=False, initial=True, label="Save sent messages in mailbox Sent Items")
+    timeout_seconds = forms.IntegerField(required=False, min_value=3, max_value=120, initial=15)
+    test_recipient = forms.EmailField(required=False, label="Test recipient")
+
+    SETTING_MAP = {
+        "enabled": ("M365_GRAPH_ENABLED", False),
+        "tenant_id": ("M365_GRAPH_TENANT_ID", True),
+        "client_id": ("M365_GRAPH_CLIENT_ID", True),
+        "client_secret": ("M365_GRAPH_CLIENT_SECRET", True),
+        "default_mailbox": ("M365_GRAPH_DEFAULT_MAILBOX", False),
+        "billing_mailbox": ("M365_GRAPH_BILLING_MAILBOX", False),
+        "support_mailbox": ("M365_GRAPH_SUPPORT_MAILBOX", False),
+        "domains_mailbox": ("M365_GRAPH_DOMAINS_MAILBOX", False),
+        "notifications_mailbox": ("M365_GRAPH_NOTIFICATIONS_MAILBOX", False),
+        "save_to_sent_items": ("M365_GRAPH_SAVE_TO_SENT_ITEMS", False),
+        "timeout_seconds": ("M365_GRAPH_TIMEOUT_SECONDS", False),
+    }
+
+    @classmethod
+    def initial_from_settings(cls):
+        data = {}
+        for field_name, (setting_key, _is_secret) in cls.SETTING_MAP.items():
+            if field_name == "client_secret":
+                data[field_name] = ""
+                continue
+            value = IntegrationSetting.get_value(setting_key, "")
+            if field_name in {"enabled", "save_to_sent_items"}:
+                data[field_name] = str(value).strip().lower() in {"1", "true", "yes", "on"}
+            else:
+                data[field_name] = value
+        return data
+
+    def save_settings(self):
+        for field_name, (setting_key, is_secret) in self.SETTING_MAP.items():
+            value = self.cleaned_data.get(field_name)
+            if field_name == "client_secret" and not value:
+                continue
+            if isinstance(value, bool):
+                value = "true" if value else "false"
+            IntegrationSetting.set_value(setting_key, str(value or ""), is_secret=is_secret)
 
 
 class AdminUserCreateForm(forms.ModelForm):

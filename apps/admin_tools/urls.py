@@ -71,6 +71,7 @@ urlpatterns = [
     path("tasks/", views.task_management, name="task_management"),
     path("templates/scan/", views.template_scan, name="template_scan"),
     path("integrations/", views.integrations_overview, name="integrations_overview"),
+    path("integrations/m365-graph/config/", views.m365_graph_config, name="m365_graph_config"),
     path("integrations/<str:service>/", views.integration_detail, name="integration_detail"),
     path("integrations/companies-house/config/", views.companies_house_config, name="companies_house_config"),
     path("integrations/resellerclub/debug/", views.resellerclub_debug, name="resellerclub_debug"),

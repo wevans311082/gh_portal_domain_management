@@ -1,0 +1,109 @@
+{% extends "base_admin.html" %}
+
+{% block title %}Microsoft 365 Graph Mail - {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Microsoft 365 Graph Mail{% endblock %}
+
+{% block header_actions %}
+<a href="{% url 'admin_tools:integrations_overview' %}" class="text-sm text-cyan-700 hover:underline font-medium">Back to integrations</a>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-5">
+  <form method="post" class="xl:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-5">
+    {% csrf_token %}
+    <div>
+      <h2 class="text-sm font-semibold text-slate-900">Outbound Mail Provider</h2>
+      <p class="text-xs text-slate-500 mt-1">Toggle Microsoft Graph mail sending and configure the Entra app registration used for client credentials.</p>
+    </div>
+
+    <label class="flex items-start gap-3 rounded-lg border border-cyan-200 bg-cyan-50 p-3">
+      {{ form.enabled }}
+      <span>
+        <span class="block text-sm font-semibold text-cyan-950">{{ form.enabled.label }}</span>
+        <span class="block text-xs text-cyan-800">When disabled, Django uses the configured fallback email backend.</span>
+      </span>
+    </label>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label for="{{ form.tenant_id.id_for_label }}">Tenant ID</label>
+        {{ form.tenant_id }}
+      </div>
+      <div>
+        <label for="{{ form.client_id.id_for_label }}">Application client ID</label>
+        {{ form.client_id }}
+      </div>
+      <div class="md:col-span-2">
+        <label for="{{ form.client_secret.id_for_label }}">Client secret</label>
+        {{ form.client_secret }}
+        <p class="field-example-hint">{{ form.client_secret.help_text }}</p>
+      </div>
+    </div>
+
+    <div>
+      <h3 class="text-sm font-semibold text-slate-900 mb-3">Shared Mailboxes</h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div><label for="{{ form.default_mailbox.id_for_label }}">Default</label>{{ form.default_mailbox }}</div>
+        <div><label for="{{ form.billing_mailbox.id_for_label }}">Billing</label>{{ form.billing_mailbox }}</div>
+        <div><label for="{{ form.support_mailbox.id_for_label }}">Support</label>{{ form.support_mailbox }}</div>
+        <div><label for="{{ form.domains_mailbox.id_for_label }}">Domains</label>{{ form.domains_mailbox }}</div>
+        <div class="md:col-span-2"><label for="{{ form.notifications_mailbox.id_for_label }}">General notifications</label>{{ form.notifications_mailbox }}</div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <label class="flex items-center gap-2 text-sm text-slate-700">
+        {{ form.save_to_sent_items }}
+        {{ form.save_to_sent_items.label }}
+      </label>
+      <div>
+        <label for="{{ form.timeout_seconds.id_for_label }}">Timeout seconds</label>
+        {{ form.timeout_seconds }}
+      </div>
+    </div>
+
+    <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+      <label for="{{ form.test_recipient.id_for_label }}">Test recipient</label>
+      {{ form.test_recipient }}
+      <p class="text-xs text-slate-500 mt-2">Used only when pressing Send test email.</p>
+    </div>
+
+    {% if form.errors %}
+    <div class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{{ form.errors }}</div>
+    {% endif %}
+
+    <div class="flex flex-wrap gap-3">
+      <button type="submit" name="action" value="save" class="px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800">Save settings</button>
+      <button type="submit" name="action" value="test_connectivity" class="px-4 py-2 rounded-lg bg-cyan-600 text-white text-sm font-semibold hover:bg-cyan-700">Save and test mailbox</button>
+      <button type="submit" name="action" value="send_test" class="px-4 py-2 rounded-lg border border-cyan-300 text-cyan-800 text-sm font-semibold hover:bg-cyan-50">Save and send test email</button>
+    </div>
+  </form>
+
+  <aside class="space-y-5">
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+      <h2 class="text-sm font-semibold text-slate-900 mb-2">Required Microsoft setup</h2>
+      <ul class="text-xs text-slate-600 space-y-2 list-disc pl-4">
+        <li>Create an Entra app registration for this portal.</li>
+        <li>Grant Microsoft Graph application permission <code>Mail.Send</code> and admin consent.</li>
+        <li>Use shared mailbox addresses for billing, support, domains, and notifications.</li>
+        <li>Restrict mailbox access in Exchange Online so the app can only send from approved mailboxes.</li>
+      </ul>
+      <div class="mt-4 space-y-2 text-xs">
+        <a href="{{ graph_docs_url }}" target="_blank" rel="noopener" class="block text-cyan-700 hover:underline">Microsoft Graph sendMail docs</a>
+        <a href="{{ mailbox_scope_docs_url }}" target="_blank" rel="noopener" class="block text-cyan-700 hover:underline">Limit app mailbox access</a>
+      </div>
+    </div>
+
+    {% if test_result %}
+    <div class="rounded-xl border {% if test_result.ok %}border-emerald-200 bg-emerald-50{% else %}border-red-200 bg-red-50{% endif %} p-5">
+      <h2 class="text-sm font-semibold {% if test_result.ok %}text-emerald-900{% else %}text-red-900{% endif %}">Latest test result</h2>
+      {% if test_result.ok %}
+      <pre class="mt-3 text-xs whitespace-pre-wrap text-emerald-900">{{ test_result.data }}</pre>
+      {% else %}
+      <p class="mt-3 text-xs text-red-800 break-words">{{ test_result.error }}</p>
+      {% endif %}
+    </div>
+    {% endif %}
+  </aside>
+</div>
+{% endblock %}

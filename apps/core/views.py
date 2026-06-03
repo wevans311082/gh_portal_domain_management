@@ -153,7 +153,7 @@ def contact(request):
                 dest = settings.destination_email
                 if dest:
                     try:
-                        from django.core.mail import send_mail
+                        from django.core.mail import EmailMultiAlternatives
                         from django.conf import settings as django_settings
 
                         plain_body = (
@@ -177,14 +177,15 @@ def contact(request):
                             f"<div style='background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:12px 16px;white-space:pre-wrap'>{message}</div>"
                             "</body></html>"
                         )
-                        send_mail(
+                        msg = EmailMultiAlternatives(
                             subject=f"[Contact] {subject or 'New enquiry'} from {name}",
-                            message=plain_body,
+                            body=plain_body,
                             from_email=django_settings.DEFAULT_FROM_EMAIL,
-                            recipient_list=[dest],
-                            fail_silently=False,
-                            html_message=html_body,
+                            to=[dest],
+                            headers={"X-CyberAsk-Mailbox-Purpose": "support"},
                         )
+                        msg.attach_alternative(html_body, "text/html")
+                        msg.send(fail_silently=False)
                     except Exception:
                         pass
 

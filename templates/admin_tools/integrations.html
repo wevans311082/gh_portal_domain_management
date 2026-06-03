@@ -49,6 +49,8 @@
         <a href="{% url 'admin_tools:integration_detail' 'whm' %}" class="mt-auto text-xs text-sky-600 hover:underline font-medium">View details →</a>
         {% elif probe.label == "Stripe" %}
         <a href="{% url 'admin_tools:integration_detail' 'stripe' %}" class="mt-auto text-xs text-sky-600 hover:underline font-medium">View details →</a>
+        {% elif probe.label == "Microsoft 365 Graph Mail" %}
+        <a href="{% url 'admin_tools:m365_graph_config' %}" class="mt-auto text-xs text-sky-600 hover:underline font-medium">Configure mail →</a>
         {% endif %}
     </div>
     {% endfor %}
