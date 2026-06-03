@@ -91,3 +91,36 @@ def test_list_domain_orders_parses_orderid_keyed_payload(monkeypatch):
     assert rows[0]["orderid"] == "12345"
     assert rows[0]["domainname"] == "example.com"
     assert rows[0]["expiry_date"] == "2026-01-01"
+
+
+def test_list_domain_orders_normalizes_alternate_domain_fields(monkeypatch):
+    client = ResellerClubClient()
+
+    def fake_get(endpoint, params=None):
+        assert endpoint == "domains/search"
+        return {
+            "12345": {
+                "description": "Example.COM",
+                "entityid": 12345,
+                "status": "Active",
+                "creationtime": 1735689600,
+                "endtime": 1767225600,
+            },
+            "67890": {
+                "domain-name": "other.example",
+                "order-id": 67890,
+                "current-status": "Active",
+            },
+        }
+
+    monkeypatch.setattr(client, "_get", fake_get)
+
+    rows = client.list_domain_orders(page_no=1, no_of_records=25, status="All")
+
+    assert len(rows) == 2
+    assert rows[0]["domainname"] == "example.com"
+    assert rows[0]["orderid"] == "12345"
+    assert rows[0]["currentstatus"] == "Active"
+    assert rows[1]["domainname"] == "other.example"
+    assert rows[1]["orderid"] == "67890"
+    assert rows[1]["currentstatus"] == "Active"

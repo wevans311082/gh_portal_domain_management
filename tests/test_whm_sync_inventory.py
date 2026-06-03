@@ -260,6 +260,20 @@ def test_whm_reconciliation_flags_accounts_not_active_at_registrar(django_user_m
 
 
 @pytest.mark.django_db
+def test_whm_reconciliation_matches_registrar_rows_with_alternate_domain_keys():
+    WHMAccountSnapshot.objects.create(username="goodacct", domain="example.com", is_active=True)
+
+    report = WHMSyncService(client=_FakeWHMClient()).build_domain_reconciliation(
+        registrar_orders=[
+            {"description": "Example.COM", "entityid": "123", "status": "Active"},
+        ]
+    )
+
+    assert report["matched_account_total"] == 1
+    assert report["orphaned_account_total"] == 0
+
+
+@pytest.mark.django_db
 def test_terminate_orphaned_account_rechecks_registrar_before_removing(django_user_model, monkeypatch):
     user = django_user_model.objects.create_user(email="terminate-orphan@example.com", password="password123")
     package = Package.objects.create(

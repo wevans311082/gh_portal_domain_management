@@ -170,9 +170,16 @@ class WHMSyncService:
         for order in registrar_orders or []:
             if not isinstance(order, dict):
                 continue
-            domain_name = self.normalize_domain(order.get("domainname"))
+            domain_name = self.normalize_domain(ResellerClubClient._extract_domain_name_from_order(order))
             if not domain_name:
                 continue
+            order.setdefault("domainname", domain_name)
+            extracted_status = ResellerClubClient._extract_status_from_order(order)
+            if extracted_status and not order.get("currentstatus"):
+                order["currentstatus"] = extracted_status
+            extracted_order_id = ResellerClubClient._extract_order_id_from_order(order)
+            if extracted_order_id and not order.get("orderid"):
+                order["orderid"] = extracted_order_id
             registrar_by_domain[domain_name] = order
             if self._registrar_status_is_active(order.get("currentstatus")):
                 active_registrar_domains.add(domain_name)

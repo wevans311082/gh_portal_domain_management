@@ -618,6 +618,58 @@ class ResellerClubClient:
             return ""
         return datetime.fromtimestamp(epoch, tz=timezone.utc).date().isoformat()
 
+    @staticmethod
+    def _first_text_from_order(record: dict, *keys: str) -> str:
+        if not isinstance(record, dict):
+            return ""
+        for key in keys:
+            value = record.get(key)
+            if value not in (None, ""):
+                return str(value).strip()
+        details = record.get("order_details")
+        if isinstance(details, dict):
+            for key in keys:
+                value = details.get(key)
+                if value not in (None, ""):
+                    return str(value).strip()
+        return ""
+
+    @classmethod
+    def _extract_domain_name_from_order(cls, record: dict) -> str:
+        return cls._first_text_from_order(
+            record,
+            "domainname",
+            "domain-name",
+            "domain_name",
+            "domain",
+            "description",
+        ).lower().rstrip(".")
+
+    @classmethod
+    def _extract_order_id_from_order(cls, record: dict) -> str:
+        return cls._first_text_from_order(
+            record,
+            "orderid",
+            "order-id",
+            "order_id",
+            "entityid",
+            "entity-id",
+            "entity_id",
+        )
+
+    @classmethod
+    def _extract_status_from_order(cls, record: dict) -> str:
+        return cls._first_text_from_order(
+            record,
+            "currentstatus",
+            "current-status",
+            "current_status",
+            "status",
+            "orderstatus",
+            "order-status",
+            "order_status",
+        )
+
     def list_domain_orders(
         self,
         page_no: int = 1,
@@ -653,7 +705,23 @@ class ResellerClubClient:
                         continue
                     if not any(
                         marker in value
-                        for marker in ("domainname", "orderid", "currentstatus", "endtime", "creationtime")
+                        for marker in (
+                            "domainname",
+                            "domain-name",
+                            "domain_name",
+                            "domain",
+                            "description",
+                            "orderid",
+                            "order-id",
+                            "order_id",
+                            "entityid",
+                            "currentstatus",
+                            "current-status",
+                            "current_status",
+                            "status",
+                            "endtime",
+                            "creationtime",
+                        )
                     ):
                         continue
                     row = dict(value)
@@ -668,19 +736,32 @@ class ResellerClubClient:
             if not isinstance(record, dict):
                 continue
             item = dict(record)
+            domain_name = self._extract_domain_name_from_order(item)
+            order_id = self._extract_order_id_from_order(item)
+            current_status = self._extract_status_from_order(item)
+            if domain_name:
+                item["domainname"] = domain_name
+            if order_id:
+                item["orderid"] = order_id
+            if current_status:
+                item["currentstatus"] = current_status
             item["expiry_date"] = self._epoch_to_iso(record.get("endtime"))
             item["creation_date"] = self._epoch_to_iso(record.get("creationtime"))
 
             if include_details and idx < max_details:
-                order_id = str(record.get("orderid") or "").strip()
+                order_id = str(item.get("orderid") or "").strip()
                 if order_id:
                     try:
                         details = self.get_order_details(order_id)
                         item["order_details"] = details
                         # Backfill common fields from details if list payload omits them.
                         if isinstance(details, dict):
-                            item.setdefault("domainname", details.get("domainname"))
-                            item.setdefault("currentstatus", details.get("currentstatus"))
+                            detail_domain = self._extract_domain_name_from_order(details)
+                            detail_status = self._extract_status_from_order(details)
+                            if detail_domain:
+                                item["domainname"] = item.get("domainname") or detail_domain
+                            if detail_status:
+                                item["currentstatus"] = item.get("currentstatus") or detail_status
                             item.setdefault("recurring", details.get("recurring"))
                             item.setdefault("endtime", details.get("endtime"))
                             item.setdefault("creationtime", details.get("creationtime"))
