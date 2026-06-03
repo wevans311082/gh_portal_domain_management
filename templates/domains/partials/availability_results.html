@@ -1,107 +1,188 @@
-﻿{% if results %}
-<div class="space-y-4">
-    <div class="rounded-2xl border border-slate-200 bg-white/90 backdrop-blur-sm px-4 py-3 text-sm text-slate-600 shadow-sm">
-        Results for <strong class="text-slate-900">{{ query }}</strong>
-        {% if prices_are_test_mode %}
-        <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
-            Test mode &mdash; prices are sandbox placeholders, not real rates
-        </span>
-        {% endif %}
-        {% if debug_mode %}
-        <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">
-            Debug mode: live API data (cache bypassed)
-        </span>
-        {% endif %}
+{% if results %}
+<div class="domain-results-shell rounded-3xl border border-slate-200/80 bg-white/95 p-3 shadow-xl shadow-slate-900/10 backdrop-blur md:p-5">
+    <div class="flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+            <p class="text-xs font-semibold uppercase text-sky-700">Domain availability</p>
+            <p class="mt-1 text-sm text-slate-600">
+                Results for <strong class="text-slate-950">{{ query }}</strong>
+            </p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            {% if prices_are_test_mode %}
+            <span class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
+                Test prices
+            </span>
+            {% endif %}
+            {% if debug_mode %}
+            <span class="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-1 text-xs font-semibold text-orange-800">
+                Live debug data
+            </span>
+            {% endif %}
+        </div>
     </div>
 
-    {% for result in results %}
-    <article class="group rounded-2xl border border-slate-200 bg-white shadow-sm hover:shadow-md transition-shadow overflow-hidden">
-        <div class="p-5">
-            <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div class="min-w-0">
-                    <div class="flex items-center gap-3 mb-2">
-                        {% if result.available is None %}
-                        <span class="inline-flex h-3 w-3 rounded-full bg-slate-300"></span>
-                        {% elif result.available %}
-                        <span class="inline-flex h-3 w-3 rounded-full bg-emerald-500"></span>
-                        {% else %}
-                        <span class="inline-flex h-3 w-3 rounded-full bg-rose-500"></span>
-                        {% endif %}
-                        <h3 class="text-lg font-semibold text-slate-900 break-all">{{ result.domain }}</h3>
-                    </div>
-
-                    <p class="text-sm {% if result.available is None %}text-slate-500{% elif result.available %}text-emerald-700{% else %}text-rose-700{% endif %}">
-                        {% if result.available is None %}Availability unknown
-                        {% elif result.available %}Available to register now
-                        {% else %}Already registered{% endif %}
-                    </p>
-
-                    <div class="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
-                        <div class="rounded-xl bg-sky-50 px-3 py-2">
-                            <p class="uppercase tracking-wide text-[10px] text-sky-700 font-semibold">Registration</p>
-                            <p class="text-slate-900 font-semibold">{% if result.registration_price %}GBP {{ result.registration_price|floatformat:2 }}/yr{% else %}&mdash;{% endif %}</p>
-                        </div>
-                        <div class="rounded-xl bg-indigo-50 px-3 py-2">
-                            <p class="uppercase tracking-wide text-[10px] text-indigo-700 font-semibold">Renewal</p>
-                            <p class="text-slate-900 font-semibold">{% if result.renewal_price %}GBP {{ result.renewal_price|floatformat:2 }}/yr{% else %}&mdash;{% endif %}</p>
-                        </div>
-                        <div class="rounded-xl bg-emerald-50 px-3 py-2">
-                            <p class="uppercase tracking-wide text-[10px] text-emerald-700 font-semibold">Transfer</p>
-                            <p class="text-slate-900 font-semibold">{% if result.transfer_price %}GBP {{ result.transfer_price|floatformat:2 }}/yr{% else %}&mdash;{% endif %}</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="flex flex-wrap gap-2 lg:justify-end">
-                    {% if result.available %}
-                    {% if request.user.is_authenticated %}
-                    <a href="{% url 'portal:shop' %}?domain={{ result.domain|urlencode }}"
-                       class="inline-flex items-center rounded-lg border border-sky-200 px-3.5 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-50 transition-colors">
-                        Add to Cart
-                    </a>
-                    <a href="{% url 'domains:register' %}?domain={{ result.domain }}"
-                       class="inline-flex items-center rounded-lg bg-sky-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-sky-700 transition-colors">
-                        Register
-                    </a>
-                    {% else %}
-                    <a href="{% url 'account_login' %}?next={% url 'domains:register' %}%3Fdomain%3D{{ result.domain|urlencode }}"
-                       class="inline-flex items-center rounded-lg bg-sky-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-sky-700 transition-colors">
-                        Register
-                    </a>
-                    {% endif %}
-                    {% elif result.available == False %}
-                    <button
-                        type="button"
-                        class="inline-flex items-center rounded-lg border border-slate-300 px-3.5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
-                        hx-get="{% url 'domains:whois' %}?domain={{ result.domain|urlencode }}"
-                        hx-target="#whois-{{ forloop.counter }}"
-                        hx-swap="innerHTML"
-                    >
-                        View WHOIS
-                    </button>
-                    {% if request.user.is_authenticated %}
-                    <a href="{% url 'support:create' %}?domain={{ result.domain|urlencode }}"
-                       class="inline-flex items-center rounded-lg bg-emerald-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors">
-                        Transfer In
-                    </a>
-                    {% else %}
-                    <a href="{% url 'account_login' %}?next={% url 'support:create' %}%3Fdomain%3D{{ result.domain|urlencode }}"
-                       class="inline-flex items-center rounded-lg bg-emerald-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors">
-                        Transfer In
-                    </a>
-                    {% endif %}
-                    {% endif %}
-                </div>
+    <section class="py-5" aria-label="Available domains">
+        <div class="mb-3 flex items-center justify-between gap-3">
+            <div>
+                <h2 class="text-base font-bold text-slate-950">Available now</h2>
+                <p class="text-xs text-slate-500">Use the controls to browse available names.</p>
+            </div>
+            <div class="flex gap-2">
+                <button type="button"
+                        class="domain-carousel-prev inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:border-sky-300 hover:text-sky-700"
+                        aria-label="Previous available domain">
+                    <span aria-hidden="true">&lsaquo;</span>
+                </button>
+                <button type="button"
+                        class="domain-carousel-next inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:border-sky-300 hover:text-sky-700"
+                        aria-label="Next available domain">
+                    <span aria-hidden="true">&rsaquo;</span>
+                </button>
             </div>
         </div>
 
-        {% if result.available == False %}
-        <div id="whois-{{ forloop.counter }}" class="border-t border-slate-100 bg-slate-50/70 px-5 py-3 text-xs text-slate-500">
-            Click <strong>View WHOIS</strong> to load live registration details.
+        <div class="domain-carousel overflow-hidden" data-domain-carousel>
+            <div class="domain-carousel-track flex gap-4 transition-transform duration-500 ease-out">
+                {% for result in results %}
+                {% if result.available %}
+                <article class="domain-carousel-slide min-w-full sm:min-w-[78%] lg:min-w-[42%] xl:min-w-[32%]">
+                    <div class="h-full rounded-2xl border border-emerald-200 bg-gradient-to-br from-white via-emerald-50/70 to-sky-50 p-5 shadow-sm">
+                        <div class="mb-5 flex items-start justify-between gap-3">
+                            <div class="min-w-0">
+                                <p class="mb-1 inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-800">
+                                    <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
+                                    Available
+                                </p>
+                                <h3 class="mt-3 break-all text-2xl font-black text-slate-950">{{ result.domain }}</h3>
+                            </div>
+                            <div class="rounded-2xl bg-white/80 px-3 py-2 text-right shadow-sm ring-1 ring-slate-100">
+                                <p class="text-[10px] font-bold uppercase text-slate-500">From</p>
+                                <p class="text-lg font-black text-slate-950">
+                                    {% if result.registration_price %}&pound;{{ result.registration_price|floatformat:2 }}{% else %}&mdash;{% endif %}
+                                </p>
+                            </div>
+                        </div>
+
+                        <dl class="grid grid-cols-3 gap-2 text-xs">
+                            <div class="rounded-xl bg-white/85 px-3 py-2">
+                                <dt class="font-bold uppercase text-sky-700">Register</dt>
+                                <dd class="mt-1 font-semibold text-slate-900">{% if result.registration_price %}&pound;{{ result.registration_price|floatformat:2 }}{% else %}&mdash;{% endif %}</dd>
+                            </div>
+                            <div class="rounded-xl bg-white/85 px-3 py-2">
+                                <dt class="font-bold uppercase text-indigo-700">Renew</dt>
+                                <dd class="mt-1 font-semibold text-slate-900">{% if result.renewal_price %}&pound;{{ result.renewal_price|floatformat:2 }}{% else %}&mdash;{% endif %}</dd>
+                            </div>
+                            <div class="rounded-xl bg-white/85 px-3 py-2">
+                                <dt class="font-bold uppercase text-emerald-700">Transfer</dt>
+                                <dd class="mt-1 font-semibold text-slate-900">{% if result.transfer_price %}&pound;{{ result.transfer_price|floatformat:2 }}{% else %}&mdash;{% endif %}</dd>
+                            </div>
+                        </dl>
+
+                        <div class="mt-5 flex flex-wrap gap-2">
+                            {% if request.user.is_authenticated %}
+                            <a href="{% url 'portal:shop' %}?domain={{ result.domain|urlencode }}"
+                               class="inline-flex flex-1 items-center justify-center rounded-xl border border-sky-200 bg-white px-4 py-2.5 text-sm font-bold text-sky-700 transition hover:bg-sky-50">
+                                Add to Cart
+                            </a>
+                            <a href="{% url 'domains:register' %}?domain={{ result.domain|urlencode }}"
+                               class="inline-flex flex-1 items-center justify-center rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-sky-700">
+                                Register
+                            </a>
+                            {% else %}
+                            <a href="{% url 'account_login' %}?next={% url 'domains:register' %}%3Fdomain%3D{{ result.domain|urlencode }}"
+                               class="inline-flex w-full items-center justify-center rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-sky-700">
+                                Register
+                            </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </article>
+                {% endif %}
+                {% endfor %}
+            </div>
         </div>
-        {% endif %}
-    </article>
-    {% endfor %}
+
+        <div class="domain-carousel-empty hidden rounded-2xl border border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-600">
+            No available matches came back for this search. Try another name or clear extension filters.
+        </div>
+    </section>
+
+    <section class="border-t border-slate-100 pt-5" aria-label="Unavailable domain details">
+        <div class="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+                <h2 class="text-base font-bold text-slate-950">Registered or unknown</h2>
+                <p class="text-xs text-slate-500">Expand a result for pricing, WHOIS, and transfer options.</p>
+            </div>
+        </div>
+
+        <div class="grid gap-3">
+            {% for result in results %}
+            {% if result.available == False or result.available is None %}
+            <article class="rounded-2xl border border-slate-200 bg-slate-50/80">
+                <button type="button"
+                        class="domain-detail-toggle flex w-full items-center justify-between gap-4 px-4 py-3 text-left"
+                        aria-expanded="false"
+                        aria-controls="domain-detail-{{ forloop.counter }}">
+                    <span class="min-w-0">
+                        <span class="block break-all text-sm font-bold text-slate-950">{{ result.domain }}</span>
+                        <span class="mt-1 inline-flex items-center gap-1.5 text-xs font-semibold {% if result.available is None %}text-slate-500{% else %}text-rose-700{% endif %}">
+                            <span class="h-2 w-2 rounded-full {% if result.available is None %}bg-slate-400{% else %}bg-rose-500{% endif %}"></span>
+                            {% if result.available is None %}Availability unknown{% else %}Already registered{% endif %}
+                        </span>
+                    </span>
+                    <span class="domain-detail-icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-lg text-slate-600 shadow-sm">+</span>
+                </button>
+
+                <div id="domain-detail-{{ forloop.counter }}" class="domain-detail-panel hidden border-t border-slate-200 bg-white px-4 py-4">
+                    <dl class="grid grid-cols-1 gap-2 text-xs sm:grid-cols-3">
+                        <div class="rounded-xl bg-sky-50 px-3 py-2">
+                            <dt class="font-bold uppercase text-sky-700">Registration</dt>
+                            <dd class="mt-1 font-semibold text-slate-900">{% if result.registration_price %}&pound;{{ result.registration_price|floatformat:2 }}/yr{% else %}&mdash;{% endif %}</dd>
+                        </div>
+                        <div class="rounded-xl bg-indigo-50 px-3 py-2">
+                            <dt class="font-bold uppercase text-indigo-700">Renewal</dt>
+                            <dd class="mt-1 font-semibold text-slate-900">{% if result.renewal_price %}&pound;{{ result.renewal_price|floatformat:2 }}/yr{% else %}&mdash;{% endif %}</dd>
+                        </div>
+                        <div class="rounded-xl bg-emerald-50 px-3 py-2">
+                            <dt class="font-bold uppercase text-emerald-700">Transfer</dt>
+                            <dd class="mt-1 font-semibold text-slate-900">{% if result.transfer_price %}&pound;{{ result.transfer_price|floatformat:2 }}/yr{% else %}&mdash;{% endif %}</dd>
+                        </div>
+                    </dl>
+
+                    <div class="mt-4 flex flex-wrap gap-2">
+                        {% if result.available == False %}
+                        <button type="button"
+                                class="inline-flex items-center rounded-xl border border-slate-300 px-3.5 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+                                hx-get="{% url 'domains:whois' %}?domain={{ result.domain|urlencode }}"
+                                hx-target="#whois-{{ forloop.counter }}"
+                                hx-swap="innerHTML">
+                            View WHOIS
+                        </button>
+                        {% endif %}
+                        {% if request.user.is_authenticated %}
+                        <a href="{% url 'support:create' %}?domain={{ result.domain|urlencode }}"
+                           class="inline-flex items-center rounded-xl bg-emerald-600 px-3.5 py-2 text-sm font-bold text-white transition hover:bg-emerald-700">
+                            Transfer In
+                        </a>
+                        {% else %}
+                        <a href="{% url 'account_login' %}?next={% url 'support:create' %}%3Fdomain%3D{{ result.domain|urlencode }}"
+                           class="inline-flex items-center rounded-xl bg-emerald-600 px-3.5 py-2 text-sm font-bold text-white transition hover:bg-emerald-700">
+                            Transfer In
+                        </a>
+                        {% endif %}
+                    </div>
+
+                    {% if result.available == False %}
+                    <div id="whois-{{ forloop.counter }}" class="mt-4 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-xs text-slate-500">
+                        Click <strong>View WHOIS</strong> to load live registration details.
+                    </div>
+                    {% endif %}
+                </div>
+            </article>
+            {% endif %}
+            {% endfor %}
+        </div>
+    </section>
 </div>
 {% endif %}
 

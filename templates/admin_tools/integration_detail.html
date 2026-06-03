@@ -19,6 +19,11 @@
     <input type="hidden" name="action" value="refresh_now">
     <button type="submit" class="text-sm text-emerald-700 hover:underline font-medium">Refresh Now</button>
 </form>
+<form method="post" class="inline">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="reconcile_domains">
+    <button type="submit" class="text-sm text-amber-700 hover:underline font-medium">Cross-check Registrar</button>
+</form>
 {% endif %}
 {% endblock %}
 
@@ -184,6 +189,121 @@
         {% if whm_context.latest_run.last_error %}
         <p class="text-xs text-red-600 mt-2">Last error: {{ whm_context.latest_run.last_error }}</p>
         {% endif %}
+        {% endif %}
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-amber-100 overflow-hidden">
+        <div class="px-5 py-3 border-b border-amber-100 bg-amber-50/50 flex items-center justify-between gap-4 flex-wrap">
+            <div>
+                <h3 class="text-sm font-semibold text-amber-950">Registrar / WHM Cross-check</h3>
+                <p class="text-xs text-amber-800 mt-1">ResellerClub active domains are treated as the source of truth for WHM account cleanup.</p>
+            </div>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="reconcile_domains">
+                <button type="submit" class="px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs font-medium">Run Cross-check</button>
+            </form>
+        </div>
+
+        {% if whm_context.reconciliation %}
+        <div class="p-5">
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-3 text-xs">
+                <div class="bg-slate-50 rounded-lg p-3">
+                    <p class="text-slate-500">Active Registrar Domains</p>
+                    <p class="text-slate-900 font-semibold text-base">{{ whm_context.reconciliation.active_registrar_domain_total }}</p>
+                </div>
+                <div class="bg-slate-50 rounded-lg p-3">
+                    <p class="text-slate-500">WHM Accounts</p>
+                    <p class="text-slate-900 font-semibold text-base">{{ whm_context.reconciliation.whm_account_total }}</p>
+                </div>
+                <div class="bg-emerald-50 rounded-lg p-3">
+                    <p class="text-emerald-700">Matched Accounts</p>
+                    <p class="text-emerald-900 font-semibold text-base">{{ whm_context.reconciliation.matched_account_total }}</p>
+                </div>
+                <div class="bg-rose-50 rounded-lg p-3">
+                    <p class="text-rose-700">Stale / Orphaned WHM</p>
+                    <p class="text-rose-900 font-semibold text-base">{{ whm_context.reconciliation.orphaned_account_total }}</p>
+                </div>
+                <div class="bg-sky-50 rounded-lg p-3">
+                    <p class="text-sky-700">Registrar-only</p>
+                    <p class="text-sky-900 font-semibold text-base">{{ whm_context.reconciliation.registrar_only_domain_total }}</p>
+                </div>
+            </div>
+
+            <div class="mt-5 overflow-x-auto">
+                <table class="min-w-full text-xs">
+                    <thead class="bg-slate-50 text-slate-600">
+                        <tr>
+                            <th class="px-4 py-2 text-left">WHM User</th>
+                            <th class="px-4 py-2 text-left">WHM Domain</th>
+                            <th class="px-4 py-2 text-left">Registrar Status</th>
+                            <th class="px-4 py-2 text-left">Reason</th>
+                            <th class="px-4 py-2 text-left">Linked Service</th>
+                            <th class="px-4 py-2 text-left">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in whm_context.reconciliation.orphaned_accounts %}
+                        <tr class="border-t border-slate-100">
+                            <td class="px-4 py-2 font-medium text-slate-800">{{ row.account.username }}</td>
+                            <td class="px-4 py-2 text-slate-600">{{ row.domain|default:"â€”" }}</td>
+                            <td class="px-4 py-2 text-slate-600">{{ row.registrar_status|default:"Not found" }}</td>
+                            <td class="px-4 py-2 text-slate-600">{{ row.reason }}</td>
+                            <td class="px-4 py-2 text-slate-600">
+                                {% if row.account.service %}#{{ row.account.service.id }}{% else %}â€”{% endif %}
+                            </td>
+                            <td class="px-4 py-2">
+                                <form method="post" onsubmit="return confirm('Terminate WHM account {{ row.account.username }}? This removes the cPanel account.')" class="flex items-center gap-2">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="terminate_orphan">
+                                    <input type="hidden" name="username" value="{{ row.account.username }}">
+                                    <label class="inline-flex items-center gap-1 text-[11px] text-slate-500">
+                                        <input type="checkbox" name="keep_dns" value="1" class="rounded border-slate-300">
+                                        Keep DNS
+                                    </label>
+                                    <button type="submit" class="px-2 py-1 rounded bg-rose-600 text-white text-[11px] font-medium">Terminate</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="6" class="px-4 py-4 text-slate-500">No stale or orphaned WHM accounts found in the latest cross-check.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% if whm_context.reconciliation.registrar_only_domains %}
+            <details class="mt-5">
+                <summary class="cursor-pointer text-xs font-medium text-sky-700">Registrar-only active domains</summary>
+                <div class="mt-3 overflow-x-auto">
+                    <table class="min-w-full text-xs">
+                        <thead class="bg-slate-50 text-slate-600">
+                            <tr>
+                                <th class="px-4 py-2 text-left">Domain</th>
+                                <th class="px-4 py-2 text-left">Order ID</th>
+                                <th class="px-4 py-2 text-left">Local Domain</th>
+                                <th class="px-4 py-2 text-left">Service</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in whm_context.reconciliation.registrar_only_domains %}
+                            <tr class="border-t border-slate-100">
+                                <td class="px-4 py-2 font-medium text-slate-800">{{ row.domain }}</td>
+                                <td class="px-4 py-2 text-slate-600">{{ row.registrar_order.orderid|default:"â€”" }}</td>
+                                <td class="px-4 py-2 text-slate-600">{% if row.local_domain %}#{{ row.local_domain.id }}{% else %}â€”{% endif %}</td>
+                                <td class="px-4 py-2 text-slate-600">{% if row.service %}#{{ row.service.id }}{% else %}â€”{% endif %}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+            {% endif %}
+        </div>
+        {% else %}
+        <div class="p-5 text-sm text-slate-600">
+            Run a cross-check to compare active ResellerClub domain orders with the current WHM account snapshot.
+        </div>
         {% endif %}
     </div>
 

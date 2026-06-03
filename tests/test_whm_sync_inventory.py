@@ -2,6 +2,7 @@ import pytest
 from django.urls import reverse
 
 from apps.products.models import Package
+from apps.domains.models import Domain
 from apps.provisioning.models import (
     WHMAccountSnapshot,
     WHMAccountUsageSnapshot,
@@ -223,6 +224,83 @@ def test_whm_sync_service_converts_byte_usage_to_mb(django_user_model):
 
 
 @pytest.mark.django_db
+def test_whm_reconciliation_flags_accounts_not_active_at_registrar(django_user_model):
+    user = django_user_model.objects.create_user(email="reconcile@example.com", password="password123")
+    package = Package.objects.create(
+        name="Starter Reconcile",
+        slug="starter-reconcile",
+        price_monthly="9.99",
+        price_annually="99.99",
+    )
+    service = Service.objects.create(
+        user=user,
+        package=package,
+        domain_name="stale.example",
+        cpanel_username="staleacct",
+        status=Service.STATUS_ACTIVE,
+    )
+    WHMAccountSnapshot.objects.create(username="goodacct", domain="active.example", is_active=True)
+    WHMAccountSnapshot.objects.create(username="staleacct", domain="stale.example", service=service, is_active=True)
+    WHMAccountSnapshot.objects.create(username="missingacct", domain="missing.example", is_active=True)
+    Domain.objects.create(user=user, name="stale.example", tld="example", status=Domain.STATUS_ACTIVE)
+
+    report = WHMSyncService(client=_FakeWHMClient()).build_domain_reconciliation(
+        registrar_orders=[
+            {"domainname": "active.example", "currentstatus": "Active", "orderid": "1"},
+            {"domainname": "stale.example", "currentstatus": "Deleted", "orderid": "2"},
+            {"domainname": "registrar-only.example", "currentstatus": "Active", "orderid": "3"},
+        ]
+    )
+
+    assert report["matched_account_total"] == 1
+    assert report["orphaned_account_total"] == 2
+    assert {row["account"].username for row in report["orphaned_accounts"]} == {"staleacct", "missingacct"}
+    assert report["registrar_only_domain_total"] == 1
+    assert report["local_stale_domain_total"] == 1
+
+
+@pytest.mark.django_db
+def test_terminate_orphaned_account_rechecks_registrar_before_removing(django_user_model, monkeypatch):
+    user = django_user_model.objects.create_user(email="terminate-orphan@example.com", password="password123")
+    package = Package.objects.create(
+        name="Starter Terminate",
+        slug="starter-terminate",
+        price_monthly="9.99",
+        price_annually="99.99",
+    )
+    service = Service.objects.create(
+        user=user,
+        package=package,
+        domain_name="orphan.example",
+        cpanel_username="orphanacct",
+        status=Service.STATUS_ACTIVE,
+    )
+    WHMAccountSnapshot.objects.create(username="orphanacct", domain="orphan.example", service=service, is_active=True)
+
+    monkeypatch.setattr(
+        "apps.provisioning.whm_sync.ResellerClubClient.list_all_domain_orders",
+        lambda self, no_of_records=100, status="All", include_details=False, max_details=100, max_pages=50: [],
+    )
+
+    class TerminatingClient(_FakeWHMClient):
+        def __init__(self):
+            self.terminated = []
+
+        def terminate_account(self, username, keep_dns=False):
+            self.terminated.append((username, keep_dns))
+            return {"metadata": {"result": 1}}
+
+    whm_client = TerminatingClient()
+    WHMSyncService(client=whm_client).terminate_orphaned_account("orphanacct", keep_dns=True)
+
+    assert whm_client.terminated == [("orphanacct", True)]
+    assert WHMAccountSnapshot.objects.get(username="orphanacct").is_active is False
+    service.refresh_from_db()
+    assert service.status == Service.STATUS_TERMINATED
+    assert service.whm_last_sync_action == "terminate_orphan"
+
+
+@pytest.mark.django_db
 def test_whm_integration_detail_refresh_now_runs_sync_immediately(client, django_user_model, monkeypatch):
     staff = django_user_model.objects.create_user(
         email="whm-admin@example.com",
@@ -249,6 +327,39 @@ def test_whm_integration_detail_refresh_now_runs_sync_immediately(client, django
 
     assert response.status_code == 302
     assert called["result"]["account_count"] == 2
+
+
+@pytest.mark.django_db
+def test_whm_integration_detail_reconcile_action_runs_whm_and_registrar(client, django_user_model, monkeypatch):
+    staff = django_user_model.objects.create_user(
+        email="whm-reconcile-admin@example.com",
+        password="password123",
+        is_staff=True,
+    )
+    client.force_login(staff)
+
+    called = {"synced": False, "reported": False}
+
+    monkeypatch.setattr(
+        "apps.provisioning.whm_sync.WHMSyncService.sync_all",
+        lambda self: called.__setitem__("synced", True) or {"account_count": 2},
+    )
+    monkeypatch.setattr(
+        "apps.provisioning.whm_sync.WHMSyncService.build_domain_reconciliation",
+        lambda self: called.__setitem__("reported", True) or {
+            "orphaned_account_total": 1,
+            "registrar_only_domain_total": 0,
+        },
+    )
+
+    response = client.post(
+        reverse("admin_tools:integration_detail", kwargs={"service": "whm"}),
+        {"action": "reconcile_domains"},
+    )
+
+    assert response.status_code == 302
+    assert response.url.endswith("?reconcile=1")
+    assert called == {"synced": True, "reported": True}
 
 
 @pytest.mark.django_db
@@ -303,6 +414,36 @@ def test_whm_integration_detail_includes_synced_inventory_context(client, django
     assert response.context["whm_context"]["package_total"] == 1
     assert response.context["whm_context"]["account_total"] == 1
     assert response.context["whm_context"]["usage_total"] == 1
+
+
+@pytest.mark.django_db
+def test_whm_integration_detail_includes_reconciliation_context(client, django_user_model, monkeypatch):
+    staff = django_user_model.objects.create_user(
+        email="whm-reconcile-view@example.com",
+        password="password123",
+        is_staff=True,
+    )
+    client.force_login(staff)
+
+    monkeypatch.setattr(
+        "apps.provisioning.whm_sync.WHMSyncService.build_domain_reconciliation",
+        lambda self: {
+            "active_registrar_domain_total": 1,
+            "whm_account_total": 1,
+            "matched_account_total": 0,
+            "orphaned_account_total": 1,
+            "registrar_only_domain_total": 0,
+            "orphaned_accounts": [],
+            "registrar_only_domains": [],
+            "local_stale_domains": [],
+        },
+    )
+
+    response = client.get(reverse("admin_tools:integration_detail", kwargs={"service": "whm"}) + "?reconcile=1")
+
+    assert response.status_code == 200
+    assert response.context["whm_context"]["show_reconciliation"] is True
+    assert response.context["whm_context"]["reconciliation"]["orphaned_account_total"] == 1
 
 
 @pytest.mark.django_db

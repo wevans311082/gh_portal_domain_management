@@ -614,6 +614,29 @@ def integration_detail(request, service):
             except Exception as exc:
                 messages.error(request, f"WHM refresh failed: {exc}")
             return redirect("admin_tools:integration_detail", service="whm")
+        if action == "reconcile_domains":
+            try:
+                result = WHMSyncService().sync_all()
+                report = WHMSyncService().build_domain_reconciliation()
+                messages.success(
+                    request,
+                    "Registrar cross-check complete: "
+                    f"{result.get('account_count', 0)} WHM accounts synced, "
+                    f"{report.get('orphaned_account_total', 0)} stale/orphaned account(s), "
+                    f"{report.get('registrar_only_domain_total', 0)} registrar-only domain(s).",
+                )
+            except Exception as exc:
+                messages.error(request, f"WHM/ResellerClub cross-check failed: {exc}")
+            return redirect(f"{reverse('admin_tools:integration_detail', kwargs={'service': 'whm'})}?reconcile=1")
+        if action == "terminate_orphan":
+            username = (request.POST.get("username") or "").strip()
+            keep_dns = (request.POST.get("keep_dns") or "").strip() == "1"
+            try:
+                WHMSyncService().terminate_orphaned_account(username=username, keep_dns=keep_dns)
+                messages.success(request, f"Terminated orphaned WHM account '{username}'.")
+            except Exception as exc:
+                messages.error(request, f"Could not terminate '{username}': {exc}")
+            return redirect(f"{reverse('admin_tools:integration_detail', kwargs={'service': 'whm'})}?reconcile=1")
         if action == "package_create":
             try:
                 name = (request.POST.get("name") or "").strip()
@@ -710,6 +733,7 @@ def integration_detail(request, service):
     if service == "whm":
         account_query = (request.GET.get("q") or "").strip().lower()
         suspended_filter = (request.GET.get("suspended") or "all").strip().lower()
+        show_reconciliation = (request.GET.get("reconcile") or "").strip() == "1"
 
         def _to_float(value):
             try:
@@ -790,7 +814,15 @@ def integration_detail(request, service):
                 "q": account_query,
                 "suspended": suspended_filter,
             },
+            "reconciliation": None,
+            "show_reconciliation": show_reconciliation,
         }
+
+        if show_reconciliation:
+            try:
+                whm_context["reconciliation"] = WHMSyncService().build_domain_reconciliation()
+            except Exception as exc:
+                messages.error(request, f"Could not build registrar cross-check report: {exc}")
 
     if service == "resellerclub":
         full_refresh = (request.GET.get("full") or "").strip() == "1"

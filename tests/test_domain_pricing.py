@@ -189,7 +189,8 @@ def test_domain_check_renders_cached_sell_price(client, monkeypatch):
     content = response.content.decode()
 
     assert response.status_code == 200
-    assert "GBP 12.00/yr" in content
+    assert "12.00" in content
+    assert "Available" in content
 
 
 @pytest.mark.django_db
@@ -216,7 +217,7 @@ def test_domain_check_shows_transfer_price_and_whois_for_taken_domain(client, mo
 
     assert response.status_code == 200
     assert "Already registered" in content
-    assert "GBP 12.50/yr" in content
+    assert "12.50" in content
     assert "View WHOIS" in content
     assert reverse("domains:whois") in content
     assert "Transfer In" in content
@@ -261,7 +262,7 @@ def test_domain_check_debug_mode_bypasses_cache_and_calls_api(client, monkeypatc
     content = response.content.decode()
 
     assert response.status_code == 200
-    assert "Available to register now" in content
+    assert "Available" in content
     assert calls["availability"] == 1
     assert calls["costs"] >= 1
 
@@ -295,4 +296,4 @@ def test_domain_check_syncs_missing_pricing_records(client, monkeypatch):
 
     assert response.status_code == 200
     assert TLDPricing.objects.filter(tld="com").exists()
-    assert "GBP 12.50/yr" in content
+    assert "12.50" in content

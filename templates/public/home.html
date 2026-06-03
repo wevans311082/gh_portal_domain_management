@@ -119,7 +119,7 @@
             </form>
             <span id="hero-indicator" class="htmx-indicator text-cyan-100 text-sm mt-2 block">Checking...</span>
         </div>
-        <div id="hero-results" class="max-w-xl mx-auto text-left relative z-10"></div>
+        <div id="hero-results" class="max-w-5xl mx-auto text-left relative z-10"></div>
 
         <div class="mt-8 flex flex-wrap justify-center gap-3 relative z-10">
             <a href="{% url 'core:pricing' %}"
@@ -268,4 +268,5 @@
 
 {% block extra_js %}
 <script src="{% static 'js/home.js' %}"></script>
+<script src="{% static 'js/domain-results.js' %}"></script>
 {% endblock %}

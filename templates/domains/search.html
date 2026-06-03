@@ -45,8 +45,6 @@
             <img src="{% static 'images/logo.png' %}" alt="{{ SITE_NAME }}" class="h-9 w-9 rounded-lg shadow-md ring-1 ring-white/20 bg-white/10 p-0.5">
             <span class="text-sky-100">{{ SITE_NAME }}</span>
         </a>
-        <div class="flex gap-4 items-center text-sm">
-            <a href="{% url 'core:pricing' %}" class="hover:text-sky-200">Pricing</a>
         <div class="flex gap-4 items-center text-sm hidden sm:flex">
             <a href="{% url 'core:pricing' %}" class="hover:text-sky-200">Pricing</a>
             <a href="{% url 'account_login' %}" class="hover:text-sky-200">Login</a>
@@ -136,4 +134,5 @@
 
 {% block extra_js %}
 <script src="{% static 'js/domain-search.js' %}"></script>
+<script src="{% static 'js/domain-results.js' %}"></script>
 {% endblock %}

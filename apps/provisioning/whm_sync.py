@@ -5,9 +5,12 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterable
 
+from django.db.models import Q
 from django.utils import timezone
 
 from apps.core.runtime_settings import get_runtime_setting
+from apps.domains.models import Domain
+from apps.domains.resellerclub_client import ResellerClubClient
 from apps.services.models import Service
 from apps.provisioning.models import (
     WHMAccountSnapshot,
@@ -129,6 +132,162 @@ class WHMSyncService:
         if raw < 0:
             return ""
         return str(round(raw / (1024 * 1024), 2))
+
+    @staticmethod
+    def normalize_domain(value: str) -> str:
+        return str(value or "").strip().lower().rstrip(".")
+
+    @staticmethod
+    def _registrar_status_is_active(value: str) -> bool:
+        # LogicBoxes uses "Active" for live registered domains. Avoid matching
+        # "InActive", which still contains the word "active".
+        return str(value or "").strip().lower() == "active"
+
+    def build_domain_reconciliation(
+        self,
+        registrar_orders: list[dict] | None = None,
+        include_registrar_details: bool = False,
+        max_registrar_details: int = 100,
+    ) -> dict:
+        """Compare active ResellerClub domains with active WHM accounts.
+
+        ResellerClub is treated as the source of truth for whether a domain is
+        registered and active. WHM accounts whose primary domain is not active
+        at the registrar are returned as orphan/stale candidates for manual
+        review and optional termination.
+        """
+        if registrar_orders is None:
+            registrar_orders = ResellerClubClient().list_all_domain_orders(
+                no_of_records=100,
+                status="All",
+                include_details=include_registrar_details,
+                max_details=max_registrar_details,
+                max_pages=50,
+            )
+
+        registrar_by_domain: dict[str, dict] = {}
+        active_registrar_domains: set[str] = set()
+        for order in registrar_orders or []:
+            if not isinstance(order, dict):
+                continue
+            domain_name = self.normalize_domain(order.get("domainname"))
+            if not domain_name:
+                continue
+            registrar_by_domain[domain_name] = order
+            if self._registrar_status_is_active(order.get("currentstatus")):
+                active_registrar_domains.add(domain_name)
+
+        active_accounts = list(
+            WHMAccountSnapshot.objects.filter(is_active=True)
+            .select_related("service", "service__user")
+            .order_by("username")
+        )
+        whm_domains: set[str] = set()
+        matched_accounts = []
+        orphaned_accounts = []
+        for account in active_accounts:
+            account_domain = self.normalize_domain(account.domain)
+            service_domain = self.normalize_domain(account.service.domain_name if account.service else "")
+            comparison_domain = account_domain or service_domain
+            if comparison_domain:
+                whm_domains.add(comparison_domain)
+
+            registrar_order = registrar_by_domain.get(comparison_domain)
+            row = {
+                "account": account,
+                "domain": comparison_domain,
+                "registrar_order": registrar_order,
+                "registrar_status": (registrar_order or {}).get("currentstatus", ""),
+                "reason": "",
+            }
+
+            if comparison_domain and comparison_domain in active_registrar_domains:
+                matched_accounts.append(row)
+                continue
+
+            if not comparison_domain:
+                row["reason"] = "No domain recorded on the WHM account or linked service."
+            elif registrar_order:
+                row["reason"] = f"Registrar status is {(registrar_order.get('currentstatus') or 'unknown')}."
+            else:
+                row["reason"] = "Domain is not present in the registrar inventory."
+            orphaned_accounts.append(row)
+
+        registrar_only_domains = []
+        for domain_name in sorted(active_registrar_domains - whm_domains):
+            registrar_only_domains.append(
+                {
+                    "domain": domain_name,
+                    "registrar_order": registrar_by_domain.get(domain_name),
+                    "local_domain": Domain.objects.filter(name__iexact=domain_name).first(),
+                    "service": Service.objects.filter(
+                        Q(domain_name__iexact=domain_name) | Q(cpanel_domain__iexact=domain_name)
+                    ).first(),
+                }
+            )
+
+        local_active_domains = {
+            self.normalize_domain(domain.name): domain
+            for domain in Domain.objects.filter(status=Domain.STATUS_ACTIVE)
+        }
+        local_stale_domains = [
+            {
+                "domain": domain_name,
+                "local_domain": local_domain,
+                "registrar_order": registrar_by_domain.get(domain_name),
+                "registrar_status": (registrar_by_domain.get(domain_name) or {}).get("currentstatus", ""),
+            }
+            for domain_name, local_domain in sorted(local_active_domains.items())
+            if domain_name and domain_name not in active_registrar_domains
+        ]
+
+        return {
+            "registrar_domain_total": len(registrar_by_domain),
+            "active_registrar_domain_total": len(active_registrar_domains),
+            "whm_account_total": len(active_accounts),
+            "matched_account_total": len(matched_accounts),
+            "orphaned_account_total": len(orphaned_accounts),
+            "registrar_only_domain_total": len(registrar_only_domains),
+            "local_stale_domain_total": len(local_stale_domains),
+            "matched_accounts": matched_accounts[:100],
+            "orphaned_accounts": orphaned_accounts[:100],
+            "registrar_only_domains": registrar_only_domains[:100],
+            "local_stale_domains": local_stale_domains[:100],
+        }
+
+    def terminate_orphaned_account(self, username: str, keep_dns: bool = False) -> dict:
+        """Terminate a WHM account only if reconciliation still marks it orphaned."""
+        normalized_username = str(username or "").strip()
+        if not normalized_username:
+            raise ValueError("WHM username is required.")
+
+        report = self.build_domain_reconciliation()
+        orphaned_usernames = {
+            row["account"].username
+            for row in report.get("orphaned_accounts", [])
+            if row.get("account")
+        }
+        if normalized_username not in orphaned_usernames:
+            raise ValueError(f"{normalized_username} is not currently flagged as a registrar orphan.")
+
+        result = self.client.terminate_account(normalized_username, keep_dns=keep_dns)
+        WHMAccountSnapshot.objects.filter(username__iexact=normalized_username).update(
+            is_active=False,
+            payload={
+                "terminated_by_reconciliation": True,
+                "terminated_at": timezone.now().isoformat(),
+                "keep_dns": keep_dns,
+                "whm_response": result,
+            },
+        )
+        Service.objects.filter(cpanel_username__iexact=normalized_username).update(
+            status=Service.STATUS_TERMINATED,
+            whm_last_sync_action="terminate_orphan",
+            whm_last_sync_at=timezone.now(),
+            whm_last_sync_ok=True,
+            whm_last_sync_message="Terminated after ResellerClub/WHM reconciliation.",
+        )
+        return result
 
     def sync_all(self) -> dict:
         sync_run = WHMSyncRun.objects.create(status=WHMSyncRun.STATUS_RUNNING)
