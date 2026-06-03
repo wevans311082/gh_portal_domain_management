@@ -151,3 +151,143 @@ class WHMAccountUsageSnapshot(TimeStampedModel):
 
     def __str__(self):
         return f"Usage for {self.account.username}"
+
+
+class HostingNode(TimeStampedModel):
+    STATUS_ACTIVE = "active"
+    STATUS_DRAINING = "draining"
+    STATUS_OFFLINE = "offline"
+    STATUS_MAINTENANCE = "maintenance"
+
+    STATUS_CHOICES = [
+        (STATUS_ACTIVE, "Active"),
+        (STATUS_DRAINING, "Draining"),
+        (STATUS_OFFLINE, "Offline"),
+        (STATUS_MAINTENANCE, "Maintenance"),
+    ]
+
+    name = models.CharField(max_length=120, unique=True)
+    hostname = models.CharField(max_length=255)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    daemon_url = models.URLField(blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_ACTIVE)
+    last_error = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["name"]
+        verbose_name = "Hosting node"
+        verbose_name_plural = "Hosting nodes"
+
+    def __str__(self):
+        return self.name
+
+
+class WebsiteRuntime(TimeStampedModel):
+    RUNTIME_STATIC = "static"
+    RUNTIME_PHP = "php"
+    RUNTIME_NODE = "node"
+    RUNTIME_PYTHON = "python"
+    RUNTIME_CUSTOM = "custom"
+
+    RUNTIME_TYPE_CHOICES = [
+        (RUNTIME_STATIC, "Static"),
+        (RUNTIME_PHP, "PHP"),
+        (RUNTIME_NODE, "Node.js"),
+        (RUNTIME_PYTHON, "Python"),
+        (RUNTIME_CUSTOM, "Custom"),
+    ]
+
+    STATUS_PENDING = "pending"
+    STATUS_ACTIVE = "active"
+    STATUS_FAILED = "failed"
+    STATUS_RETIRED = "retired"
+
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "Pending"),
+        (STATUS_ACTIVE, "Active"),
+        (STATUS_FAILED, "Failed"),
+        (STATUS_RETIRED, "Retired"),
+    ]
+
+    service = models.ForeignKey(
+        Service, on_delete=models.CASCADE, related_name="website_runtimes"
+    )
+    node = models.ForeignKey(
+        HostingNode, on_delete=models.PROTECT, related_name="website_runtimes"
+    )
+    runtime_type = models.CharField(
+        max_length=30, choices=RUNTIME_TYPE_CHOICES, default=RUNTIME_STATIC
+    )
+    image = models.CharField(max_length=255)
+    image_tag = models.CharField(max_length=120, default="latest")
+    document_root = models.CharField(max_length=255, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    last_deployed_at = models.DateTimeField(null=True, blank=True)
+    last_error = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["service", "runtime_type", "image"]
+        verbose_name = "Website runtime"
+        verbose_name_plural = "Website runtimes"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["service", "runtime_type", "image", "image_tag"],
+                name="uniq_website_runtime_per_service_image",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.service} - {self.runtime_type} ({self.image}:{self.image_tag})"
+
+
+class WebsiteContainer(TimeStampedModel):
+    STATUS_CREATING = "creating"
+    STATUS_RUNNING = "running"
+    STATUS_STOPPED = "stopped"
+    STATUS_UNHEALTHY = "unhealthy"
+    STATUS_FAILED = "failed"
+    STATUS_REMOVED = "removed"
+
+    STATUS_CHOICES = [
+        (STATUS_CREATING, "Creating"),
+        (STATUS_RUNNING, "Running"),
+        (STATUS_STOPPED, "Stopped"),
+        (STATUS_UNHEALTHY, "Unhealthy"),
+        (STATUS_FAILED, "Failed"),
+        (STATUS_REMOVED, "Removed"),
+    ]
+
+    service = models.ForeignKey(
+        Service, on_delete=models.CASCADE, related_name="website_containers"
+    )
+    node = models.ForeignKey(
+        HostingNode, on_delete=models.PROTECT, related_name="website_containers"
+    )
+    runtime = models.ForeignKey(
+        WebsiteRuntime,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="containers",
+    )
+    container_name = models.CharField(max_length=255, unique=True)
+    internal_port = models.PositiveIntegerField(default=80)
+    domain = models.CharField(max_length=255)
+    document_root = models.CharField(max_length=255, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_CREATING)
+    healthcheck_url = models.URLField(blank=True)
+    last_deployed_at = models.DateTimeField(null=True, blank=True)
+    last_error = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["domain", "container_name"]
+        verbose_name = "Website container"
+        verbose_name_plural = "Website containers"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["node", "domain"], name="uniq_website_container_node_domain"
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.domain} on {self.node} ({self.status})"

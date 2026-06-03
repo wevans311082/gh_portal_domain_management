@@ -8,6 +8,7 @@ from celery.exceptions import MaxRetriesExceededError
 
 from apps.services.models import Service
 from apps.provisioning.models import ProvisioningJob
+from apps.provisioning.providers import ProvisioningProviderError, get_provider_for_service
 from apps.provisioning.whm_client import WHMClient, WHMClientError, generate_cpanel_username, generate_secure_password
 
 logger = logging.getLogger(__name__)
@@ -77,20 +78,21 @@ def provision_hosting_account(self, service_id: int, job_id: int):
 
     job.status = ProvisioningJob.STATUS_IN_PROGRESS
     job.attempt_count += 1
-    job.celery_task_id = self.request.id
+    job.celery_task_id = self.request.id or ""
     job.save(update_fields=["status", "attempt_count", "celery_task_id"])
 
     try:
-        client = WHMClient()
+        provider = get_provider_for_service(service)
         username = generate_cpanel_username(service.domain_name or service.user.email.split("@")[0])
         password = generate_secure_password()
 
-        result = client.create_account(
+        result = provider.create_site(
             domain=service.domain_name,
             username=username,
             password=password,
             package=service.package.whm_package_name,
             email=service.user.email,
+            service=service,
         )
 
         # Wrap the database updates in a transaction so that if any save fails
@@ -103,7 +105,11 @@ def provision_hosting_account(self, service_id: int, job_id: int):
 
             job.status = ProvisioningJob.STATUS_COMPLETED
             job.completed_at = timezone.now()
-            job.result_data = {"username": username, "result": str(result)}
+            job.result_data = {
+                "username": username,
+                "provider": provider.provider_key,
+                "result": str(result),
+            }
             job.save(update_fields=["status", "completed_at", "result_data"])
 
         # Import here to avoid circular imports
@@ -121,8 +127,8 @@ def provision_hosting_account(self, service_id: int, job_id: int):
 
         logger.info(f"Provisioning completed for service {service_id}, username={username}")
 
-    except WHMClientError as e:
-        logger.error(f"WHM error provisioning service {service_id}: {e}")
+    except (ProvisioningProviderError, WHMClientError) as e:
+        logger.error(f"Provider error provisioning service {service_id}: {e}")
         job.last_error = str(e)
         job.status = ProvisioningJob.STATUS_RETRY
         job.save(update_fields=["last_error", "status"])
