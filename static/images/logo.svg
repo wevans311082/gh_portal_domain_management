@@ -1,4 +1,29 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 60">
-  <text x="10" y="45" font-family="Arial" font-size="36" font-weight="bold" fill="#f97316">GH</text>
-  <text x="65" y="45" font-family="Arial" font-size="18" fill="#374151">Grumpy Hosting</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 96" role="img" aria-labelledby="title desc">
+  <title id="title">CyberAsk Domains</title>
+  <desc id="desc">CyberAsk Domains wordmark with connected line symbol.</desc>
+  <defs>
+    <linearGradient id="mark" x1="8" y1="8" x2="84" y2="84" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#22d3ee"/>
+      <stop offset="0.55" stop-color="#38bdf8"/>
+      <stop offset="1" stop-color="#34d399"/>
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <rect width="320" height="96" rx="18" fill="#071827"/>
+  <rect x="1" y="1" width="318" height="94" rx="17" fill="none" stroke="#1e3a5f"/>
+  <g filter="url(#glow)">
+    <path d="M25 64V32l28-16 28 16v32L53 80 25 64Z" fill="none" stroke="url(#mark)" stroke-width="4" stroke-linejoin="round"/>
+    <path d="M36 55l17-25 17 25M43 45h20" fill="none" stroke="#e0faff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="25" cy="64" r="3" fill="#34d399"/>
+    <circle cx="81" cy="64" r="3" fill="#22d3ee"/>
+    <circle cx="53" cy="16" r="3" fill="#38bdf8"/>
+  </g>
+  <text x="104" y="43" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="25" font-weight="800" fill="#f8fafc">CyberAsk</text>
+  <text x="105" y="66" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="16" font-weight="600" letter-spacing="2.5" fill="#7dd3fc">DOMAINS</text>
 </svg>

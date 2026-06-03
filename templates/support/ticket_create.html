@@ -19,7 +19,7 @@
                     {{ form.subject.errors }}
                     <input type="text" name="subject" id="id_subject"
                            value="{{ form.subject.value|default:'' }}"
-                           class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-orange-500"
+                           class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-cyan-500"
                            placeholder="Briefly describe your issue">
                 </div>
 
@@ -28,7 +28,7 @@
                         <label for="id_department" class="block text-sm font-medium text-gray-700 mb-1">Department</label>
                         {{ form.department.errors }}
                         <select name="department" id="id_department"
-                                class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-orange-500">
+                                class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-cyan-500">
                             <option value="">— Select —</option>
                             {% for dept in departments %}
                             <option value="{{ dept.pk }}"
@@ -43,7 +43,7 @@
                         <label for="id_priority" class="block text-sm font-medium text-gray-700 mb-1">Priority</label>
                         {{ form.priority.errors }}
                         <select name="priority" id="id_priority"
-                                class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-orange-500">
+                                class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-cyan-500">
                             {% for value, label in form.fields.priority.choices %}
                             <option value="{{ value }}"
                                 {% if form.priority.value == value %}selected{% endif %}>
@@ -57,7 +57,7 @@
                 <div>
                     <label for="id_message" class="block text-sm font-medium text-gray-700 mb-1">Message</label>
                     <textarea name="message" id="id_message" rows="6"
-                              class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-orange-500"
+                              class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-cyan-500"
                               placeholder="Please describe your issue in detail...">{{ message_value|default:'' }}</textarea>
                 </div>
             </div>

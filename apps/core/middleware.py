@@ -1,4 +1,4 @@
-"""Custom middleware for Grumpy Hosting portal."""
+"""Custom middleware for the CyberAsk Domains portal."""
 import logging
 import uuid
 
@@ -7,6 +7,20 @@ from django.conf import settings
 from apps.domains.debug_state import reset_entries
 
 logger = logging.getLogger(__name__)
+
+
+class SubdomainURLRoutingMiddleware:
+    """Select a URLconf for CyberAsk service subdomains."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        host = request.get_host().split(":", 1)[0].lower()
+        urlconf = getattr(settings, "HOST_URLCONF_MAP", {}).get(host)
+        if urlconf:
+            request.urlconf = urlconf
+        return self.get_response(request)
 
 
 class RequestCorrelationIDMiddleware:

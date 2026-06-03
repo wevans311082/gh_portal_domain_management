@@ -31,7 +31,7 @@
         }
     }
 </style>
-<div class="admin-shell flex h-full"
+<div class="admin-shell flex h-full cyber-line-bg"
      x-data="{ sidebarOpen: false, pageTitle: '', init() { this.pageTitle = (this.$refs.pageTitleSource?.textContent || '').trim() || 'Dashboard'; } }">
 
     <span x-ref="pageTitleSource" class="sr-only">{% block page_title %}{% endblock %}</span>
@@ -49,19 +49,17 @@
          aria-hidden="true"></div>
 
     <!-- ── Admin Sidebar (drawer on mobile, static on lg+) ─────────── -->
-    <aside class="fixed inset-y-0 left-0 z-40 w-72 bg-slate-900 text-white flex flex-col shadow-xl
+    <aside class="fixed inset-y-0 left-0 z-40 w-72 bg-slate-950/95 text-white flex flex-col shadow-xl border-r border-cyan-300/15
                   transition-transform duration-300 ease-in-out
                   lg:relative lg:translate-x-0 lg:w-64 lg:flex-shrink-0 lg:inset-auto lg:z-auto"
             :class="sidebarOpen ? 'mobile-drawer-open' : 'mobile-drawer-closed'">
         <!-- Brand + close btn -->
-        <div class="px-5 py-4 border-b border-slate-700">
+        <div class="px-5 py-4 border-b border-cyan-300/15">
             <div class="flex items-center gap-2.5">
-                <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center flex-shrink-0">
-                    <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-                </div>
+                <img src="{% static 'images/logo.svg' %}" alt="{{ SITE_NAME }}" class="w-9 h-9 brand-mark object-cover flex-shrink-0">
                 <div class="flex-1 min-w-0">
                     <p class="text-sm font-bold text-white leading-tight">{{ SITE_NAME }}</p>
-                    <p class="text-xs text-indigo-400 font-medium">Admin Panel</p>
+                    <p class="text-xs text-cyan-300 font-medium">Admin Panel</p>
                 </div>
                 <!-- Close btn — mobile only -->
                 <button @click="sidebarOpen = false" class="lg:hidden text-slate-400 hover:text-white p-1 -mr-1 flex-shrink-0" aria-label="Close menu">
@@ -297,12 +295,12 @@
         <!-- User footer -->
         <div class="border-t border-slate-700 px-3 py-3">
             <div class="flex items-center gap-2.5 px-2 py-1.5 mb-1">
-                <div class="w-7 h-7 rounded-full bg-indigo-600 flex items-center justify-center text-xs font-bold uppercase flex-shrink-0">
+                <div class="w-7 h-7 rounded-full bg-cyan-600 flex items-center justify-center text-xs font-bold uppercase flex-shrink-0">
                     {{ request.user.email|first }}
                 </div>
                 <div class="min-w-0">
                     <p class="truncate text-xs font-medium text-slate-200">{{ request.user.email }}</p>
-                    <p class="text-xs text-indigo-400">{% if request.user.is_superuser %}Superadmin{% else %}Staff{% endif %}</p>
+                    <p class="text-xs text-cyan-300">{% if request.user.is_superuser %}Superadmin{% else %}Staff{% endif %}</p>
                 </div>
             </div>
             <a href="{% url 'accounts_custom:profile' %}"

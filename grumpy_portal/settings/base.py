@@ -12,7 +12,17 @@ SECRET_KEY = env("DJANGO_SECRET_KEY")
 
 DEBUG = env.bool("DJANGO_DEBUG", default=False)
 
-ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
+ALLOWED_HOSTS = env.list(
+    "DJANGO_ALLOWED_HOSTS",
+    default=[
+        "localhost",
+        "127.0.0.1",
+        "www.cyberask.co.uk",
+        "portal.cyberask.co.uk",
+        "billing.cyberask.co.uk",
+        "domains.cyberask.co.uk",
+    ],
+)
 
 DJANGO_APPS = [
     "django.contrib.admin",
@@ -61,6 +71,7 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "apps.core.middleware.SubdomainURLRoutingMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -76,6 +87,11 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = "grumpy_portal.urls"
+HOST_URLCONF_MAP = {
+    "portal.cyberask.co.uk": "grumpy_portal.urls_portal",
+    "billing.cyberask.co.uk": "grumpy_portal.urls_billing",
+    "domains.cyberask.co.uk": "grumpy_portal.urls_domains",
+}
 
 TEMPLATES = [
     {
@@ -176,6 +192,7 @@ CELERY_RESULT_EXPIRES = 60 * 60 * 24 * 7  # 7 days — prevents unbounded Redis 
 CELERY_RESULT_EXTENDED = True
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 CELERY_TASK_DEFAULT_QUEUE = "default"
+CELERY_IMPORTS = ("apps.provisioning.tasks",)
 
 # ---------------------------------------------------------------------------
 # Website Templates
@@ -197,7 +214,7 @@ EMAIL_PORT = env.int("EMAIL_PORT", default=587)
 EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=True)
 EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
 EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
-DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="Grumpy Hosting <noreply@grumpyhosting.co.uk>")
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="CyberAsk Domains <noreply@cyberask.co.uk>")
 SERVER_EMAIL = DEFAULT_FROM_EMAIL
 
 ACCOUNT_USER_MODEL_USERNAME_FIELD = None
@@ -207,11 +224,22 @@ ACCOUNT_AUTHENTICATION_METHOD = "email"
 ACCOUNT_EMAIL_VERIFICATION = "mandatory"
 ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
 LOGIN_URL = "/accounts/login/"
-LOGIN_REDIRECT_URL = "/portal/"
+LOGIN_REDIRECT_URL = "/"
 LOGOUT_REDIRECT_URL = "/"
+SESSION_COOKIE_DOMAIN = env("SESSION_COOKIE_DOMAIN", default=".cyberask.co.uk")
+CSRF_COOKIE_DOMAIN = env("CSRF_COOKIE_DOMAIN", default=".cyberask.co.uk")
+CSRF_TRUSTED_ORIGINS = env.list(
+    "CSRF_TRUSTED_ORIGINS",
+    default=[
+        "https://www.cyberask.co.uk",
+        "https://portal.cyberask.co.uk",
+        "https://billing.cyberask.co.uk",
+        "https://domains.cyberask.co.uk",
+    ],
+)
 
-SITE_DOMAIN = env("SITE_DOMAIN", default="grumpyhosting.co.uk")
-SITE_NAME = env("SITE_NAME", default="Grumpy Hosting")
+SITE_DOMAIN = env("SITE_DOMAIN", default="www.cyberask.co.uk")
+SITE_NAME = env("SITE_NAME", default="CyberAsk Domains")
 # Randomise the admin URL — set this to a secret slug in production
 DJANGO_ADMIN_URL = env("DJANGO_ADMIN_URL", default="manage-site-a3f7c2/")
 

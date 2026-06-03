@@ -105,7 +105,7 @@ def _as_int(value: str, default: int) -> int:
 class SiteSettingsForm(forms.Form):
     site_name = forms.CharField(
         max_length=100, label="Site / Company Name",
-        initial=lambda: _read_env_key("SITE_NAME", "My Hosting"),
+        initial=lambda: _read_env_key("SITE_NAME", "CyberAsk Domains"),
     )
     site_domain = forms.CharField(
         max_length=253, label="Primary Domain (e.g. example.com)",
@@ -355,7 +355,7 @@ _STEP_ENV_KEYS = {
 
 _STEP_FIELD_DEFAULTS = {
     WizardProgress.STEP_SITE: {
-        "site_name": "My Hosting",
+        "site_name": "CyberAsk Domains",
         "site_domain": "",
         "time_zone": "Europe/London",
         "admin_url_slug": "manage-site-a3f7c2/",

@@ -454,7 +454,7 @@ def _absolute_logo_url(branding: BillingDocumentBranding, base_url: Optional[str
 
 def _branding_context(branding: BillingDocumentBranding, *, base_url: Optional[str] = None) -> dict:
     supplier_details = [
-        {"label": "Registered name", "value": branding.company_name or "Grumpy Hosting LTD"},
+        {"label": "Registered name", "value": branding.company_name or "Cyber Ask Ltd"},
         {"label": "Company number", "value": branding.company_number},
         {"label": "VAT number", "value": branding.vat_number},
         {"label": "Website", "value": branding.website_url},
@@ -463,7 +463,7 @@ def _branding_context(branding: BillingDocumentBranding, *, base_url: Optional[s
     ]
     return {
         "branding": branding,
-        "company_name": branding.company_name or "Grumpy Hosting LTD",
+        "company_name": branding.company_name or "CyberAsk Domains",
         "accent_colour": branding.accent_colour,
         "logo_url": _absolute_logo_url(branding, base_url),
         "supplier_details": [item for item in supplier_details if item["value"]],

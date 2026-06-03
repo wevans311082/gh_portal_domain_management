@@ -8,7 +8,7 @@
     <h1 class="text-2xl md:text-4xl font-bold text-center mb-8 md:mb-12">Hosting Plans</h1>
     <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
         {% for package in packages %}
-        <div class="border rounded-lg p-6 {% if package.is_featured %}border-orange-500 shadow-lg{% else %}border-gray-200{% endif %}">
+        <div class="border rounded-lg p-6 {% if package.is_featured %}border-cyan-500 shadow-lg{% else %}border-gray-200{% endif %}">
             {% if package.is_featured %}
             <div class="text-center mb-2">
                 <span class="bg-sky-600 text-white text-sm px-3 py-1 rounded-full">Most Popular</span>

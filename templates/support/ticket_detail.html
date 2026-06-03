@@ -28,7 +28,7 @@
     <div class="lg:col-span-3 space-y-4">
         {% for msg in ticket_messages %}
         <div class="bg-white rounded-lg shadow p-5
-            {% if msg.user == ticket.user %}border-l-4 border-orange-400{% else %}border-l-4 border-gray-300{% endif %}">
+            {% if msg.user == ticket.user %}border-l-4 border-cyan-400{% else %}border-l-4 border-gray-300{% endif %}">
             <div class="flex justify-between items-center mb-3">
                 <div class="flex items-center gap-2">
                     <span class="font-medium text-sm">
@@ -66,7 +66,7 @@
                 {% csrf_token %}
                 {{ form.content.errors }}
                 <textarea name="content" rows="5"
-                          class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-orange-500 mb-3"
+                          class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-cyan-500 mb-3"
                           placeholder="Type your reply..."></textarea>
                 <div class="flex items-center gap-4">
                     <div>

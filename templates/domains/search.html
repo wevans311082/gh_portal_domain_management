@@ -32,23 +32,21 @@
         box-shadow: 0 4px 14px -4px rgba(14, 165, 233, 0.6);
     }
     .tld-chip[data-active="true"] .tld-chip-price { color: #e0f2fe; }
-    .hero-grad {
-        background: radial-gradient(ellipse at top, #0c4a6e 0%, #0f172a 60%);
-    }
+    .hero-grad { background: transparent; }
 </style>
 {% endblock %}
 
 {% block body %}
-<header class="hero-grad text-white">
+<header class="hero-grad cyber-line-bg text-white">
     <nav class="container mx-auto px-4 py-4 flex justify-between items-center">
         <a href="{% url 'core:home' %}" class="flex items-center gap-2 text-xl font-bold">
-            <img src="{% static 'images/logo.png' %}" alt="{{ SITE_NAME }}" class="h-9 w-9 rounded-lg shadow-md ring-1 ring-white/20 bg-white/10 p-0.5">
-            <span class="text-sky-100">{{ SITE_NAME }}</span>
+            <img src="{% static 'images/logo.svg' %}" alt="{{ SITE_NAME }}" class="h-9 w-9 brand-mark object-cover">
+            <span class="text-cyan-100">{{ SITE_NAME }}</span>
         </a>
         <div class="flex gap-4 items-center text-sm hidden sm:flex">
             <a href="{% url 'core:pricing' %}" class="hover:text-sky-200">Pricing</a>
             <a href="{% url 'account_login' %}" class="hover:text-sky-200">Login</a>
-            <a href="{% url 'accounts_custom:register' %}" class="bg-cyan-400 text-slate-900 font-semibold px-3 py-1.5 rounded hover:bg-cyan-300">Get Started</a>
+            <a href="{% url 'accounts_custom:register' %}" class="bg-cyan-400 text-slate-900 font-semibold px-3 py-1.5 rounded hover:bg-cyan-300">Start Securely</a>
         </div>
     </nav>
 </header>
@@ -58,8 +56,8 @@
         <span class="inline-flex items-center gap-1.5 rounded-full bg-sky-100 text-sky-700 px-3 py-1 text-xs font-semibold mb-4">
             {% octicon "globe" classes="w-3.5 h-3.5" %} Live registry availability
         </span>
-        <h1 class="text-3xl md:text-5xl font-bold text-slate-900 mb-3">Find Your Perfect Domain</h1>
-        <p class="text-lg text-slate-600">Search across our supported extensions in real time. Results refresh as you type.</p>
+        <h1 class="text-3xl md:text-5xl font-bold text-slate-900 mb-3">Find a domain with security in mind</h1>
+        <p class="text-lg text-slate-600">Search supported extensions in real time through the CyberAsk domain service. Results refresh as you type.</p>
     </div>
 
     <div class="max-w-3xl mx-auto mb-6">

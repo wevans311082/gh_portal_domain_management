@@ -1,5 +1,5 @@
-// Grumpy Hosting Portal - Application JavaScript
-console.log('Grumpy Hosting Portal loaded');
+// CyberAsk Domains - Application JavaScript
+console.log('CyberAsk Domains portal loaded');
 
 (function () {
     function dismissToast(el) {
