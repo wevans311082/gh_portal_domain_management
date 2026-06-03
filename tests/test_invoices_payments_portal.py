@@ -166,6 +166,60 @@ def test_invoice_pdf_no_weasyprint_returns_html(client, django_user_model):
     assert response.status_code == 200
 
 
+@pytest.mark.django_db
+def test_invoice_pdf_includes_company_and_customer_details(client, django_user_model):
+    from apps.accounts.models import ClientProfile
+    from apps.billing.models import BillingDocumentBranding
+    from apps.companies.models import BusinessProfile
+
+    branding = BillingDocumentBranding.get_solo()
+    branding.company_name = "Grumpy Hosting LTD"
+    branding.registered_address = "1 Hosting Street\nLondon\nEC1A 1AA"
+    branding.company_number = "12345678"
+    branding.vat_number = "GB123456789"
+    branding.support_email = "support@grumpyhosting.test"
+    branding.save()
+
+    user = make_user(django_user_model, email="client@example.com")
+    user.first_name = "Alice"
+    user.last_name = "Example"
+    user.phone = "07123456789"
+    user.save(update_fields=["first_name", "last_name", "phone"])
+    ClientProfile.objects.create(
+        user=user,
+        address_line1="22 Client Road",
+        address_line2="Suite 4",
+        city="Manchester",
+        county="Greater Manchester",
+        postcode="M1 1AA",
+        country="GB",
+        vat_number="GB987654321",
+    )
+    BusinessProfile.objects.create(
+        user=user,
+        company_name="Client Widgets Ltd",
+        company_number="87654321",
+        registered_address="99 Registered Lane\nManchester\nM2 2BB",
+    )
+    invoice = make_invoice(user, number="INV-DETAILS")
+    invoice.billing_address = ""
+    invoice.save(update_fields=["billing_address"])
+    make_line_item(invoice, description="Managed hosting")
+    client.force_login(user)
+
+    with patch.dict("sys.modules", {"pdfkit": None, "weasyprint": None}):
+        response = client.get(reverse("invoices:pdf", kwargs={"pk": invoice.pk}))
+
+    content = response.content.decode("utf-8")
+    assert "Grumpy Hosting LTD" in content
+    assert "Company No. 12345678" in content or "12345678" in content
+    assert "Client Widgets Ltd" in content
+    assert "87654321" in content
+    assert "99 Registered Lane" in content
+    assert "GH-CUST-" in content
+    assert "GH-INVOICE-" in content
+
+
 # ─────────────────────────────────────────────
 # Payments — stripe_checkout
 # ─────────────────────────────────────────────

@@ -24,6 +24,7 @@ import logging
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Iterable, List, Optional, Sequence
+from urllib.parse import urljoin
 
 from django.db import transaction
 from django.utils import timezone
@@ -423,19 +424,134 @@ def convert_quote_to_invoice(
 # ---------------------------------------------------------------------------
 
 
-def _branding_context(branding: BillingDocumentBranding) -> dict:
+def _compact_lines(*values) -> list[str]:
+    return [str(value).strip() for value in values if str(value or "").strip()]
+
+
+def _profile_address(profile) -> str:
+    if not profile:
+        return ""
+    return "\n".join(
+        _compact_lines(
+            getattr(profile, "address_line1", ""),
+            getattr(profile, "address_line2", ""),
+            getattr(profile, "city", ""),
+            getattr(profile, "county", ""),
+            getattr(profile, "postcode", ""),
+            getattr(profile, "country", ""),
+        )
+    )
+
+
+def _absolute_logo_url(branding: BillingDocumentBranding, base_url: Optional[str]) -> str:
+    if not branding.logo:
+        return ""
+    logo_url = branding.logo.url
+    if base_url and logo_url.startswith("/"):
+        return urljoin(base_url, logo_url)
+    return logo_url
+
+
+def _branding_context(branding: BillingDocumentBranding, *, base_url: Optional[str] = None) -> dict:
+    supplier_details = [
+        {"label": "Registered name", "value": branding.company_name or "Grumpy Hosting LTD"},
+        {"label": "Company number", "value": branding.company_number},
+        {"label": "VAT number", "value": branding.vat_number},
+        {"label": "Website", "value": branding.website_url},
+        {"label": "Email", "value": branding.support_email},
+        {"label": "Phone", "value": branding.support_phone},
+    ]
     return {
         "branding": branding,
-        "company_name": branding.company_name,
+        "company_name": branding.company_name or "Grumpy Hosting LTD",
         "accent_colour": branding.accent_colour,
-        "logo_url": branding.logo.url if branding.logo else "",
+        "logo_url": _absolute_logo_url(branding, base_url),
+        "supplier_details": [item for item in supplier_details if item["value"]],
+    }
+
+
+def _document_party_context(document, doc_kind: str) -> dict:
+    user = getattr(document, "user", None)
+    profile = getattr(user, "client_profile", None) if user else None
+    business = getattr(user, "business_profile", None) if user else None
+
+    if doc_kind == "invoice":
+        display_name = (
+            document.billing_name
+            or getattr(business, "company_name", "")
+            or getattr(user, "full_name", "")
+            or getattr(user, "email", "")
+        )
+        address = document.billing_address or getattr(business, "registered_address", "") or _profile_address(profile)
+        contact_details = [
+            {"label": "Contact", "value": getattr(user, "full_name", "") if user else ""},
+            {"label": "Email", "value": getattr(user, "email", "") if user else ""},
+            {"label": "Phone", "value": getattr(user, "phone", "") if user else ""},
+            {"label": "Company", "value": getattr(business, "company_name", "")},
+            {"label": "Company number", "value": getattr(business, "company_number", "")},
+            {"label": "Company status", "value": getattr(business, "status", "")},
+            {"label": "Customer VAT", "value": getattr(profile, "vat_number", "")},
+        ]
+    else:
+        display_name = (
+            document.lead_company
+            or document.display_recipient
+            or getattr(business, "company_name", "")
+            or getattr(user, "full_name", "")
+            or getattr(user, "email", "")
+        )
+        address = getattr(business, "registered_address", "") or _profile_address(profile)
+        contact_details = [
+            {"label": "Contact", "value": document.display_recipient},
+            {"label": "Email", "value": document.lead_email or (getattr(user, "email", "") if user else "")},
+            {"label": "Phone", "value": document.lead_phone or (getattr(user, "phone", "") if user else "")},
+            {"label": "Company", "value": document.lead_company or getattr(business, "company_name", "")},
+            {"label": "Company number", "value": getattr(business, "company_number", "")},
+            {"label": "Company status", "value": getattr(business, "status", "")},
+            {"label": "Customer VAT", "value": getattr(profile, "vat_number", "")},
+        ]
+
+    customer_id = getattr(user, "id", None)
+    account_ref = f"GH-CUST-{customer_id:06d}" if customer_id else "Prospective customer"
+    contract_ref = f"GH-{doc_kind.upper()}-{getattr(document, 'id', 0):06d}" if getattr(document, "id", None) else ""
+    document_meta = [
+        {"label": "Document number", "value": document.number},
+        {"label": "Status", "value": document.get_status_display()},
+        {"label": "Account ref", "value": account_ref},
+        {"label": "Contract ref", "value": contract_ref},
+    ]
+    if doc_kind == "invoice":
+        document_meta.extend(
+            [
+                {"label": "Invoice type", "value": document.get_source_kind_display()},
+                {"label": "Issued", "value": document.created_at.strftime("%d %b %Y")},
+                {"label": "Due", "value": document.due_date.strftime("%d %b %Y") if document.due_date else ""},
+                {"label": "Paid", "value": document.paid_at.strftime("%d %b %Y") if document.paid_at else ""},
+            ]
+        )
+    else:
+        document_meta.extend(
+            [
+                {"label": "Issued", "value": document.created_at.strftime("%d %b %Y")},
+                {"label": "Valid until", "value": document.valid_until.strftime("%d %b %Y") if document.valid_until else ""},
+            ]
+        )
+
+    return {
+        "customer_display_name": display_name,
+        "customer_address": address,
+        "customer_details": [item for item in contact_details if item["value"]],
+        "document_meta": [item for item in document_meta if item["value"]],
+        "account_ref": account_ref,
+        "contract_ref": contract_ref,
     }
 
 
 def render_invoice_pdf(invoice: Invoice, *, base_url: Optional[str] = None):
     branding = BillingDocumentBranding.get_solo()
     ctx = {"invoice": invoice, "document": invoice, "doc_kind": "invoice"}
-    ctx.update(_branding_context(branding))
+    ctx.update(_branding_context(branding, base_url=base_url))
+    ctx.update(_document_party_context(invoice, "invoice"))
     return render_document_pdf(
         "billing/document_pdf.html",
         ctx,
@@ -448,7 +564,8 @@ def render_invoice_pdf(invoice: Invoice, *, base_url: Optional[str] = None):
 def render_quote_pdf(quote: Quote, *, base_url: Optional[str] = None):
     branding = BillingDocumentBranding.get_solo()
     ctx = {"quote": quote, "document": quote, "doc_kind": "quote"}
-    ctx.update(_branding_context(branding))
+    ctx.update(_branding_context(branding, base_url=base_url))
+    ctx.update(_document_party_context(quote, "quote"))
     return render_document_pdf(
         "billing/document_pdf.html",
         ctx,

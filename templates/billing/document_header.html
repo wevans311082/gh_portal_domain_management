@@ -1,12 +1,29 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8">
+<html lang="en">
+<head>
+<meta charset="UTF-8">
 <style>
-  body { font-family: Helvetica, Arial, sans-serif; font-size: 8pt; color: #6b7280; margin: 0; padding: 6px 15mm; }
-  .bar { border-bottom: 1px solid {{ accent_colour|default:"#0ea5e9" }}; padding-bottom: 4px; display: flex; justify-content: space-between; }
-</style></head>
+  body {
+    margin: 0;
+    padding: 6px 14mm 0;
+    font-family: Helvetica, Arial, sans-serif;
+    color: #64748b;
+    font-size: 8pt;
+  }
+  .bar {
+    border-bottom: 1px solid #e2e8f0;
+    padding-bottom: 5px;
+    width: 100%;
+  }
+  .left { float: left; font-weight: 700; color: #0f172a; }
+  .right { float: right; }
+  .accent { color: {{ accent_colour|default:"#0ea5e9" }}; }
+</style>
+</head>
 <body>
 <div class="bar">
-  <div>{{ company_name }}</div>
-  <div>{{ doc_kind|title }} {{ document.number }}</div>
+  <span class="left">{{ company_name }}</span>
+  <span class="right"><span class="accent">{{ doc_kind|title }}</span> {{ document.number }}{% if contract_ref %} | {{ contract_ref }}{% endif %}</span>
 </div>
-</body></html>
+</body>
+</html>

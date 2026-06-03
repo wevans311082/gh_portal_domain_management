@@ -1,15 +1,31 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8">
+<html lang="en">
+<head>
+<meta charset="UTF-8">
 <style>
-  body { font-family: Helvetica, Arial, sans-serif; font-size: 8pt; color: #6b7280; margin: 0; padding: 4px 15mm; }
-  .bar { border-top: 1px solid {{ accent_colour|default:"#0ea5e9" }}; padding-top: 4px; display: flex; justify-content: space-between; }
+  body {
+    margin: 0;
+    padding: 0 14mm 6px;
+    font-family: Helvetica, Arial, sans-serif;
+    color: #64748b;
+    font-size: 8pt;
+  }
+  .bar {
+    border-top: 1px solid #e2e8f0;
+    padding-top: 5px;
+    width: 100%;
+  }
+  .left { float: left; max-width: 75%; }
+  .right { float: right; }
 </style>
 <script>
-  // wkhtmltopdf provides page numbers via query string.
   function subst() {
     var vars = {};
     var query = document.location.search.substring(1).split('&');
-    for (var i in query) { var z = query[i].split('=', 2); vars[z[0]] = unescape(z[1]); }
+    for (var i = 0; i < query.length; i++) {
+      var z = query[i].split('=', 2);
+      vars[z[0]] = unescape(z[1] || '');
+    }
     var els = document.getElementsByClassName('pagevar');
     for (var j = 0; j < els.length; j++) {
       var key = els[j].getAttribute('data-var');
@@ -20,7 +36,8 @@
 </head>
 <body onload="subst()">
 <div class="bar">
-  <div>{{ branding.footer_text|default:company_name }}</div>
-  <div>Page <span class="pagevar" data-var="page"></span> of <span class="pagevar" data-var="topage"></span></div>
+  <span class="left">{{ branding.footer_text|default:company_name }}</span>
+  <span class="right">Page <span class="pagevar" data-var="page"></span> of <span class="pagevar" data-var="topage"></span></span>
 </div>
-</body></html>
+</body>
+</html>

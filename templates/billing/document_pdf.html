@@ -4,206 +4,288 @@
 <meta charset="UTF-8">
 <title>{{ doc_kind|title }} {{ document.number }}</title>
 <style>
-  @page { size: A4; margin: 18mm 15mm 22mm 15mm; }
+  @page { size: A4; margin: 16mm 14mm 20mm 14mm; }
   * { box-sizing: border-box; }
   body {
-    font-family: "Helvetica", "Arial", sans-serif;
-    font-size: 11pt;
-    color: #1f2937;
     margin: 0;
     padding: 0;
-    line-height: 1.4;
-  }
-  .accent { color: {{ accent_colour|default:"#0ea5e9" }}; }
-  .accent-bg { background: {{ accent_colour|default:"#0ea5e9" }}; color: #fff; }
-  .doc-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 24px;
-    border-bottom: 3px solid {{ accent_colour|default:"#0ea5e9" }};
-    padding-bottom: 16px;
-  }
-  .doc-header .brand h1 {
-    margin: 0;
-    font-size: 22pt;
-    color: {{ accent_colour|default:"#0ea5e9" }};
-  }
-  .doc-header .brand .meta { font-size: 9pt; color: #6b7280; margin-top: 4px; white-space: pre-line; }
-  .doc-header .doc-meta { text-align: right; }
-  .doc-header .doc-meta .doc-type {
-    font-size: 9pt;
-    text-transform: uppercase;
-    letter-spacing: 2px;
-    color: #6b7280;
-  }
-  .doc-header .doc-meta .doc-number {
-    font-size: 18pt;
-    font-weight: bold;
     color: #111827;
+    font-family: "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 10pt;
+    line-height: 1.45;
+    background: #ffffff;
   }
-  .doc-header .doc-meta dl { margin: 12px 0 0; font-size: 9pt; color: #374151; }
-  .doc-header .doc-meta dt { display: inline-block; width: 90px; color: #6b7280; }
-  .doc-header .doc-meta dd { display: inline; margin: 0; }
-
-  .billto {
-    display: flex;
-    gap: 24px;
-    margin-bottom: 18px;
+  .muted { color: #64748b; }
+  .strong { font-weight: 700; color: #0f172a; }
+  .accent { color: {{ accent_colour|default:"#0ea5e9" }}; }
+  .top-band {
+    height: 8px;
+    background: {{ accent_colour|default:"#0ea5e9" }};
+    margin: -16mm -14mm 16px -14mm;
   }
-  .billto > div {
-    flex: 1;
-    background: #f9fafb;
-    border-left: 3px solid {{ accent_colour|default:"#0ea5e9" }};
-    padding: 10px 14px;
-  }
-  .billto h3 {
-    margin: 0 0 6px;
-    font-size: 8pt;
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
-    color: #6b7280;
-  }
-  .billto .name { font-weight: bold; color: #111827; }
-  .billto .address { white-space: pre-line; font-size: 9.5pt; color: #374151; }
-
-  .header-text { font-size: 10pt; color: #4b5563; margin-bottom: 14px; white-space: pre-line; }
-
-  table.lines {
+  .hero {
     width: 100%;
     border-collapse: collapse;
-    margin-bottom: 8px;
+    margin-bottom: 18px;
   }
-  table.lines thead th {
-    background: {{ accent_colour|default:"#0ea5e9" }};
-    color: #fff;
-    text-align: left;
-    padding: 8px 10px;
-    font-size: 9pt;
+  .brand-cell { width: 58%; vertical-align: top; padding-right: 18px; }
+  .doc-cell { width: 42%; vertical-align: top; text-align: right; }
+  .logo { max-width: 210px; max-height: 58px; display: block; margin-bottom: 12px; }
+  .brand-name { margin: 0 0 8px; font-size: 18pt; line-height: 1.1; font-weight: 800; color: #0f172a; }
+  .company-address { white-space: pre-line; color: #475569; font-size: 9pt; }
+  .doc-label {
+    display: inline-block;
+    padding: 5px 10px;
+    background: #eff6ff;
+    color: #075985;
+    border-radius: 999px;
+    font-size: 8pt;
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 1.2px;
+    font-weight: 800;
   }
-  table.lines tbody td {
-    padding: 8px 10px;
-    border-bottom: 1px solid #e5e7eb;
-    vertical-align: top;
+  .doc-number { margin-top: 8px; font-size: 24pt; font-weight: 850; color: #0f172a; }
+  .status {
+    display: inline-block;
+    margin-top: 8px;
+    padding: 5px 10px;
+    border-radius: 999px;
+    font-size: 8pt;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
   }
-  table.lines td.num { text-align: right; white-space: nowrap; }
-  table.lines tbody tr:nth-child(even) td { background: #f9fafb; }
+  .status.paid, .status.accepted, .status.converted { background: #dcfce7; color: #166534; }
+  .status.unpaid, .status.sent, .status.viewed, .status.partially_paid { background: #fef3c7; color: #92400e; }
+  .status.overdue, .status.expired, .status.declined { background: #fee2e2; color: #991b1b; }
+  .status.void, .status.draft { background: #e2e8f0; color: #334155; }
 
-  .totals { width: 45%; margin-left: auto; margin-top: 12px; }
-  .totals td { padding: 6px 10px; font-size: 10pt; }
-  .totals tr.grand td {
-    background: {{ accent_colour|default:"#0ea5e9" }};
-    color: #fff;
-    font-weight: bold;
-    font-size: 12pt;
+  .meta-grid {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 7px;
+    margin: 14px 0 18px;
   }
-  .totals td.label { text-align: right; color: #6b7280; }
-  .totals td.value { text-align: right; }
+  .meta-grid td {
+    width: 25%;
+    padding: 9px 10px;
+    background: #f8fafc;
+    border-top: 1px solid #e2e8f0;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .meta-grid td:first-child { border-left: 1px solid #e2e8f0; border-radius: 8px 0 0 8px; }
+  .meta-grid td:last-child { border-right: 1px solid #e2e8f0; border-radius: 0 8px 8px 0; }
+  .meta-label { display: block; font-size: 7.5pt; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 800; }
+  .meta-value { display: block; margin-top: 2px; font-size: 9.2pt; color: #0f172a; font-weight: 700; }
 
-  .notes, .legal {
-    margin-top: 18px;
-    padding: 12px 14px;
-    background: #f9fafb;
-    border: 1px solid #e5e7eb;
-    border-radius: 4px;
-    font-size: 9.5pt;
-    white-space: pre-line;
+  .section-table { width: 100%; border-collapse: collapse; margin: 16px 0 14px; }
+  .section-table td { width: 50%; vertical-align: top; }
+  .section-table td:first-child { padding-right: 8px; }
+  .section-table td:last-child { padding-left: 8px; }
+  .panel {
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #ffffff;
   }
-  .notes h4, .legal h4 {
-    margin: 0 0 6px;
+  .panel-title {
+    padding: 9px 12px;
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+    color: #334155;
     font-size: 8pt;
     text-transform: uppercase;
     letter-spacing: 1px;
-    color: #6b7280;
+    font-weight: 850;
+  }
+  .panel-body { padding: 12px; min-height: 112px; }
+  .party-name { font-size: 12pt; font-weight: 850; color: #0f172a; margin-bottom: 6px; }
+  .address { white-space: pre-line; color: #334155; margin-bottom: 8px; }
+  .detail-table { width: 100%; border-collapse: collapse; }
+  .detail-table th {
+    width: 34%;
+    padding: 3px 8px 3px 0;
+    color: #64748b;
+    text-align: left;
+    font-weight: 700;
+    font-size: 8.3pt;
+  }
+  .detail-table td { padding: 3px 0; color: #0f172a; font-size: 8.8pt; }
+
+  .intro {
+    margin: 12px 0 16px;
+    padding: 11px 13px;
+    border-left: 4px solid {{ accent_colour|default:"#0ea5e9" }};
+    background: #f8fafc;
+    color: #334155;
+    white-space: pre-line;
+    border-radius: 0 8px 8px 0;
   }
 
-  .badge {
-    display: inline-block;
-    padding: 3px 10px;
-    border-radius: 3px;
-    font-size: 8.5pt;
-    font-weight: bold;
+  .line-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 14px;
+    border: 1px solid #dbe4ee;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .line-table th {
+    background: #0f172a;
+    color: #ffffff;
+    padding: 10px 11px;
+    font-size: 8pt;
+    text-align: left;
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 0.8px;
   }
-  .badge.paid { background: #10b981; color: #fff; }
-  .badge.unpaid { background: #f59e0b; color: #fff; }
-  .badge.overdue { background: #ef4444; color: #fff; }
-  .badge.void { background: #6b7280; color: #fff; }
-  .badge.draft { background: #9ca3af; color: #fff; }
-  .badge.sent, .badge.viewed { background: #3b82f6; color: #fff; }
-  .badge.accepted, .badge.converted { background: #10b981; color: #fff; }
-  .badge.expired, .badge.declined { background: #ef4444; color: #fff; }
+  .line-table th.num { text-align: right; }
+  .line-table td {
+    padding: 10px 11px;
+    border-bottom: 1px solid #e5edf5;
+    vertical-align: top;
+    color: #1e293b;
+  }
+  .line-table tbody tr:nth-child(even) td { background: #f8fafc; }
+  .line-table tbody tr:last-child td { border-bottom: 0; }
+  .num { text-align: right; white-space: nowrap; }
 
-  .signature { margin-top: 28px; white-space: pre-line; font-size: 9.5pt; color: #374151; }
+  .summary-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+  .summary-left { width: 55%; vertical-align: top; padding-right: 18px; }
+  .summary-right { width: 45%; vertical-align: top; }
+  .payment-box {
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    border-radius: 10px;
+    padding: 12px;
+    color: #334155;
+    min-height: 88px;
+  }
+  .payment-box h4, .notes h4, .legal h4, .signature h4 {
+    margin: 0 0 7px;
+    font-size: 8pt;
+    color: #475569;
+    text-transform: uppercase;
+    letter-spacing: 0.9px;
+    font-weight: 850;
+  }
+  .totals { width: 100%; border-collapse: collapse; }
+  .totals td { padding: 7px 10px; border-bottom: 1px solid #e2e8f0; }
+  .totals .label { color: #64748b; text-align: right; }
+  .totals .value { text-align: right; font-weight: 750; color: #0f172a; }
+  .totals .grand td {
+    background: {{ accent_colour|default:"#0ea5e9" }};
+    color: #ffffff;
+    border-bottom: 0;
+    font-weight: 900;
+    font-size: 13pt;
+  }
+  .totals .grand .label { border-radius: 8px 0 0 8px; color: #ffffff; }
+  .totals .grand .value { border-radius: 0 8px 8px 0; color: #ffffff; }
+
+  .notes, .legal, .signature {
+    margin-top: 14px;
+    padding: 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    background: #ffffff;
+    color: #334155;
+    white-space: pre-line;
+  }
+  .footer-note {
+    margin-top: 20px;
+    color: #64748b;
+    font-size: 8.2pt;
+    text-align: center;
+  }
 </style>
 </head>
 <body>
+<div class="top-band"></div>
 
-<div class="doc-header">
-  <div class="brand">
-    {% if logo_url %}
-      <img src="{{ logo_url }}" alt="{{ company_name }}" style="max-height:60px;max-width:220px;">
-    {% else %}
-      <h1>{{ company_name }}</h1>
-    {% endif %}
-    <div class="meta">{{ branding.registered_address }}{% if branding.company_number %}
-Company No: {{ branding.company_number }}{% endif %}{% if branding.vat_number %}
-VAT No: {{ branding.vat_number }}{% endif %}{% if branding.support_email %}
-{{ branding.support_email }}{% endif %}{% if branding.support_phone %}
-{{ branding.support_phone }}{% endif %}</div>
-  </div>
-  <div class="doc-meta">
-    <div class="doc-type">{{ doc_kind }}</div>
-    <div class="doc-number">{{ document.number }}</div>
-    <div style="margin-top:6px;">
-      <span class="badge {{ document.status }}">{{ document.get_status_display }}</span>
-    </div>
-    <dl>
-      <dt>Issued:</dt><dd>{{ document.created_at|date:"d M Y" }}</dd><br>
-      {% if doc_kind == "invoice" %}
-        {% if document.due_date %}<dt>Due:</dt><dd>{{ document.due_date|date:"d M Y" }}</dd><br>{% endif %}
-        {% if document.paid_at %}<dt>Paid:</dt><dd>{{ document.paid_at|date:"d M Y" }}</dd><br>{% endif %}
+<table class="hero">
+  <tr>
+    <td class="brand-cell">
+      {% if logo_url %}
+        <img src="{{ logo_url }}" alt="{{ company_name }}" class="logo">
       {% else %}
-        {% if document.valid_until %}<dt>Valid until:</dt><dd>{{ document.valid_until|date:"d M Y" }}</dd>{% endif %}
+        <h1 class="brand-name">{{ company_name }}</h1>
       {% endif %}
-    </dl>
-  </div>
-</div>
+      <div class="company-address">{{ branding.registered_address }}</div>
+    </td>
+    <td class="doc-cell">
+      <span class="doc-label">{{ doc_kind }}</span>
+      <div class="doc-number">{{ document.number }}</div>
+      <span class="status {{ document.status }}">{{ document.get_status_display }}</span>
+    </td>
+  </tr>
+</table>
 
-<div class="billto">
-  <div>
-    <h3>From</h3>
-    <div class="name">{{ company_name }}</div>
-    <div class="address">{{ branding.registered_address }}</div>
-  </div>
-  <div>
-    <h3>{% if doc_kind == "invoice" %}Bill to{% else %}Quote for{% endif %}</h3>
-    {% if doc_kind == "invoice" %}
-      <div class="name">{{ document.billing_name|default:document.user.full_name|default:document.user.email }}</div>
-      <div class="address">{{ document.billing_address }}</div>
-    {% else %}
-      <div class="name">{{ document.display_recipient }}</div>
-      {% if document.lead_company %}<div class="address">{{ document.lead_company }}</div>{% endif %}
-      {% if document.lead_email %}<div class="address">{{ document.lead_email }}</div>{% endif %}
-      {% if document.lead_phone %}<div class="address">{{ document.lead_phone }}</div>{% endif %}
-    {% endif %}
-  </div>
-</div>
+<table class="meta-grid">
+  <tr>
+    {% for item in document_meta|slice:":4" %}
+    <td>
+      <span class="meta-label">{{ item.label }}</span>
+      <span class="meta-value">{{ item.value }}</span>
+    </td>
+    {% endfor %}
+  </tr>
+  {% if document_meta|length > 4 %}
+  <tr>
+    {% for item in document_meta|slice:"4:8" %}
+    <td>
+      <span class="meta-label">{{ item.label }}</span>
+      <span class="meta-value">{{ item.value }}</span>
+    </td>
+    {% endfor %}
+  </tr>
+  {% endif %}
+</table>
+
+<table class="section-table">
+  <tr>
+    <td>
+      <div class="panel">
+        <div class="panel-title">Supplier</div>
+        <div class="panel-body">
+          <div class="party-name">{{ company_name }}</div>
+          <div class="address">{{ branding.registered_address }}</div>
+          <table class="detail-table">
+            {% for item in supplier_details %}
+            <tr><th>{{ item.label }}</th><td>{{ item.value }}</td></tr>
+            {% endfor %}
+          </table>
+        </div>
+      </div>
+    </td>
+    <td>
+      <div class="panel">
+        <div class="panel-title">{% if doc_kind == "invoice" %}Customer and billing details{% else %}Customer and quote details{% endif %}</div>
+        <div class="panel-body">
+          <div class="party-name">{{ customer_display_name }}</div>
+          {% if customer_address %}<div class="address">{{ customer_address }}</div>{% endif %}
+          <table class="detail-table">
+            {% for item in customer_details %}
+            <tr><th>{{ item.label }}</th><td>{{ item.value }}</td></tr>
+            {% endfor %}
+          </table>
+        </div>
+      </div>
+    </td>
+  </tr>
+</table>
 
 {% if branding.header_text %}
-<div class="header-text">{{ branding.header_text }}</div>
+<div class="intro">{{ branding.header_text }}</div>
 {% endif %}
 
-<table class="lines">
+<table class="line-table">
   <thead>
     <tr>
       <th style="width:55%;">Description</th>
-      <th style="width:10%;text-align:right;">Qty</th>
-      <th style="width:17%;text-align:right;">Unit price</th>
-      <th style="width:18%;text-align:right;">Line total</th>
+      <th class="num" style="width:10%;">Qty</th>
+      <th class="num" style="width:17%;">Unit price</th>
+      <th class="num" style="width:18%;">Line total</th>
     </tr>
   </thead>
   <tbody>
@@ -218,14 +300,36 @@ VAT No: {{ branding.vat_number }}{% endif %}{% if branding.support_email %}
   </tbody>
 </table>
 
-<table class="totals">
-  <tr><td class="label">Subtotal</td><td class="value">{{ document.currency }} {{ document.subtotal|floatformat:2 }}</td></tr>
-  <tr><td class="label">VAT ({{ document.vat_rate|floatformat:"-2" }}%)</td><td class="value">{{ document.currency }} {{ document.vat_amount|floatformat:2 }}</td></tr>
-  <tr class="grand"><td class="label" style="color:#fff;">Total</td><td class="value">{{ document.currency }} {{ document.total|floatformat:2 }}</td></tr>
-  {% if doc_kind == "invoice" and document.amount_paid %}
-  <tr><td class="label">Paid</td><td class="value">{{ document.currency }} {{ document.amount_paid|floatformat:2 }}</td></tr>
-  <tr><td class="label">Outstanding</td><td class="value">{{ document.currency }} {{ document.amount_outstanding|floatformat:2 }}</td></tr>
-  {% endif %}
+<table class="summary-table">
+  <tr>
+    <td class="summary-left">
+      <div class="payment-box">
+        <h4>{% if doc_kind == "invoice" %}Payment information{% else %}Commercial summary{% endif %}</h4>
+        {% if doc_kind == "invoice" %}
+          <div><span class="strong">Account reference:</span> {{ account_ref }}</div>
+          <div><span class="strong">Contract reference:</span> {{ contract_ref }}</div>
+          {% if document.due_date %}<div><span class="strong">Payment due:</span> {{ document.due_date|date:"d M Y" }}</div>{% endif %}
+          <div class="muted">Please include the invoice number when making payment.</div>
+        {% else %}
+          <div><span class="strong">Account reference:</span> {{ account_ref }}</div>
+          <div><span class="strong">Quote reference:</span> {{ contract_ref }}</div>
+          {% if document.valid_until %}<div><span class="strong">Valid until:</span> {{ document.valid_until|date:"d M Y" }}</div>{% endif %}
+          <div class="muted">Prices are subject to the terms below and any written scope agreed with Grumpy Hosting.</div>
+        {% endif %}
+      </div>
+    </td>
+    <td class="summary-right">
+      <table class="totals">
+        <tr><td class="label">Subtotal</td><td class="value">{{ document.currency }} {{ document.subtotal|floatformat:2 }}</td></tr>
+        <tr><td class="label">VAT ({{ document.vat_rate|floatformat:"-2" }}%)</td><td class="value">{{ document.currency }} {{ document.vat_amount|floatformat:2 }}</td></tr>
+        {% if doc_kind == "invoice" and document.amount_paid %}
+        <tr><td class="label">Paid</td><td class="value">{{ document.currency }} {{ document.amount_paid|floatformat:2 }}</td></tr>
+        <tr><td class="label">Outstanding</td><td class="value">{{ document.currency }} {{ document.amount_outstanding|floatformat:2 }}</td></tr>
+        {% endif %}
+        <tr class="grand"><td class="label">Total</td><td class="value">{{ document.currency }} {{ document.total|floatformat:2 }}</td></tr>
+      </table>
+    </td>
+  </tr>
 </table>
 
 {% if document.notes %}
@@ -233,12 +337,15 @@ VAT No: {{ branding.vat_number }}{% endif %}{% if branding.support_email %}
 {% endif %}
 
 {% if branding.legal_text %}
-<div class="legal"><h4>Terms</h4>{{ branding.legal_text }}</div>
+<div class="legal"><h4>Terms and payment terms</h4>{{ branding.legal_text }}</div>
 {% endif %}
 
 {% if branding.signature_block %}
-<div class="signature">{{ branding.signature_block }}</div>
+<div class="signature"><h4>Authorisation</h4>{{ branding.signature_block }}</div>
 {% endif %}
 
+<div class="footer-note">
+  {{ company_name }}{% if branding.company_number %} - Company No. {{ branding.company_number }}{% endif %}{% if branding.vat_number %} - VAT {{ branding.vat_number }}{% endif %}
+</div>
 </body>
 </html>
