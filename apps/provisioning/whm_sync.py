@@ -195,10 +195,14 @@ class WHMSyncService:
             registrar_order = registrar_by_domain.get(comparison_domain)
             row = {
                 "account": account,
+                "username": account.username,
                 "domain": comparison_domain,
                 "registrar_order": registrar_order,
                 "registrar_status": (registrar_order or {}).get("currentstatus", ""),
                 "reason": "",
+                "service_id": account.service_id,
+                "suspended": account.suspended,
+                "plan": account.plan,
             }
 
             if comparison_domain and comparison_domain in active_registrar_domains:
@@ -253,6 +257,66 @@ class WHMSyncService:
             "orphaned_accounts": orphaned_accounts[:100],
             "registrar_only_domains": registrar_only_domains[:100],
             "local_stale_domains": local_stale_domains[:100],
+        }
+
+    @staticmethod
+    def serialize_domain_reconciliation(report: dict) -> dict:
+        """Convert a reconciliation report into JSON-safe data for storage."""
+        def registrar_summary(order):
+            if not isinstance(order, dict):
+                return {}
+            return {
+                "domainname": order.get("domainname", ""),
+                "currentstatus": order.get("currentstatus", ""),
+                "orderid": order.get("orderid", ""),
+                "expiry_date": order.get("expiry_date", ""),
+            }
+
+        def account_row(row):
+            account = row.get("account")
+            return {
+                "username": row.get("username") or getattr(account, "username", ""),
+                "domain": row.get("domain", ""),
+                "registrar_status": row.get("registrar_status", ""),
+                "reason": row.get("reason", ""),
+                "service_id": row.get("service_id") or getattr(account, "service_id", None),
+                "suspended": bool(row.get("suspended", getattr(account, "suspended", False))),
+                "plan": row.get("plan") or getattr(account, "plan", ""),
+                "registrar_order": registrar_summary(row.get("registrar_order")),
+            }
+
+        def registrar_only_row(row):
+            local_domain = row.get("local_domain")
+            service = row.get("service")
+            return {
+                "domain": row.get("domain", ""),
+                "registrar_order": registrar_summary(row.get("registrar_order")),
+                "local_domain_id": getattr(local_domain, "id", None),
+                "service_id": getattr(service, "id", None),
+            }
+
+        def local_stale_row(row):
+            local_domain = row.get("local_domain")
+            return {
+                "domain": row.get("domain", ""),
+                "local_domain_id": getattr(local_domain, "id", None),
+                "registrar_status": row.get("registrar_status", ""),
+                "registrar_order": registrar_summary(row.get("registrar_order")),
+            }
+
+        return {
+            "generated_at": timezone.now().isoformat(),
+            "registrar_domain_total": report.get("registrar_domain_total", 0),
+            "active_registrar_domain_total": report.get("active_registrar_domain_total", 0),
+            "whm_account_total": report.get("whm_account_total", 0),
+            "matched_account_total": report.get("matched_account_total", 0),
+            "orphaned_account_total": report.get("orphaned_account_total", 0),
+            "registrar_only_domain_total": report.get("registrar_only_domain_total", 0),
+            "local_stale_domain_total": report.get("local_stale_domain_total", 0),
+            "matched_accounts": [account_row(row) for row in report.get("matched_accounts", [])],
+            "orphaned_accounts": [account_row(row) for row in report.get("orphaned_accounts", [])],
+            "registrar_only_domains": [registrar_only_row(row) for row in report.get("registrar_only_domains", [])],
+            "local_stale_domains": [local_stale_row(row) for row in report.get("local_stale_domains", [])],
         }
 
     def terminate_orphaned_account(self, username: str, keep_dns: bool = False) -> dict:

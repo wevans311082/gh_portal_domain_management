@@ -425,17 +425,22 @@ def test_whm_integration_detail_includes_reconciliation_context(client, django_u
     )
     client.force_login(staff)
 
-    monkeypatch.setattr(
-        "apps.provisioning.whm_sync.WHMSyncService.build_domain_reconciliation",
-        lambda self: {
-            "active_registrar_domain_total": 1,
-            "whm_account_total": 1,
-            "matched_account_total": 0,
-            "orphaned_account_total": 1,
-            "registrar_only_domain_total": 0,
-            "orphaned_accounts": [],
-            "registrar_only_domains": [],
-            "local_stale_domains": [],
+    from apps.provisioning.models import WHMSyncRun
+
+    WHMSyncRun.objects.create(
+        status=WHMSyncRun.STATUS_COMPLETED,
+        result_data={
+            "domain_reconciliation": {
+                "generated_at": "2026-06-03T10:00:00+00:00",
+                "active_registrar_domain_total": 1,
+                "whm_account_total": 1,
+                "matched_account_total": 0,
+                "orphaned_account_total": 1,
+                "registrar_only_domain_total": 0,
+                "orphaned_accounts": [],
+                "registrar_only_domains": [],
+                "local_stale_domains": [],
+            }
         },
     )
 

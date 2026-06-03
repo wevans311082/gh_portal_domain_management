@@ -15,6 +15,8 @@ logger = logging.getLogger(__name__)
 
 WHM_SYNC_TASK_NAME = "Sync WHM inventory"
 WHM_SYNC_TASK_PATH = "apps.provisioning.tasks.sync_whm_inventory"
+WHM_RECONCILE_TASK_NAME = "Cross-check WHM domains with ResellerClub"
+WHM_RECONCILE_TASK_PATH = "apps.provisioning.tasks.reconcile_whm_registrar_domains"
 
 
 def ensure_whm_sync_schedule():
@@ -48,6 +50,40 @@ def sync_whm_inventory():
         result.get("error_count"),
     )
     return result
+
+
+@shared_task(name="apps.provisioning.tasks.reconcile_whm_registrar_domains")
+def reconcile_whm_registrar_domains():
+    """Refresh WHM inventory, compare against ResellerClub, and store report."""
+    from apps.provisioning.models import WHMSyncRun
+    from apps.provisioning.whm_sync import WHMSyncService
+
+    service = WHMSyncService()
+    sync_result = service.sync_all()
+    report = service.build_domain_reconciliation()
+    serialized_report = service.serialize_domain_reconciliation(report)
+
+    sync_run_id = sync_result.get("sync_run_id")
+    if sync_run_id:
+        sync_run = WHMSyncRun.objects.filter(pk=sync_run_id).first()
+        if sync_run:
+            result_data = dict(sync_run.result_data or {})
+            result_data["domain_reconciliation"] = serialized_report
+            sync_run.result_data = result_data
+            sync_run.save(update_fields=["result_data", "updated_at"])
+
+    logger.info(
+        "WHM registrar reconciliation complete run=%s orphaned=%s registrar_only=%s",
+        sync_run_id,
+        serialized_report.get("orphaned_account_total"),
+        serialized_report.get("registrar_only_domain_total"),
+    )
+    return {
+        "ok": True,
+        "sync_run_id": sync_run_id,
+        "orphaned_account_total": serialized_report.get("orphaned_account_total", 0),
+        "registrar_only_domain_total": serialized_report.get("registrar_only_domain_total", 0),
+    }
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=300)

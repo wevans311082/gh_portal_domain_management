@@ -616,17 +616,15 @@ def integration_detail(request, service):
             return redirect("admin_tools:integration_detail", service="whm")
         if action == "reconcile_domains":
             try:
-                result = WHMSyncService().sync_all()
-                report = WHMSyncService().build_domain_reconciliation()
+                from apps.provisioning.tasks import reconcile_whm_registrar_domains
+
+                task = reconcile_whm_registrar_domains.delay()
                 messages.success(
                     request,
-                    "Registrar cross-check complete: "
-                    f"{result.get('account_count', 0)} WHM accounts synced, "
-                    f"{report.get('orphaned_account_total', 0)} stale/orphaned account(s), "
-                    f"{report.get('registrar_only_domain_total', 0)} registrar-only domain(s).",
+                    f"Registrar cross-check queued in the background. Task ID: {task.id}",
                 )
             except Exception as exc:
-                messages.error(request, f"WHM/ResellerClub cross-check failed: {exc}")
+                messages.error(request, f"Could not queue WHM/ResellerClub cross-check: {exc}")
             return redirect(f"{reverse('admin_tools:integration_detail', kwargs={'service': 'whm'})}?reconcile=1")
         if action == "terminate_orphan":
             username = (request.POST.get("username") or "").strip()
@@ -819,10 +817,14 @@ def integration_detail(request, service):
         }
 
         if show_reconciliation:
-            try:
-                whm_context["reconciliation"] = WHMSyncService().build_domain_reconciliation()
-            except Exception as exc:
-                messages.error(request, f"Could not build registrar cross-check report: {exc}")
+            latest_reconciliation_run = (
+                WHMSyncRun.objects.exclude(result_data__domain_reconciliation__isnull=True)
+                .order_by("-started_at")
+                .first()
+            )
+            if latest_reconciliation_run:
+                whm_context["reconciliation"] = (latest_reconciliation_run.result_data or {}).get("domain_reconciliation")
+                whm_context["reconciliation_run"] = latest_reconciliation_run
 
     if service == "resellerclub":
         full_refresh = (request.GET.get("full") or "").strip() == "1"
