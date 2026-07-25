@@ -106,10 +106,75 @@ def _ensure_cloudflare_zone(domain, order, registrar_client):
         domain.save(update_fields=["nameserver1", "nameserver2", "updated_at"])
 
 
+def _normalize_ns_list(values) -> list[str]:
+    """Normalize nameserver hostnames from env/runtime/API values."""
+    if values is None:
+        return []
+    if isinstance(values, str):
+        # Support "ns1.a.com,ns2.a.com" and whitespace/newline separated
+        raw_parts = values.replace(";", ",").replace("\n", ",").split(",")
+        values = raw_parts
+    out: list[str] = []
+    for item in values:
+        host = str(item or "").strip().lower().rstrip(".")
+        if host and host not in out:
+            out.append(host)
+    return out
+
+
+def _configured_nameservers() -> list[str]:
+    """Resolve platform nameservers from runtime DB settings, then env."""
+    from apps.core.runtime_settings import get_runtime_list, get_runtime_setting
+
+    # Runtime IntegrationSetting (Admin → Integrations) takes priority.
+    runtime = get_runtime_list("WHM_NAMESERVERS", default=None)
+    if runtime:
+        cleaned = _normalize_ns_list(runtime)
+        if cleaned:
+            return cleaned
+
+    # Single string runtime value
+    runtime_str = get_runtime_setting("WHM_NAMESERVERS", "")
+    cleaned = _normalize_ns_list(runtime_str)
+    if cleaned:
+        return cleaned
+
+    return _normalize_ns_list(getattr(settings, "WHM_NAMESERVERS", []) or [])
+
+
 def _build_nameservers(order):
+    """Nameservers attached to a new registration.
+
+    Sources (first match with ≥2 hosts wins for non-Cloudflare):
+    1. Order contact domain fields already set on a related domain (rare)
+    2. WHM_NAMESERVERS from runtime settings / .env
+    3. Live WHM nameserver config / hostname-derived ns1/ns2
+    4. Cloudflare placeholder pair only when provider is Cloudflare
+    """
+    configured = _configured_nameservers()
+
     if order.dns_provider == Domain.DNS_PROVIDER_CLOUDFLARE:
-        return list(settings.WHM_NAMESERVERS)[:2] or ["ns1.pending-cloudflare.invalid", "ns2.pending-cloudflare.invalid"]
-    return list(settings.WHM_NAMESERVERS)
+        # Temporary NS for the initial register call; CF NS applied after zone create.
+        return (configured[:2] or ["ns1.pending-cloudflare.invalid", "ns2.pending-cloudflare.invalid"])
+
+    if len(configured) >= 2:
+        return configured[:4]
+
+    # Fall back to WHM so registration still works when env var was never set
+    # but WHM credentials are present (typical lab/prod gap).
+    try:
+        from apps.provisioning.whm_client import WHMClient
+
+        whm_ns = _normalize_ns_list(WHMClient().get_nameservers())
+        if len(whm_ns) >= 2:
+            logger.info("Using nameservers from WHM: %s", whm_ns)
+            return whm_ns[:4]
+        if whm_ns:
+            logger.warning("WHM returned fewer than 2 nameservers: %s", whm_ns)
+    except Exception as exc:
+        logger.warning("Could not load nameservers from WHM: %s", exc)
+
+    return configured
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=300)
@@ -177,9 +242,14 @@ def register_domain_order(self, order_id):
     contact_service = DomainContactService(client=registrar_client)
     nameservers = _build_nameservers(order)
 
-    if not nameservers:
+    if len(nameservers) < 2:
         order.status = DomainOrder.STATUS_FAILED
-        order.last_error = "WHM_NAMESERVERS must be configured before registering domains."
+        order.last_error = (
+            "At least two nameservers are required before registering domains. "
+            "Set WHM_NAMESERVERS in .env (comma-separated, e.g. ns1.example.com,ns2.example.com), "
+            "or under Admin → Integrations / runtime settings, or ensure WHM API can return "
+            "nameserver config (get_nameserver_config / gethostname)."
+        )
         order.save(update_fields=["status", "last_error", "updated_at"])
         raise ValueError(order.last_error)
 
@@ -385,10 +455,15 @@ def execute_domain_transfer(transfer_id: int):
 
     registrar_client = ResellerClubClient()
     contact_service = DomainContactService(client=registrar_client)
-    nameservers = list(settings.WHM_NAMESERVERS)
-    if not nameservers:
+    nameservers = _build_nameservers(
+        type("NSOrder", (), {"dns_provider": Domain.DNS_PROVIDER_CPANEL})()
+    )
+    if len(nameservers) < 2:
         transfer.status = DomainTransfer.STATUS_FAILED
-        transfer.last_error = "WHM_NAMESERVERS must be configured before transferring domains."
+        transfer.last_error = (
+            "At least two nameservers are required before transferring domains. "
+            "Configure WHM_NAMESERVERS or ensure WHM API nameserver config is available."
+        )
         transfer.save(update_fields=["status", "last_error"])
         return
 

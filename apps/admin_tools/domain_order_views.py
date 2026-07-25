@@ -82,6 +82,14 @@ def domain_order_detail(request, pk):
     if request.method == "POST":
         return _save_order_details(request, order)
 
+    resolved_ns = []
+    try:
+        from apps.domains.tasks import _build_nameservers
+
+        resolved_ns = _build_nameservers(order)
+    except Exception:
+        resolved_ns = []
+
     return render(
         request,
         "admin_tools/ops/domain_order_detail.html",
@@ -91,6 +99,7 @@ def domain_order_detail(request, pk):
             "users": users,
             "status_choices": DomainOrder.STATUS_CHOICES,
             "dns_choices": Domain.DNS_CHOICES,
+            "resolved_nameservers": resolved_ns,
         },
     )
 

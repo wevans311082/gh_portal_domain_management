@@ -224,6 +224,79 @@ class WHMClient:
                 return data["data"].get("pkg", [])
         return []
 
+    def get_nameservers(self) -> list[str]:
+        """Best-effort list of authoritative nameservers from WHM.
+
+        Tries modern nameserver config APIs, then falls back to ``ns1.``/``ns2.``
+        derived from the server hostname when WHM is configured.
+        """
+        names: list[str] = []
+
+        for function in ("get_nameserver_config", "nameserver_config", "list_nameservers"):
+            try:
+                data = self._call(function)
+            except WHMClientError:
+                continue
+            payload = data.get("data") if isinstance(data.get("data"), dict) else data
+            if not isinstance(payload, dict):
+                continue
+            # Common key shapes across WHM versions
+            candidates = []
+            for key in (
+                "nameserver",
+                "nameservers",
+                "ns",
+                "nameserver_list",
+            ):
+                val = payload.get(key)
+                if isinstance(val, list):
+                    candidates.extend(val)
+                elif isinstance(val, str) and val.strip():
+                    candidates.append(val)
+            for i in range(1, 5):
+                for key in (f"nameserver{i}", f"ns{i}", f"nameserver_{i}"):
+                    val = payload.get(key)
+                    if val:
+                        candidates.append(val)
+            for item in candidates:
+                if isinstance(item, dict):
+                    host = (
+                        item.get("nameserver")
+                        or item.get("name")
+                        or item.get("hostname")
+                        or item.get("ns")
+                        or ""
+                    )
+                else:
+                    host = str(item or "")
+                host = host.strip().lower().rstrip(".")
+                if host and host not in names:
+                    names.append(host)
+            if len(names) >= 2:
+                return names[:4]
+
+        # Fallback: derive ns1/ns2 from WHM hostname (common cPanel convention)
+        try:
+            data = self._call("gethostname")
+            payload = data.get("data") if isinstance(data.get("data"), dict) else data
+            hostname = ""
+            if isinstance(payload, dict):
+                hostname = str(payload.get("hostname") or payload.get("host") or "").strip().lower()
+            if not hostname and self.host:
+                hostname = str(self.host).strip().lower()
+            hostname = hostname.rstrip(".")
+            if hostname and "." in hostname:
+                # Prefer apex for ns labels when host is server.example.com → example.com
+                parts = hostname.split(".")
+                apex = ".".join(parts[-2:]) if len(parts) >= 2 else hostname
+                # Prefer ns under the full hostname domain first
+                derived = [f"ns1.{apex}", f"ns2.{apex}"]
+                return derived
+        except WHMClientError as exc:
+            logger.warning("WHM gethostname for nameservers failed: %s", exc)
+
+        return names
+
     # ── cPanel UAPI proxy methods ────────────────────────────────────────────
     # WHM can proxy cPanel UAPI calls on behalf of any user via:
     #   GET /execute/{Module}/{function}?cpanel_user={username}

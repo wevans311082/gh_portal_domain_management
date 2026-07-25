@@ -37,6 +37,39 @@ def test_contact_service_builds_defaults_from_profile(django_user_model):
     assert defaults["country"] == "GB"
 
 
+def test_build_nameservers_prefers_runtime_then_whm(settings, monkeypatch):
+    from apps.domains.tasks import _build_nameservers
+
+    settings.WHM_NAMESERVERS = []
+
+    monkeypatch.setattr(
+        "apps.core.runtime_settings.get_runtime_list",
+        lambda key, default=None: ["ns1.runtime.test", "ns2.runtime.test"] if key == "WHM_NAMESERVERS" else default,
+    )
+    monkeypatch.setattr(
+        "apps.core.runtime_settings.get_runtime_setting",
+        lambda key, default="": default,
+    )
+    order = type("O", (), {"dns_provider": "cpanel"})()
+    assert _build_nameservers(order) == ["ns1.runtime.test", "ns2.runtime.test"]
+
+    monkeypatch.setattr(
+        "apps.core.runtime_settings.get_runtime_list",
+        lambda key, default=None: [] if key == "WHM_NAMESERVERS" else default,
+    )
+    monkeypatch.setattr(
+        "apps.core.runtime_settings.get_runtime_setting",
+        lambda key, default="": "",
+    )
+
+    class FakeWHM:
+        def get_nameservers(self):
+            return ["ns1.whm.test", "ns2.whm.test"]
+
+    monkeypatch.setattr("apps.provisioning.whm_client.WHMClient", FakeWHM)
+    assert _build_nameservers(order) == ["ns1.whm.test", "ns2.whm.test"]
+
+
 @pytest.mark.django_db
 def test_register_domain_order_creates_domain_and_cloudflare_records(settings, django_user_model, monkeypatch):
     from apps.domains.models import Domain, DomainOrder

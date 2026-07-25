@@ -62,6 +62,15 @@
 <div class="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900 whitespace-pre-wrap">{{ order.last_error }}</div>
 {% endif %}
 
+<div class="mb-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+  <span class="font-semibold text-slate-900">Nameservers that will be used on Process:</span>
+  {% if resolved_nameservers %}
+    <span class="font-mono">{{ resolved_nameservers|join:", " }}</span>
+  {% else %}
+    <span class="text-rose-700">None resolved — set <code>WHM_NAMESERVERS</code> in .env (e.g. ns1.example.com,ns2.example.com) or ensure WHM API is reachable.</span>
+  {% endif %}
+</div>
+
 <form method="post" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
   {% csrf_token %}
 
