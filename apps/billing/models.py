@@ -30,7 +30,7 @@ class BillingDocumentBranding(TimeStampedModel):
     or invoice numbering scheme.
     """
 
-    company_name = models.CharField(max_length=255, default="CyberAsk Domains")
+    company_name = models.CharField(max_length=255, default="Cyber Ask Domains")
     registered_address = models.TextField(blank=True)
     company_number = models.CharField(max_length=64, blank=True)
     vat_number = models.CharField(max_length=64, blank=True)

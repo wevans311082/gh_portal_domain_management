@@ -31,7 +31,7 @@
         }
     }
 </style>
-<div class="admin-shell flex h-full cyber-line-bg"
+<div class="admin-shell fluent-shell flex h-full"
      x-data="{ sidebarOpen: false, pageTitle: '', init() { this.pageTitle = (this.$refs.pageTitleSource?.textContent || '').trim() || 'Dashboard'; } }">
 
     <span x-ref="pageTitleSource" class="sr-only">{% block page_title %}{% endblock %}</span>
@@ -49,17 +49,17 @@
          aria-hidden="true"></div>
 
     <!-- ── Admin Sidebar (drawer on mobile, static on lg+) ─────────── -->
-    <aside class="fixed inset-y-0 left-0 z-40 w-72 bg-slate-950/95 text-white flex flex-col shadow-xl border-r border-cyan-300/15
+    <aside class="fixed inset-y-0 left-0 z-40 w-72 bg-fluent-nav text-white flex flex-col shadow-fluent-lg
                   transition-transform duration-300 ease-in-out
                   lg:relative lg:translate-x-0 lg:w-64 lg:flex-shrink-0 lg:inset-auto lg:z-auto"
             :class="sidebarOpen ? 'mobile-drawer-open' : 'mobile-drawer-closed'">
         <!-- Brand + close btn -->
-        <div class="px-5 py-4 border-b border-cyan-300/15">
+        <div class="px-5 py-4 border-b border-white/10">
             <div class="flex items-center gap-2.5">
                 <img src="{% static 'images/logo.svg' %}" alt="{{ SITE_NAME }}" class="w-9 h-9 brand-mark object-cover flex-shrink-0">
                 <div class="flex-1 min-w-0">
-                    <p class="text-sm font-bold text-white leading-tight">{{ SITE_NAME }}</p>
-                    <p class="text-xs text-cyan-300 font-medium">Admin Panel</p>
+                    <p class="text-sm font-semibold text-white leading-tight">{{ SITE_NAME }}</p>
+                    <p class="text-xs text-brand-300 font-medium">Admin panel</p>
                 </div>
                 <!-- Close btn — mobile only -->
                 <button @click="sidebarOpen = false" class="lg:hidden text-slate-400 hover:text-white p-1 -mr-1 flex-shrink-0" aria-label="Close menu">

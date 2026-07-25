@@ -46,7 +46,7 @@ if [ "${RUN_COLLECTSTATIC:-1}" = "1" ]; then
 fi
 
 echo "Starting gunicorn..."
-exec gunicorn grumpy_portal.wsgi:application \
+exec gunicorn cyberask_domains.wsgi:application \
     --bind 0.0.0.0:8000 \
     --workers 4 \
     --worker-class gthread \

@@ -1,92 +1,66 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 {% load static core_tags %}
 
-{% block title %}{{ SITE_NAME }} - Secure UK Domain Services{% endblock %}
+{% block title %}{{ SITE_NAME }} — Register &amp; manage domains{% endblock %}
 
 {% block extra_head %}
 <script src="{% static 'vendor/htmx-1.9.10.min.js' %}"></script>
 <style>
-    :root {
-        --glass-bg: rgba(255, 255, 255, 0.14);
-        --glass-border: rgba(255, 255, 255, 0.28);
-        --glass-shadow: 0 12px 40px rgba(4, 24, 45, 0.25);
-    }
-
     .glass-card {
-        background: var(--glass-bg);
-        border: 1px solid var(--glass-border);
-        box-shadow: var(--glass-shadow);
+        background: rgba(255, 255, 255, 0.12);
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        box-shadow: 0 12px 40px rgba(4, 24, 45, 0.22);
         backdrop-filter: blur(12px);
         -webkit-backdrop-filter: blur(12px);
     }
-
-    #hero-bg { min-height: 92vh; }
+    #hero-bg { min-height: 88vh; }
 </style>
 {% endblock %}
 
 {% block body %}
 <div id="hero-bg" class="relative overflow-hidden cyber-line-bg">
-<!-- Navigation -->
 <header class="text-white sticky top-0 z-40" x-data="{ mobileMenuOpen: false }">
     <nav class="container mx-auto px-4 py-4 flex justify-between items-center">
-        <a href="{% url 'core:home' %}" class="flex items-center gap-2 text-xl font-bold text-white">
-            <img src="{% static 'images/logo.svg' %}" alt="{{ SITE_NAME }}"
-                 class="h-10 w-10 brand-mark object-cover">
+        <a href="{% url 'core:home' %}" class="flex items-center gap-2 text-xl font-semibold text-white">
+            <img src="{% static 'images/logo.svg' %}" alt="{{ SITE_NAME }}" class="h-10 w-10 brand-mark object-cover">
             <span class="tracking-tight">{{ SITE_NAME }}</span>
         </a>
-        <!-- Desktop nav -->
         <div class="hidden md:flex gap-6 items-center glass-card rounded-full px-5 py-2">
-            <a href="#features" class="hover:text-sky-100 text-sm">Assurance</a>
-            <a href="{% url 'core:pricing' %}" class="hover:text-sky-100 text-sm">Services</a>
             <a href="{% url 'domains:search' %}" class="hover:text-sky-100 text-sm">Domains</a>
+            <a href="{% url 'core:pricing' %}" class="hover:text-sky-100 text-sm">Hosting</a>
             <a href="{% url 'account_login' %}" class="hover:text-sky-100 text-sm">Login</a>
             <a href="{% url 'accounts_custom:register' %}"
-               class="bg-cyan-500 px-4 py-2 rounded text-sm hover:bg-cyan-400 font-medium text-slate-900 inline-flex items-center gap-1.5">
-                {% octicon "rocket" classes="w-3.5 h-3.5" %} Start Securely
+               class="bg-brand-500 px-4 py-2 rounded text-sm hover:bg-brand-400 font-semibold text-white">
+                Create account
             </a>
         </div>
-        <!-- Mobile hamburger -->
         <button @click="mobileMenuOpen = !mobileMenuOpen" class="md:hidden text-white p-2" aria-label="Toggle menu">
             <svg x-show="!mobileMenuOpen" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
             <svg x-show="mobileMenuOpen" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
     </nav>
-    <!-- Mobile menu panel -->
-    <div x-show="mobileMenuOpen"
-         x-transition:enter="transition ease-out duration-150"
-         x-transition:enter-start="opacity-0 -translate-y-2"
-         x-transition:enter-end="opacity-100 translate-y-0"
-         x-transition:leave="transition ease-in duration-100"
-         x-transition:leave-start="opacity-100 translate-y-0"
-         x-transition:leave-end="opacity-0 -translate-y-2"
-         class="md:hidden glass-card border-t border-white/20 px-4 pb-4 space-y-2">
-        <a href="#features" @click="mobileMenuOpen = false" class="block py-2 text-sm text-white hover:text-sky-200">Assurance</a>
-        <a href="{% url 'core:pricing' %}" @click="mobileMenuOpen = false" class="block py-2 text-sm text-white hover:text-sky-200">Services</a>
-        <a href="{% url 'domains:search' %}" @click="mobileMenuOpen = false" class="block py-2 text-sm text-white hover:text-sky-200">Domains</a>
-        <a href="{% url 'account_login' %}" @click="mobileMenuOpen = false" class="block py-2 text-sm text-white hover:text-sky-200">Login</a>
-        <a href="{% url 'accounts_custom:register' %}" class="block mt-2 w-full text-center bg-cyan-500 px-4 py-2.5 rounded text-sm font-medium text-slate-900 hover:bg-cyan-400">
-            Start Securely
-        </a>
+    <div x-show="mobileMenuOpen" class="md:hidden glass-card border-t border-white/20 px-4 pb-4 space-y-2">
+        <a href="{% url 'domains:search' %}" class="block py-2 text-sm text-white">Domains</a>
+        <a href="{% url 'core:pricing' %}" class="block py-2 text-sm text-white">Hosting</a>
+        <a href="{% url 'account_login' %}" class="block py-2 text-sm text-white">Login</a>
+        <a href="{% url 'accounts_custom:register' %}" class="block mt-2 w-full text-center bg-brand-500 px-4 py-2.5 rounded text-sm font-semibold text-white">Create account</a>
     </div>
 </header>
 
-<!-- Hero -->
 <section class="text-white py-16 md:py-24 relative">
-    <div class="absolute inset-0 bg-slate-900/45"></div>
+    <div class="absolute inset-0 bg-slate-900/40"></div>
     <div class="container mx-auto px-4 text-center">
-        <p class="relative z-10 mb-5 inline-flex items-center gap-2 rounded-full border border-cyan-300/30 bg-slate-950/45 px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-cyan-100">
-            CyberAsk domain services
+        <p class="relative z-10 mb-5 inline-flex items-center gap-2 rounded-full border border-sky-300/30 bg-slate-950/45 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-sky-100">
+            Domain services by Cyber Ask Ltd
         </p>
-        <h2 class="text-3xl sm:text-5xl font-bold mb-6 leading-tight relative z-10">
-            Secure domain registration<br>
-            <span class="text-cyan-200">for resilient UK organisations</span>
+        <h2 class="text-3xl sm:text-5xl font-bold mb-5 leading-tight relative z-10">
+            Find, buy, and manage domains<br>
+            <span class="text-sky-200">with cPanel hosting pass-through</span>
         </h2>
-        <p class="text-xl text-slate-100 mb-10 max-w-2xl mx-auto relative z-10">
-            Register and manage domains through CyberAsk with pragmatic security guidance, clear pricing,
-            and operational controls aligned to real-world cyber resilience.
+        <p class="text-lg text-slate-100 mb-10 max-w-2xl mx-auto relative z-10">
+            A focused client portal for domain lookup, registration, renewals, and one-click access to your WHM/cPanel account.
         </p>
 
-        <!-- Domain Search -->
         <div class="max-w-xl mx-auto mb-6 relative z-10 glass-card rounded-2xl p-4 md:p-5">
             <form class="flex flex-col sm:flex-row gap-2"
                   hx-get="{% url 'domains:check' %}"
@@ -96,164 +70,89 @@
                 <input type="text"
                        id="hero-domain-input"
                        name="q"
-                       placeholder="Search for a secure domain..."
-                       class="flex-1 bg-white/95 text-gray-900 rounded-lg px-4 py-3 text-lg focus:outline-none focus:ring-2 focus:ring-cyan-300"
+                       placeholder="Search a domain name..."
+                       class="flex-1 bg-white/95 text-gray-900 rounded-lg px-4 py-3 text-lg focus:outline-none focus:ring-2 focus:ring-brand-400"
                        autocomplete="off">
-                <button type="submit"
-                        class="bg-cyan-300 text-slate-900 px-6 py-3 rounded-lg hover:bg-cyan-200 font-semibold">
+                <button type="submit" class="bg-brand-500 text-white px-6 py-3 rounded-lg hover:bg-brand-400 font-semibold">
                     Search
                 </button>
             </form>
-            <span id="hero-indicator" class="htmx-indicator text-cyan-100 text-sm mt-2 block">Checking...</span>
+            <span id="hero-indicator" class="htmx-indicator text-sky-100 text-sm mt-2 block">Checking…</span>
         </div>
         <div id="hero-results" class="max-w-5xl mx-auto text-left relative z-10"></div>
 
         <div class="mt-8 flex flex-wrap justify-center gap-3 relative z-10">
-            <a href="{% url 'core:pricing' %}"
-               class="bg-cyan-300 text-slate-900 px-8 py-4 rounded-lg text-lg hover:bg-cyan-200 font-semibold">
-                View Services
-            </a>
-            <a href="{% url 'domains:search' %}"
-               class="glass-card border text-white px-8 py-4 rounded-lg text-lg hover:bg-white/20">
-                Search Domains
-            </a>
+            <a href="{% url 'domains:search' %}" class="bg-white text-slate-900 px-8 py-3.5 rounded-lg text-base hover:bg-sky-50 font-semibold">Search domains</a>
+            <a href="{% url 'portal:shop' %}" class="glass-card border text-white px-8 py-3.5 rounded-lg text-base hover:bg-white/15">Hosting packages</a>
         </div>
     </div>
 </section>
 </div>
 
-<!-- Package Cards -->
-<section class="py-12 md:py-20 bg-slate-100/90">
+<section class="py-14 md:py-20 bg-fluent-canvas">
     <div class="container mx-auto px-4">
-        <h2 class="text-3xl font-bold text-center mb-4">Domain and hosting services with security context</h2>
-        <p class="text-gray-600 text-center mb-12">Clear pricing, operational support, and a security-led approach from CyberAsk.</p>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+        <h2 class="text-2xl md:text-3xl font-semibold text-center text-fluent-ink mb-3">What you can do</h2>
+        <p class="text-fluent-muted text-center mb-10 max-w-2xl mx-auto">Core product, kept simple.</p>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+            <div class="fluent-card p-6">
+                <div class="text-brand-600 font-semibold text-sm mb-2">01 · Lookup</div>
+                <h3 class="text-lg font-semibold mb-2">Domain search</h3>
+                <p class="text-sm text-fluent-muted">Check availability instantly and see clear pricing before you commit.</p>
+            </div>
+            <div class="fluent-card p-6">
+                <div class="text-brand-600 font-semibold text-sm mb-2">02 · Buy &amp; renew</div>
+                <h3 class="text-lg font-semibold mb-2">Checkout to invoice</h3>
+                <p class="text-sm text-fluent-muted">Add domains and hosting to your cart, then generate an invoice to complete purchase.</p>
+            </div>
+            <div class="fluent-card p-6">
+                <div class="text-brand-600 font-semibold text-sm mb-2">03 · Manage</div>
+                <h3 class="text-lg font-semibold mb-2">Portal + cPanel SSO</h3>
+                <p class="text-sm text-fluent-muted">Manage nameservers, locks, and renewals — then open cPanel with one click.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+{% if home_packages %}
+<section class="py-14 md:py-16 bg-white border-y border-fluent-border">
+    <div class="container mx-auto px-4">
+        <h2 class="text-2xl font-semibold text-center mb-8">Hosting packages</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
             {% for package in home_packages %}
-            <div class="glass-card {% if package.card_badge %}border-2 border-cyan-300{% endif %} rounded-xl p-8 transition-transform duration-300 hover:-translate-y-1 relative">
+            <div class="fluent-card p-6 {% if package.card_badge %}ring-2 ring-brand-500{% endif %} relative">
                 {% if package.card_badge %}
-                <span class="absolute -top-4 left-1/2 -translate-x-1/2 bg-sky-600 text-white px-4 py-1 rounded-full text-sm font-semibold">{{ package.card_badge }}</span>
+                <span class="absolute -top-3 left-4 bg-brand-500 text-white px-3 py-0.5 rounded text-xs font-semibold">{{ package.card_badge }}</span>
                 {% endif %}
-                <h3 class="text-xl font-bold mb-2">{{ package.name }}</h3>
-                <p class="text-4xl font-bold text-sky-600 mb-1">£{{ package.price_monthly|floatformat:0 }}<span class="text-lg text-gray-500">/mo</span></p>
-                <p class="text-gray-500 text-sm mb-6">{{ package.card_blurb|default:package.description|truncatechars:60 }}</p>
-                <ul class="space-y-3 text-sm text-gray-700 mb-8">
-                    {% for feature in package.get_features|slice:':7' %}
-                    <li class="flex items-center gap-2"><span class="{% if feature.is_positive %}text-green-500{% else %}text-red-400{% endif %}">{% if feature.is_positive %}✓{% else %}✗{% endif %}</span> {{ feature.text }}</li>
-                    {% empty %}
-                    <li class="text-slate-500">Feature list will appear here once added.</li>
-                    {% endfor %}
-                </ul>
-                <a href="{% url 'products:detail' package.slug %}"
-                   class="block text-center {% if package.card_badge %}bg-cyan-600 text-white hover:bg-cyan-700{% else %}border-2 border-cyan-500 text-cyan-700 hover:bg-cyan-50{% endif %} py-2 rounded-lg font-medium">
-                    {{ package.card_cta_label|default:'Get Started' }}
-                </a>
+                <h3 class="text-lg font-semibold mb-1">{{ package.name }}</h3>
+                <p class="text-3xl font-bold text-brand-600 mb-2">£{{ package.price_monthly|floatformat:0 }}<span class="text-base text-fluent-muted font-medium">/mo</span></p>
+                <p class="text-sm text-fluent-muted mb-4">{{ package.card_blurb|default:package.description|truncatechars:90 }}</p>
+                <a href="{% url 'portal:shop' %}" class="btn-primary inline-block text-center w-full">{{ package.card_cta_label|default:'Add to cart' }}</a>
             </div>
-            {% empty %}
-            <div class="col-span-3 text-center text-slate-500">No package cards configured yet.</div>
             {% endfor %}
         </div>
     </div>
 </section>
+{% endif %}
 
-<!-- Features -->
-<section id="features" class="py-12 md:py-20 bg-gray-50">
-    <div class="container mx-auto px-4">
-        <h2 class="text-3xl font-bold text-center mb-12">Why CyberAsk Domains?</h2>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
-            {% for card in home_service_cards %}
-            <div class="text-center p-6">
-                <div class="text-5xl mb-4">{{ card.icon_emoji }}</div>
-                <h3 class="text-xl font-semibold mb-3">{{ card.title }}</h3>
-                <p class="text-gray-600">{{ card.subtitle|default:card.description }}</p>
-                {% if card.cta_url %}
-                <a href="{{ card.cta_url }}" class="inline-block mt-3 text-sm text-sky-700 hover:underline">{{ card.cta_label|default:'Learn more' }}</a>
-                {% endif %}
-            </div>
-            {% empty %}
-            <div class="text-center p-6"><div class="text-5xl mb-4">⚡</div><h3 class="text-xl font-semibold mb-3">Lightning Fast</h3><p class="text-gray-600">Configure homepage service cards in Admin Tools → Website Content.</p></div>
+<footer class="bg-slate-950 text-gray-400 py-10">
+    <div class="container mx-auto px-4 flex flex-col md:flex-row justify-between gap-6 text-sm">
+        <div>
+            <p class="text-white font-semibold mb-1">{{ SITE_NAME }}</p>
+            <p>&copy; {% now "Y" %} Cyber Ask Ltd · <a href="https://www.cyberask.co.uk" class="hover:text-sky-300">www.cyberask.co.uk</a></p>
+        </div>
+        <div class="flex flex-wrap gap-4">
+            <a href="{% url 'domains:search' %}" class="hover:text-sky-300">Domains</a>
+            <a href="{% url 'core:pricing' %}" class="hover:text-sky-300">Hosting</a>
+            <a href="{% url 'core:contact' %}" class="hover:text-sky-300">Contact Us</a>
+            <a href="{% url 'account_login' %}" class="hover:text-sky-300">Login</a>
+            {% for link in FOOTER_LEGAL_LINKS %}
+            <a href="{% url 'core:legal_page' link.slug %}" class="hover:text-sky-300">{{ link.title }}</a>
             {% endfor %}
-        </div>
-    </div>
-</section>
-
-<!-- FAQ -->
-<section class="py-12 md:py-20 bg-white">
-    <div class="container mx-auto px-4 max-w-3xl">
-        <h2 class="text-3xl font-bold text-center mb-12">Frequently Asked Questions</h2>
-        <div class="space-y-4" x-data="{}">
-            {% for faq in home_faqs %}
-            <div x-data="{ open: false }">
-                <button @click="open = !open"
-                        class="w-full flex justify-between items-center py-4 px-0 text-left font-semibold border-b border-gray-200">
-                    {{ faq.question }}
-                    <span x-text="open ? '−' : '+'"></span>
-                </button>
-                <div x-show="open" class="py-3 text-gray-600 text-sm whitespace-pre-line">{{ faq.answer }}</div>
-            </div>
-            {% empty %}
-            <div class="py-3 text-gray-600 text-sm">No FAQs configured yet. Add them in Admin Tools → Website Content.</div>
-            {% endfor %}
-        </div>
-    </div>
-</section>
-
-<!-- CTA -->
-<section class="py-12 md:py-20 cyber-line-bg text-white">
-    <div class="container mx-auto px-4 text-center">
-        <h2 class="text-3xl font-bold mb-4">Ready to secure your domain estate?</h2>
-        <p class="text-cyan-100 mb-8 text-lg">Run domains as a CyberAsk service with governance, visibility, and clear operational ownership.</p>
-        <a href="{% url 'accounts_custom:register' %}"
-           class="bg-white text-slate-950 px-10 py-4 rounded-lg text-lg font-bold hover:bg-cyan-50 inline-block">
-            Start Securely
-        </a>
-    </div>
-</section>
-
-<!-- Footer -->
-<footer class="bg-slate-950 text-gray-400 py-12">
-    <div class="container mx-auto px-4">
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
-            <div>
-                <h4 class="text-white font-semibold mb-3">Services</h4>
-                <ul class="space-y-2 text-sm">
-                    <li><a href="{% url 'core:pricing' %}" class="hover:text-cyan-300">Hosting and services</a></li>
-                    <li><a href="{% url 'domains:search' %}" class="hover:text-cyan-300">Domain Names</a></li>
-                </ul>
-            </div>
-            <div>
-                <h4 class="text-white font-semibold mb-3">Account</h4>
-                <ul class="space-y-2 text-sm">
-                    <li><a href="{% url 'account_login' %}" class="hover:text-cyan-300">Login</a></li>
-                    <li><a href="{% url 'accounts_custom:register' %}" class="hover:text-cyan-300">Sign Up</a></li>
-                </ul>
-            </div>
-            <div>
-                <h4 class="text-white font-semibold mb-3">Support</h4>
-                <ul class="space-y-2 text-sm">
-                    <li><a href="{% url 'core:contact' %}" class="hover:text-cyan-300">Contact Us</a></li>
-                    {% if CONTENT_SETTINGS.support_email %}<li><span>{{ CONTENT_SETTINGS.support_email }}</span></li>{% endif %}
-                    {% if CONTENT_SETTINGS.support_phone %}<li><span>{{ CONTENT_SETTINGS.support_phone }}</span></li>{% endif %}
-                </ul>
-            </div>
-            <div>
-                <h4 class="text-white font-semibold mb-3">Legal</h4>
-                <ul class="space-y-2 text-sm">
-                    {% for link in FOOTER_LEGAL_LINKS %}
-                    <li><a href="{% url 'core:legal_page' link.slug %}" class="hover:text-cyan-300">{{ link.title }}</a></li>
-                    {% empty %}
-                    <li>No policy pages published yet.</li>
-                    {% endfor %}
-                </ul>
-            </div>
-        </div>
-        <div class="border-t border-gray-800 pt-6 text-sm text-center">
-            <p>&copy; {% now "Y" %} Cyber Ask Ltd. {{ SITE_NAME }} operates at www.cyberask.co.uk/domains.</p>
         </div>
     </div>
 </footer>
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'js/home.js' %}"></script>
 <script src="{% static 'js/domain-results.js' %}"></script>
 {% endblock %}

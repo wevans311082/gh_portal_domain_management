@@ -15,9 +15,10 @@
     <script defer src="{% static 'vendor/alpine-csp-3.14.1.min.js' %}"></script>
     {% endblock %}
     <link rel="stylesheet" href="{% static 'css/app.css' %}">
+    <style>[x-cloak]{display:none!important}</style>
     {% block extra_head %}{% endblock %}
 </head>
-<body class="h-full bg-slate-950 text-slate-900" data-noise-texture="{% static 'images/noise.png' %}">
+<body class="h-full bg-fluent-canvas text-fluent-ink font-sans" data-noise-texture="{% static 'images/noise.png' %}">
     {% if messages %}
     <div id="toast-stack" class="fixed top-4 right-4 z-50 space-y-2 w-[22rem] max-w-[calc(100vw-2rem)]">
         {% for message in messages %}

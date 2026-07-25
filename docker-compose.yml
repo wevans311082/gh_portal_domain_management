@@ -6,6 +6,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data/
     environment:
+      # Keep DB identity stable so existing server .env DATABASE_URL keeps working.
       POSTGRES_DB: grumpy_portal
       POSTGRES_USER: grumpy
       POSTGRES_PASSWORD: grumpy_pass
@@ -37,7 +38,7 @@ services:
     env_file:
       - .env
     environment:
-      - DJANGO_SETTINGS_MODULE=grumpy_portal.settings.development
+      - DJANGO_SETTINGS_MODULE=cyberask_domains.settings.development
       - RUN_STARTUP_MIGRATIONS=1
       - MIGRATION_LEADER=1
       - MIGRATION_LOCK_ID=8453201
@@ -51,14 +52,14 @@ services:
 
   celery:
     build: .
-    command: celery -A grumpy_portal worker -l info
+    command: celery -A cyberask_domains worker -l info
     volumes:
       - .:/app
       - media_files:/app/media
     env_file:
       - .env
     environment:
-      - DJANGO_SETTINGS_MODULE=grumpy_portal.settings.development
+      - DJANGO_SETTINGS_MODULE=cyberask_domains.settings.development
       - RUN_STARTUP_MIGRATIONS=0
       - MIGRATION_LEADER=0
       - MIGRATION_LOCK_ID=8453201
@@ -72,13 +73,13 @@ services:
 
   celery-beat:
     build: .
-    command: celery -A grumpy_portal beat -l info
+    command: celery -A cyberask_domains beat -l info
     volumes:
       - .:/app
     env_file:
       - .env
     environment:
-      - DJANGO_SETTINGS_MODULE=grumpy_portal.settings.development
+      - DJANGO_SETTINGS_MODULE=cyberask_domains.settings.development
       - RUN_STARTUP_MIGRATIONS=0
       - MIGRATION_LEADER=0
       - MIGRATION_LOCK_ID=8453201

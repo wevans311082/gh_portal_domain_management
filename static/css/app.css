@@ -1,174 +1,307 @@
-/* CyberAsk Domains - Custom Styles */
+/* Cyber Ask Domains — Fluent-inspired product shell */
+
 :root {
-    --color-primary: #06b6d4;
-    --color-primary-dark: #0891b2;
-    --cyber-navy: #071827;
-    --cyber-navy-2: #0f172a;
-    --cyber-cyan: #22d3ee;
-    --cyber-emerald: #34d399;
-    --cyber-indigo: #6366f1;
-    --cyber-line: rgba(34, 211, 238, 0.18);
+    --color-primary: #0078d4;
+    --color-primary-dark: #106ebe;
+    --color-primary-light: #deecf9;
+    --fluent-canvas: #f5f5f5;
+    --fluent-surface: #ffffff;
+    --fluent-border: #e1dfdd;
+    --fluent-ink: #242424;
+    --fluent-muted: #605e5c;
+    --fluent-nav: #201f1e;
+    --fluent-accent: #0078d4;
+    --cyber-navy: #0b1a2a;
+    --cyber-sky: #38bdf8;
+    --radius: 4px;
+    --radius-lg: 8px;
+    --shadow-fluent: 0 0.3px 0.9px rgba(0, 0, 0, 0.12), 0 1.6px 3.6px rgba(0, 0, 0, 0.12);
+    --shadow-drawer: 0 0 2px rgba(0, 0, 0, 0.12), 0 8px 16px rgba(0, 0, 0, 0.14);
+    --font-fluent: "Segoe UI", "Segoe UI Web (West European)", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", sans-serif;
 }
 
+html {
+    font-family: var(--font-fluent);
+}
+
+body {
+    color: var(--fluent-ink);
+    -webkit-font-smoothing: antialiased;
+}
+
+/* Buttons */
 .btn-primary {
     background-color: var(--color-primary);
-    color: white;
-    padding: 0.5rem 1.5rem;
-    border-radius: 0.375rem;
-    transition: background-color 0.2s;
+    color: #fff;
+    padding: 0.5rem 1.25rem;
+    border-radius: var(--radius);
+    font-weight: 600;
+    font-size: 0.875rem;
+    transition: background-color 0.15s ease;
+    border: 1px solid transparent;
 }
-
 .btn-primary:hover {
     background-color: var(--color-primary-dark);
 }
-
-.brand-mark {
-    border-radius: 0.75rem;
-    background: rgba(15, 23, 42, 0.68);
-    box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.25), 0 18px 35px rgba(2, 6, 23, 0.22);
+.btn-secondary {
+    background: #fff;
+    color: var(--fluent-ink);
+    border: 1px solid var(--fluent-border);
+    padding: 0.5rem 1.25rem;
+    border-radius: var(--radius);
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+.btn-secondary:hover {
+    background: #f3f2f1;
 }
 
+/* Brand mark */
+.brand-mark {
+    border-radius: var(--radius);
+    background: #0b1a2a;
+    box-shadow: 0 0 0 1px rgba(0, 120, 212, 0.25);
+}
+
+/* Public marketing surface (Cyber Ask dark hero) */
 .cyber-line-bg {
     position: relative;
     overflow: hidden;
     isolation: isolate;
     background:
-        radial-gradient(900px 360px at 12% -8%, rgba(34, 211, 238, 0.24), transparent 62%),
-        radial-gradient(760px 300px at 84% 8%, rgba(99, 102, 241, 0.18), transparent 66%),
-        linear-gradient(135deg, #061321 0%, #0b1728 48%, #111827 100%);
+        radial-gradient(900px 360px at 12% -8%, rgba(56, 189, 248, 0.18), transparent 62%),
+        radial-gradient(760px 300px at 84% 8%, rgba(0, 120, 212, 0.2), transparent 66%),
+        linear-gradient(145deg, #061321 0%, #0b1a2a 48%, #111827 100%);
 }
-
 .cyber-line-bg::before {
     content: "";
     position: absolute;
     inset: -20%;
     z-index: -2;
     background:
-        linear-gradient(115deg, transparent 0 42%, rgba(34, 211, 238, 0.24) 43%, transparent 45% 100%),
-        linear-gradient(25deg, transparent 0 55%, rgba(52, 211, 153, 0.14) 56%, transparent 58% 100%),
-        repeating-linear-gradient(90deg, rgba(148, 163, 184, 0.08) 0 1px, transparent 1px 92px),
-        repeating-linear-gradient(0deg, rgba(148, 163, 184, 0.06) 0 1px, transparent 1px 92px);
-    transform: translate3d(-3%, -2%, 0);
-    animation: cyber-lines-drift 18s linear infinite;
+        linear-gradient(115deg, transparent 0 42%, rgba(56, 189, 248, 0.16) 43%, transparent 45% 100%),
+        repeating-linear-gradient(90deg, rgba(148, 163, 184, 0.07) 0 1px, transparent 1px 96px),
+        repeating-linear-gradient(0deg, rgba(148, 163, 184, 0.05) 0 1px, transparent 1px 96px);
+    animation: cyber-lines-drift 22s linear infinite;
 }
-
 .cyber-line-bg::after {
     content: "";
     position: absolute;
     inset: 0;
     z-index: -1;
-    background:
-        linear-gradient(180deg, rgba(2, 6, 23, 0.08), rgba(2, 6, 23, 0.52)),
-        radial-gradient(500px 260px at 50% 18%, rgba(255, 255, 255, 0.08), transparent 70%);
+    background: linear-gradient(180deg, rgba(2, 6, 23, 0.08), rgba(2, 6, 23, 0.45));
 }
-
-.cyber-surface {
-    background: rgba(255, 255, 255, 0.94);
-    border: 1px solid rgba(148, 163, 184, 0.26);
-    box-shadow: 0 18px 50px rgba(15, 23, 42, 0.12);
-}
-
-.cyber-glass {
-    background: rgba(15, 23, 42, 0.66);
-    border: 1px solid rgba(125, 211, 252, 0.24);
-    box-shadow: 0 18px 55px rgba(2, 6, 23, 0.28);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-}
-
 @keyframes cyber-lines-drift {
-    0% { transform: translate3d(-3%, -2%, 0); }
-    100% { transform: translate3d(3%, 2%, 0); }
+    0% { transform: translate3d(-2%, -1%, 0); }
+    100% { transform: translate3d(2%, 1%, 0); }
 }
 
-/* Scoped form styling for admin/client/auth shells */
+/* Fluent surfaces */
+.fluent-shell {
+    background: var(--fluent-canvas);
+    color: var(--fluent-ink);
+}
+.fluent-card {
+    background: var(--fluent-surface);
+    border: 1px solid var(--fluent-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-fluent);
+}
+.fluent-panel {
+    background: var(--fluent-surface);
+    border: 1px solid var(--fluent-border);
+    border-radius: var(--radius-lg);
+}
+.fluent-nav-link {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.55rem 0.75rem;
+    border-radius: var(--radius);
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #c8c6c4;
+    transition: background-color 0.12s ease, color 0.12s ease;
+}
+.fluent-nav-link:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: #fff;
+}
+.fluent-nav-link.is-active {
+    background: rgba(0, 120, 212, 0.22);
+    color: #fff;
+}
+.fluent-nav-link svg {
+    width: 1.1rem;
+    height: 1.1rem;
+    flex-shrink: 0;
+    opacity: 0.9;
+}
+
+/* Azure-style right flyout */
+.fluent-drawer-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background: rgba(0, 0, 0, 0.4);
+}
+.fluent-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 60;
+    width: min(28rem, 100vw);
+    background: #fff;
+    box-shadow: var(--shadow-drawer);
+    display: flex;
+    flex-direction: column;
+    transform: translateX(100%);
+    transition: transform 0.22s cubic-bezier(0.33, 0, 0.1, 1);
+}
+.fluent-drawer.is-open {
+    transform: translateX(0);
+}
+.fluent-drawer-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--fluent-border);
+}
+.fluent-drawer-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.25rem;
+}
+.fluent-drawer-footer {
+    padding: 1rem 1.25rem;
+    border-top: 1px solid var(--fluent-border);
+    background: #faf9f8;
+}
+
+/* Forms in app shells */
 :is(.admin-shell, .portal-shell, .auth-shell) .form-surface {
-    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-    border: 1px solid #d7e2ee;
-    border-radius: 0.875rem;
+    background: linear-gradient(180deg, #ffffff 0%, #faf9f8 100%);
+    border: 1px solid var(--fluent-border);
+    border-radius: var(--radius-lg);
     padding: 1rem 1.125rem;
-    box-shadow: 0 1px 1px rgba(15, 23, 42, 0.03);
+    box-shadow: var(--shadow-fluent);
 }
-
 :is(.admin-shell, .portal-shell, .auth-shell) .form-surface :is(input, select, textarea) {
     margin-top: 0.25rem;
 }
-
 :is(.admin-shell, .portal-shell, .auth-shell) :is(label, legend) {
-    color: #334155;
+    color: #323130;
     font-weight: 600;
     font-size: 0.875rem;
 }
-
-:is(.admin-shell, .portal-shell, .auth-shell) :is(
-    input[type="text"],
-    input[type="email"],
-    input[type="password"],
-    input[type="number"],
-    input[type="date"],
-    input[type="datetime-local"],
-    input[type="time"],
-    input[type="url"],
-    input[type="search"],
-    input[type="tel"],
-    input[type="month"],
-    input[type="week"],
-    input[type="file"],
-    select,
-    textarea
-) {
+:is(.admin-shell, .portal-shell, .auth-shell) :is(input[type="text"], input[type="email"], input[type="password"], input[type="number"], input[type="search"], input[type="url"], input[type="tel"], input[type="date"], select, textarea) {
     width: 100%;
-    border: 1px solid #8fa7c0;
-    background-color: #ffffff;
-    border-radius: 0.625rem;
-    color: #0f172a;
-    min-height: 2.5rem;
-    padding: 0.55rem 0.75rem;
-    box-shadow: inset 0 0 0 1px rgba(203, 213, 225, 0.35);
-    transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+    border: 1px solid #8a8886;
+    border-radius: var(--radius);
+    background: #fff;
+    padding: 0.45rem 0.65rem;
+    font-size: 0.875rem;
+    color: var(--fluent-ink);
+    transition: border-color 0.12s ease, box-shadow 0.12s ease;
 }
-
-:is(.admin-shell, .portal-shell, .auth-shell) textarea {
-    min-height: 7rem;
-    resize: vertical;
-}
-
-:is(.admin-shell, .portal-shell, .auth-shell) :is(input, select, textarea)::placeholder {
-    color: #94a3b8;
-}
-
 :is(.admin-shell, .portal-shell, .auth-shell) :is(input, select, textarea):focus {
     outline: none;
-    border-color: #0284c7;
-    background-color: #ffffff;
-    box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 1px var(--color-primary);
 }
 
-:is(.admin-shell, .portal-shell, .auth-shell) .field-example-hint {
-    display: block;
-    margin-top: 0.35rem;
-    color: #64748b;
+/* Tables */
+.fluent-table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--fluent-border);
+    border-radius: var(--radius-lg);
+    background: #fff;
+}
+.fluent-table {
+    width: 100%;
+    font-size: 0.875rem;
+    border-collapse: collapse;
+}
+.fluent-table thead {
+    background: #faf9f8;
+    border-bottom: 1px solid var(--fluent-border);
+}
+.fluent-table th {
+    text-align: left;
+    padding: 0.75rem 1rem;
+    font-weight: 600;
+    color: #323130;
+    white-space: nowrap;
+}
+.fluent-table td {
+    padding: 0.75rem 1rem;
+    border-top: 1px solid #f3f2f1;
+    vertical-align: middle;
+}
+.fluent-table tbody tr:hover {
+    background: #f3f9fd;
+}
+
+/* Status chips */
+.chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.125rem 0.5rem;
+    border-radius: 999px;
     font-size: 0.75rem;
+    font-weight: 600;
+}
+.chip-success { background: #dff6dd; color: #0e700e; }
+.chip-warning { background: #fff4ce; color: #835c00; }
+.chip-danger { background: #fde7e9; color: #a4262c; }
+.chip-info { background: #deecf9; color: #004578; }
+.chip-neutral { background: #f3f2f1; color: #323130; }
+
+/* Command bar */
+.fluent-command-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
 }
 
-:is(.admin-shell, .portal-shell, .auth-shell) :is(input[type="checkbox"], input[type="radio"]) {
-    accent-color: #0284c7;
+/* Scrollbar polish */
+.portal-shell aside::-webkit-scrollbar,
+.admin-shell aside::-webkit-scrollbar,
+.fluent-drawer-body::-webkit-scrollbar {
+    width: 8px;
+}
+.portal-shell aside::-webkit-scrollbar-thumb,
+.admin-shell aside::-webkit-scrollbar-thumb,
+.fluent-drawer-body::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.18);
+    border-radius: 8px;
 }
 
-:is(.admin-shell, .portal-shell, .auth-shell) .helptext {
-    display: block;
-    margin-top: 0.35rem;
-    color: #64748b;
-    font-size: 0.75rem;
+/* Auth card */
+.auth-card {
+    background: #fff;
+    border: 1px solid var(--fluent-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-fluent);
 }
 
-:is(.admin-shell, .portal-shell, .auth-shell) .errorlist {
-    list-style: none;
-    margin: 0.35rem 0 0;
-    padding: 0.4rem 0.6rem;
-    border: 1px solid #fecaca;
-    background: #fff1f2;
-    color: #b91c1c;
-    border-radius: 0.5rem;
-    font-size: 0.8rem;
+/* Toast polish */
+.toast-item {
+    border-radius: var(--radius-lg) !important;
+    box-shadow: var(--shadow-fluent) !important;
+}
+
+/* Reduce motion */
+@media (prefers-reduced-motion: reduce) {
+    .cyber-line-bg::before,
+    .fluent-drawer {
+        animation: none !important;
+        transition: none !important;
+    }
 }

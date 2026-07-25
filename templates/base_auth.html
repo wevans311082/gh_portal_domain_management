@@ -1,22 +1,23 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 {% load static %}
 
 {% block body %}
 <div class="auth-shell min-h-full flex flex-col cyber-line-bg">
-    <!-- Top bar -->
-    <div class="text-white text-center py-5">
-        <h1 class="text-xl font-bold tracking-tight">{{ SITE_NAME }}</h1>
-        <p class="text-xs text-cyan-200 mt-1">Domains service by CyberAsk</p>
-    </div>
-    <!-- Card area -->
-    <div class="flex-1 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-        <div class="max-w-md w-full cyber-surface rounded-2xl px-8 py-10">
-            {% block content %}{% endblock %}
+    <div class="flex-1 flex items-center justify-center px-4 py-10">
+        <div class="w-full max-w-md">
+            <div class="text-center text-white mb-6">
+                <img src="{% static 'images/logo.svg' %}" alt="{{ SITE_NAME }}" class="h-14 w-14 brand-mark object-cover mx-auto mb-3">
+                <h1 class="text-xl font-semibold tracking-tight">{{ SITE_NAME }}</h1>
+                <p class="text-xs text-sky-200/90 mt-1">Domains &amp; hosting by Cyber Ask Ltd</p>
+            </div>
+            <div class="auth-card p-6 sm:p-8">
+                {% block content %}{% endblock %}
+            </div>
+            <p class="text-center text-xs text-white/55 mt-6">
+                &copy; {% now "Y" %} Cyber Ask Ltd ·
+                <a href="https://www.cyberask.co.uk" class="underline hover:text-white">www.cyberask.co.uk</a>
+            </p>
         </div>
-    </div>
-    <!-- Footer -->
-    <div class="border-t border-cyan-300/15 text-center py-3 text-xs text-slate-400">
-        &copy; {% now "Y" %} Cyber Ask Ltd. Domains service at www.cyberask.co.uk/domains.
     </div>
 </div>
 {% endblock %}

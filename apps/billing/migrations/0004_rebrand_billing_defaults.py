@@ -5,8 +5,13 @@ def forwards(apps, schema_editor):
     Branding = apps.get_model("billing", "BillingDocumentBranding")
     for branding in Branding.objects.all():
         changed = []
-        if not branding.company_name or branding.company_name in {"Grumpy Hosting", "Grumpy Hosting LTD"}:
-            branding.company_name = "CyberAsk Domains"
+        if not branding.company_name or branding.company_name in {
+            "Grumpy Hosting",
+            "Grumpy Hosting LTD",
+            "CyberAsk Domains",
+            "CyberAsk Domains LTD",
+        }:
+            branding.company_name = "Cyber Ask Domains"
             changed.append("company_name")
         if not branding.website_url or "grumpyhosting" in branding.website_url.lower():
             branding.website_url = "https://www.cyberask.co.uk/domains"
@@ -14,8 +19,12 @@ def forwards(apps, schema_editor):
         if not branding.company_number:
             branding.company_number = "15113248"
             changed.append("company_number")
-        if not branding.footer_text or "Grumpy Hosting" in branding.footer_text:
-            branding.footer_text = "CyberAsk Domains - a Cyber Ask Ltd service"
+        if (
+            not branding.footer_text
+            or "Grumpy Hosting" in branding.footer_text
+            or "CyberAsk Domains" in branding.footer_text
+        ):
+            branding.footer_text = "Cyber Ask Domains - a Cyber Ask Ltd service"
             changed.append("footer_text")
         if changed:
             branding.save(update_fields=changed)

@@ -108,7 +108,7 @@ def send_notification(
             pass
 
     context = dict(context or {})
-    context.setdefault("site_name", getattr(settings, "SITE_NAME", "CyberAsk Domains"))
+    context.setdefault("site_name", getattr(settings, "SITE_NAME", "Cyber Ask Domains"))
     context.setdefault("user", user)
 
     template_config = NOTIFICATION_TEMPLATES.get(template_name)

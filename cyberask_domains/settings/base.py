@@ -17,10 +17,12 @@ ALLOWED_HOSTS = env.list(
     default=[
         "localhost",
         "127.0.0.1",
+        "10.0.0.46",
         "www.cyberask.co.uk",
         "portal.cyberask.co.uk",
         "billing.cyberask.co.uk",
         "domains.cyberask.co.uk",
+        "cyberask.co.uk",
     ],
 )
 
@@ -86,11 +88,11 @@ MIDDLEWARE = [
     "apps.audit.middleware.IPAllowlistMiddleware",
 ]
 
-ROOT_URLCONF = "grumpy_portal.urls"
+ROOT_URLCONF = "cyberask_domains.urls"
 HOST_URLCONF_MAP = {
-    "portal.cyberask.co.uk": "grumpy_portal.urls_portal",
-    "billing.cyberask.co.uk": "grumpy_portal.urls_billing",
-    "domains.cyberask.co.uk": "grumpy_portal.urls_domains",
+    "portal.cyberask.co.uk": "cyberask_domains.urls_portal",
+    "billing.cyberask.co.uk": "cyberask_domains.urls_billing",
+    "domains.cyberask.co.uk": "cyberask_domains.urls_domains",
 }
 
 TEMPLATES = [
@@ -111,7 +113,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = "grumpy_portal.wsgi.application"
+WSGI_APPLICATION = "cyberask_domains.wsgi.application"
 
 DATABASES = {
     "default": env.db("DATABASE_URL", default="sqlite:///db.sqlite3")
@@ -229,7 +231,7 @@ EMAIL_PORT = env.int("EMAIL_PORT", default=587)
 EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=True)
 EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
 EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
-DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="CyberAsk Domains <noreply@cyberask.co.uk>")
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="Cyber Ask Domains <noreply@cyberask.co.uk>")
 SERVER_EMAIL = DEFAULT_FROM_EMAIL
 
 ACCOUNT_USER_MODEL_USERNAME_FIELD = None
@@ -239,22 +241,29 @@ ACCOUNT_AUTHENTICATION_METHOD = "email"
 ACCOUNT_EMAIL_VERIFICATION = "mandatory"
 ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
 LOGIN_URL = "/accounts/login/"
-LOGIN_REDIRECT_URL = "/"
+LOGIN_REDIRECT_URL = "/portal/"
 LOGOUT_REDIRECT_URL = "/"
-SESSION_COOKIE_DOMAIN = env("SESSION_COOKIE_DOMAIN", default=".cyberask.co.uk")
-CSRF_COOKIE_DOMAIN = env("CSRF_COOKIE_DOMAIN", default=".cyberask.co.uk")
+# Empty string disables domain-scoped cookies so IP + hostname both work in lab.
+_session_cookie_domain = env("SESSION_COOKIE_DOMAIN", default="")
+SESSION_COOKIE_DOMAIN = _session_cookie_domain or None
+_csrf_cookie_domain = env("CSRF_COOKIE_DOMAIN", default="")
+CSRF_COOKIE_DOMAIN = _csrf_cookie_domain or None
 CSRF_TRUSTED_ORIGINS = env.list(
     "CSRF_TRUSTED_ORIGINS",
     default=[
+        "http://10.0.0.46",
+        "http://localhost",
+        "http://127.0.0.1",
         "https://www.cyberask.co.uk",
         "https://portal.cyberask.co.uk",
         "https://billing.cyberask.co.uk",
         "https://domains.cyberask.co.uk",
+        "https://cyberask.co.uk",
     ],
 )
 
 SITE_DOMAIN = env("SITE_DOMAIN", default="www.cyberask.co.uk")
-SITE_NAME = env("SITE_NAME", default="CyberAsk Domains")
+SITE_NAME = env("SITE_NAME", default="Cyber Ask Domains")
 # Randomise the admin URL — set this to a secret slug in production
 DJANGO_ADMIN_URL = env("DJANGO_ADMIN_URL", default="manage-site-a3f7c2/")
 

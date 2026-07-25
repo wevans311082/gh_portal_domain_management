@@ -322,7 +322,7 @@ def mfa_setup(request):
     totp = pyotp.TOTP(secret)
     provisioning_uri = totp.provisioning_uri(
         name=user.email,
-        issuer_name=request.META.get("HTTP_HOST", "CyberAsk Domains"),
+        issuer_name=request.META.get("HTTP_HOST", "Cyber Ask Domains"),
     )
 
     # Render QR code as inline SVG

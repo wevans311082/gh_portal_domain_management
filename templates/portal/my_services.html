@@ -1,55 +1,62 @@
-﻿{% extends "base_portal.html" %}
+{% extends "base_portal.html" %}
 
-{% block title %}My Services - {{ SITE_NAME }}{% endblock %}
-{% block page_title %}My Services{% endblock %}
+{% block title %}My Hosting - {{ SITE_NAME }}{% endblock %}
+{% block page_title %}My hosting{% endblock %}
+
+{% block header_actions %}
+<a href="{% url 'portal:shop' %}" class="btn-primary text-xs">+ Shop packages</a>
+{% endblock %}
 
 {% block content %}
 {% if services %}
-<div class="bg-white rounded-lg shadow overflow-hidden">
-    <div class="overflow-x-auto">
-    <table class="w-full text-sm min-w-[640px]">
-        <thead class="bg-gray-50 border-b">
+<div class="fluent-table-wrap">
+    <table class="fluent-table min-w-[720px]">
+        <thead>
             <tr>
-                <th class="px-4 py-3 text-left font-semibold text-gray-700">Package</th>
-                <th class="px-4 py-3 text-left font-semibold text-gray-700">Domain</th>
-                <th class="px-4 py-3 text-left font-semibold text-gray-700">Status</th>
-                <th class="px-4 py-3 text-left font-semibold text-gray-700">Billing</th>
-                <th class="px-4 py-3 text-left font-semibold text-gray-700">Next Due</th>
-                <th class="px-4 py-3 text-left font-semibold text-gray-700">cPanel User</th>
+                <th>Package</th>
+                <th>Domain</th>
+                <th>Status</th>
+                <th>Billing</th>
+                <th>Next due</th>
+                <th>cPanel</th>
+                <th></th>
             </tr>
         </thead>
-        <tbody class="divide-y">
+        <tbody>
             {% for service in services %}
-            <tr class="hover:bg-gray-50">
-                <td class="px-4 py-3 font-medium">{{ service.package.name }}</td>
-                <td class="px-4 py-3 text-gray-600">{{ service.domain_name|default:"—" }}</td>
-                <td class="px-4 py-3">
-                    <span class="px-2 py-0.5 rounded-full text-xs font-medium
-                        {% if service.status == 'active' %}bg-green-100 text-green-800
-                        {% elif service.status == 'suspended' %}bg-yellow-100 text-yellow-800
-                        {% elif service.status == 'cancelled' or service.status == 'terminated' %}bg-red-100 text-red-800
-                        {% elif service.status == 'failed' %}bg-red-100 text-red-800
-                        {% else %}bg-gray-100 text-gray-700{% endif %}">
+            <tr>
+                <td class="font-medium">{{ service.package.name }}</td>
+                <td class="text-fluent-muted">{{ service.domain_name|default:"—" }}</td>
+                <td>
+                    <span class="chip {% if service.status == 'active' %}chip-success{% elif service.status == 'suspended' %}chip-warning{% elif service.status == 'cancelled' or service.status == 'terminated' or service.status == 'failed' %}chip-danger{% else %}chip-neutral{% endif %}">
                         {{ service.get_status_display }}
                     </span>
                 </td>
-                <td class="px-4 py-3 text-gray-600 capitalize">{{ service.billing_period }}</td>
-                <td class="px-4 py-3 text-gray-600">{{ service.next_due_date|default:"—" }}</td>
-                <td class="px-4 py-3 font-mono text-xs text-gray-600">{{ service.cpanel_username|default:"—" }}</td>
+                <td class="text-fluent-muted capitalize">{{ service.billing_period }}</td>
+                <td class="text-fluent-muted">{{ service.next_due_date|default:"—" }}</td>
+                <td class="font-mono text-xs text-fluent-muted">{{ service.cpanel_username|default:"—" }}</td>
+                <td class="text-right whitespace-nowrap">
+                    {% if service.cpanel_username and service.status == 'active' %}
+                    <a href="{% url 'portal:hosting_sso' service.pk %}"
+                       class="btn-primary text-xs inline-flex items-center gap-1"
+                       target="_blank" rel="noopener">
+                        Open cPanel
+                    </a>
+                    {% endif %}
+                    {% if service.cpanel_username %}
+                    <a href="{% url 'portal:hosting_usage' service.pk %}" class="ml-2 text-sm text-brand-600 hover:underline">Usage</a>
+                    {% endif %}
+                </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
-    </div>
 </div>
 {% else %}
-<div class="bg-white rounded-lg shadow p-12 text-center">
-    <div class="text-5xl mb-4">🖥️</div>
-    <h3 class="text-lg font-semibold text-gray-700 mb-2">No services yet</h3>
-    <p class="text-gray-500 mb-6">Sign up for a hosting package to get started.</p>
-    <a href="{% url 'core:pricing' %}" class="bg-sky-600 text-white px-6 py-2 rounded hover:bg-sky-700">
-        View Plans
-    </a>
+<div class="fluent-card p-12 text-center">
+    <h3 class="text-lg font-semibold text-fluent-ink mb-2">No hosting services yet</h3>
+    <p class="text-fluent-muted mb-6">Add a hosting package from the shop. Once provisioned, you can open cPanel from here.</p>
+    <a href="{% url 'portal:shop' %}" class="btn-primary">Browse hosting packages</a>
 </div>
 {% endif %}
 {% endblock %}
