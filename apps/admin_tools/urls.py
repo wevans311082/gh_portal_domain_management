@@ -4,6 +4,7 @@ from . import wizard_views
 from . import billing_views
 from . import content_views
 from . import operations_views
+from . import manual_order_views
 
 app_name = "admin_tools"
 
@@ -42,6 +43,18 @@ urlpatterns = [
     path("billing/cart/checkout/invoice/", billing_views.cart_builder_checkout_invoice, name="cart_builder_checkout_invoice"),
     path("billing/cart/checkout/quote/", billing_views.cart_builder_checkout_quote, name="cart_builder_checkout_quote"),
     path("domains/pricing/", views.tld_pricing, name="tld_pricing"),
+    path("domains/manual-register/", manual_order_views.manual_domain_register, name="manual_domain_register"),
+    path("domains/manual-register/<int:order_id>/", manual_order_views.manual_domain_result, name="manual_domain_result"),
+    path(
+        "domains/manual-register/<int:order_id>/invoice/",
+        manual_order_views.manual_domain_generate_invoice,
+        name="manual_domain_generate_invoice",
+    ),
+    path(
+        "domains/manual-register/<int:order_id>/hosting/",
+        manual_order_views.manual_domain_add_hosting,
+        name="manual_domain_add_hosting",
+    ),
     path("domains/", operations_views.domains_list, name="domains_list"),
     path("domains/new/", operations_views.domains_create, name="domains_create"),
     path("domains/<int:pk>/", operations_views.domains_edit, name="domains_edit"),

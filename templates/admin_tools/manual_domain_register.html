@@ -1,0 +1,136 @@
+{% extends "base_admin.html" %}
+
+{% block title %}Manual domain register · {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Manual domain registration{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl">
+  <p class="text-sm text-slate-600 mb-6">
+    Register a domain directly with ResellerClub for an existing client.
+    <strong>No invoice is required</strong> — use this for cash / offline orders.
+    You can generate an invoice afterwards.
+  </p>
+
+  <form method="post" class="space-y-6 bg-white border border-slate-200 rounded-xl shadow-sm p-6">
+    {% csrf_token %}
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div class="sm:col-span-2">
+        <label class="block text-sm font-semibold text-slate-700 mb-1">Domain name</label>
+        <input type="text" name="domain_name" required placeholder="example.co.uk"
+               value="{{ form.domain_name|default:'' }}"
+               class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-sky-500 focus:outline-none">
+      </div>
+
+      <div class="sm:col-span-2">
+        <label class="block text-sm font-semibold text-slate-700 mb-1">Client account</label>
+        <select name="user_id" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+          <option value="">Select client…</option>
+          {% for u in users %}
+          <option value="{{ u.pk }}" {% if form.user_id == u.pk|stringformat:"s" %}selected{% endif %}>
+            {{ u.email }}{% if u.full_name and u.full_name != u.email %} — {{ u.full_name }}{% endif %}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-sm font-semibold text-slate-700 mb-1">Registration years</label>
+        <select name="years" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+          {% for y in year_choices %}
+          <option value="{{ y }}" {% if form.years == y|stringformat:"s" or not form.years and y == 1 %}selected{% endif %}>{{ y }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="flex flex-col justify-end gap-2 pb-1">
+        <label class="inline-flex items-center gap-2 text-sm text-slate-700">
+          <input type="checkbox" name="privacy_enabled" {% if form.privacy_enabled or not form %}checked{% endif %} class="rounded border-slate-300">
+          WHOIS privacy
+        </label>
+        <label class="inline-flex items-center gap-2 text-sm text-slate-700">
+          <input type="checkbox" name="auto_renew" {% if form.auto_renew or not form %}checked{% endif %} class="rounded border-slate-300">
+          Auto-renew at registrar
+        </label>
+      </div>
+    </div>
+
+    <div class="border-t border-slate-100 pt-4">
+      <h3 class="font-semibold text-slate-900 mb-2">Registrant contact</h3>
+      <p class="text-xs text-slate-500 mb-3">Uses the client’s default contact if one exists. Override fields only if needed.</p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 mb-1">Name</label>
+          <input name="contact_name" value="{{ form.contact_name|default:'' }}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" placeholder="Auto from client">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 mb-1">Email</label>
+          <input name="contact_email" type="email" value="{{ form.contact_email|default:'' }}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" placeholder="Auto from client">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 mb-1">Phone</label>
+          <input name="contact_phone" value="{{ form.contact_phone|default:'' }}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" placeholder="07…">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 mb-1">Postcode</label>
+          <input name="contact_postcode" value="{{ form.contact_postcode|default:'' }}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+        </div>
+        <div class="sm:col-span-2">
+          <label class="block text-xs font-semibold text-slate-500 mb-1">Address line</label>
+          <input name="contact_address" value="{{ form.contact_address|default:'' }}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 mb-1">City</label>
+          <input name="contact_city" value="{{ form.contact_city|default:'' }}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+        </div>
+      </div>
+    </div>
+
+    <div class="border-t border-slate-100 pt-4 space-y-3">
+      <h3 class="font-semibold text-slate-900">WHM hosting (optional)</h3>
+      <label class="inline-flex items-center gap-2 text-sm text-slate-700">
+        <input type="checkbox" name="create_hosting" id="create_hosting" {% if form.create_hosting %}checked{% endif %} class="rounded border-slate-300">
+        Create cPanel/WHM account after domain registration
+      </label>
+      <div>
+        <label class="block text-sm font-semibold text-slate-700 mb-1">Hosting package</label>
+        <select name="package_id" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+          <option value="">— none —</option>
+          {% for p in packages %}
+          <option value="{{ p.pk }}" {% if form.package_id == p.pk|stringformat:"s" %}selected{% endif %}>
+            {{ p.name }}{% if p.whm_package_name %} (WHM: {{ p.whm_package_name }}){% else %} ⚠ no WHM name{% endif %}
+            — £{{ p.price_annually }}/yr
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div class="border-t border-slate-100 pt-4 space-y-3">
+      <h3 class="font-semibold text-slate-900">Invoice (optional)</h3>
+      <p class="text-xs text-slate-500">Leave off for pure cash tracking in your own books. Turn on to create an unpaid portal invoice after registration.</p>
+      <label class="inline-flex items-center gap-2 text-sm text-slate-700">
+        <input type="checkbox" name="create_invoice" {% if form.create_invoice %}checked{% endif %} class="rounded border-slate-300">
+        Create unpaid invoice after successful registration
+      </label>
+      <div>
+        <label class="block text-sm font-semibold text-slate-700 mb-1">Invoice total override (£)</label>
+        <input type="number" step="0.01" min="0" name="invoice_amount" value="{{ form.invoice_amount|default:'' }}"
+               placeholder="Auto from TLD pricing if empty"
+               class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div>
+        <label class="block text-sm font-semibold text-slate-700 mb-1">Notes</label>
+        <textarea name="notes" rows="2" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" placeholder="Cash received, reference, etc.">{{ form.notes|default:'' }}</textarea>
+      </div>
+    </div>
+
+    <div class="flex flex-wrap gap-3 pt-2">
+      <button type="submit" class="px-5 py-2.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white font-semibold text-sm">
+        Register domain now
+      </button>
+      <a href="{% url 'admin_tools:domains_list' %}" class="px-5 py-2.5 rounded-lg border border-slate-300 text-slate-700 text-sm hover:bg-slate-50">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

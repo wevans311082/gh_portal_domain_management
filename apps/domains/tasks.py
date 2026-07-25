@@ -150,8 +150,17 @@ def register_domain_order(self, order_id):
     if order.status == DomainOrder.STATUS_COMPLETED and order.domain_id:
         return order.domain_id
 
-    if not order.invoice or order.invoice.status != order.invoice.STATUS_PAID:
-        raise ValueError("Domain order cannot be registered until the invoice is paid.")
+    # Paid invoice path (cart/checkout) OR staff manual order (no invoice, status paid).
+    if order.invoice_id:
+        if order.invoice.status != order.invoice.STATUS_PAID:
+            raise ValueError("Domain order cannot be registered until the invoice is paid.")
+    elif order.status not in (
+        DomainOrder.STATUS_PAID,
+        DomainOrder.STATUS_PROCESSING,
+    ):
+        raise ValueError(
+            "Manual domain orders without an invoice must be marked paid before registration."
+        )
 
     if not settings.RESELLERCLUB_CUSTOMER_ID:
         order.status = DomainOrder.STATUS_FAILED
