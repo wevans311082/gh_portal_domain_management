@@ -150,6 +150,11 @@ def register_domain_order(self, order_id):
     if order.status == DomainOrder.STATUS_COMPLETED and order.domain_id:
         return order.domain_id
 
+    if order.status == DomainOrder.STATUS_PAUSED:
+        raise ValueError("Domain order is paused and will not be registered until resumed.")
+    if order.status == DomainOrder.STATUS_CANCELLED:
+        raise ValueError("Domain order is cancelled.")
+
     # Paid invoice path (cart/checkout) OR staff manual order (no invoice, status paid).
     if order.invoice_id:
         if order.invoice.status != order.invoice.STATUS_PAID:

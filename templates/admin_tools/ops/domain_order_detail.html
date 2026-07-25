@@ -1,0 +1,154 @@
+{% extends "base_admin.html" %}
+{% block title %}Order #{{ order.pk }} · {{ order.domain_name }} · {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Domain order #{{ order.pk }}{% endblock %}
+
+{% block content %}
+<div class="mb-4 flex flex-wrap gap-2 items-center">
+  <a href="{% url 'admin_tools:domain_orders_list' %}" class="text-sm text-sky-700 hover:underline">← All domain orders</a>
+  <span class="text-slate-300">|</span>
+  <span class="text-sm text-slate-600">Platform record only — may not exist in ResellerClub yet.</span>
+</div>
+
+<div class="flex flex-wrap gap-2 mb-6">
+  {% if order.status != 'completed' and order.status != 'cancelled' and order.status != 'paused' %}
+  <form method="post" action="{% url 'admin_tools:domain_order_action' order.pk 'process' %}">{% csrf_token %}
+    <button class="px-3 py-1.5 rounded bg-emerald-600 text-white text-xs font-semibold" type="submit">Process / register</button>
+  </form>
+  {% endif %}
+  {% if order.status == 'failed' %}
+  <form method="post" action="{% url 'admin_tools:domain_order_action' order.pk 'retry_failed' %}">{% csrf_token %}
+    <button class="px-3 py-1.5 rounded bg-emerald-700 text-white text-xs font-semibold" type="submit">Retry failed</button>
+  </form>
+  {% endif %}
+  {% if order.status == 'pending_payment' or order.status == 'draft' or order.status == 'paused' %}
+  <form method="post" action="{% url 'admin_tools:domain_order_action' order.pk 'mark_paid' %}">{% csrf_token %}
+    <button class="px-3 py-1.5 rounded bg-sky-600 text-white text-xs font-semibold" type="submit">Mark paid</button>
+  </form>
+  {% endif %}
+  {% if order.status != 'paused' and order.status != 'completed' and order.status != 'cancelled' %}
+  <form method="post" action="{% url 'admin_tools:domain_order_action' order.pk 'pause' %}" class="inline-flex gap-1">{% csrf_token %}
+    <input type="text" name="reason" placeholder="Pause reason" class="border rounded px-2 py-1 text-xs w-40">
+    <button class="px-3 py-1.5 rounded bg-violet-600 text-white text-xs font-semibold" type="submit">Pause</button>
+  </form>
+  {% endif %}
+  {% if order.status == 'paused' %}
+  <form method="post" action="{% url 'admin_tools:domain_order_action' order.pk 'resume' %}">{% csrf_token %}
+    <button class="px-3 py-1.5 rounded bg-violet-700 text-white text-xs font-semibold" type="submit">Resume</button>
+  </form>
+  {% endif %}
+  {% if order.status != 'completed' and order.status != 'cancelled' %}
+  <form method="post" action="{% url 'admin_tools:domain_order_action' order.pk 'cancel' %}" class="inline-flex gap-1" onsubmit="return confirm('Cancel this order?');">{% csrf_token %}
+    <input type="text" name="reason" placeholder="Cancel reason" class="border rounded px-2 py-1 text-xs w-40">
+    <button class="px-3 py-1.5 rounded bg-amber-600 text-white text-xs font-semibold" type="submit">Cancel</button>
+  </form>
+  {% endif %}
+  <form method="post" action="{% url 'admin_tools:domain_order_action' order.pk 'clear_error' %}">{% csrf_token %}
+    <button class="px-3 py-1.5 rounded border border-slate-300 text-slate-700 text-xs" type="submit">Clear error</button>
+  </form>
+  {% if order.status != 'completed' %}
+  <form method="post" action="{% url 'admin_tools:domain_order_action' order.pk 'delete' %}" onsubmit="return confirm('Permanently delete platform order #{{ order.pk }}?');">{% csrf_token %}
+    <button class="px-3 py-1.5 rounded bg-rose-600 text-white text-xs font-semibold" type="submit">Delete order</button>
+  </form>
+  {% endif %}
+  {% if order.invoice_id %}
+  <a href="{% url 'admin_tools:invoice_edit' order.invoice_id %}" class="px-3 py-1.5 rounded border border-slate-300 text-xs text-slate-700">Invoice {{ order.invoice.number }}</a>
+  {% endif %}
+  {% if order.domain_id %}
+  <a href="{% url 'admin_tools:domains_edit' order.domain_id %}" class="px-3 py-1.5 rounded border border-slate-300 text-xs text-slate-700">Domain record</a>
+  {% endif %}
+</div>
+
+{% if order.last_error %}
+<div class="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900 whitespace-pre-wrap">{{ order.last_error }}</div>
+{% endif %}
+
+<form method="post" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+  {% csrf_token %}
+
+  <div class="bg-white border border-slate-200 rounded-xl p-5 space-y-3 shadow-sm">
+    <h3 class="font-semibold text-slate-900">Order details</h3>
+    <div>
+      <label class="block text-xs font-semibold text-slate-500 mb-1">Domain name</label>
+      <input name="domain_name" value="{{ order.domain_name }}" class="w-full border rounded px-3 py-2 text-sm font-mono"
+             {% if order.status == 'completed' %}readonly{% endif %}>
+    </div>
+    <div>
+      <label class="block text-xs font-semibold text-slate-500 mb-1">Client</label>
+      <select name="user_id" class="w-full border rounded px-3 py-2 text-sm" {% if order.status == 'completed' %}disabled{% endif %}>
+        {% for u in users %}
+        <option value="{{ u.pk }}" {% if u.pk == order.user_id %}selected{% endif %}>{{ u.email }}</option>
+        {% endfor %}
+      </select>
+      {% if order.status == 'completed' %}<input type="hidden" name="user_id" value="{{ order.user_id }}">{% endif %}
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-xs font-semibold text-slate-500 mb-1">Status</label>
+        <select name="status" class="w-full border rounded px-3 py-2 text-sm">
+          {% for value, label in status_choices %}
+          <option value="{{ value }}" {% if order.status == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-slate-500 mb-1">Years</label>
+        <input type="number" min="1" max="10" name="registration_years" value="{{ order.registration_years }}" class="w-full border rounded px-3 py-2 text-sm">
+      </div>
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-xs font-semibold text-slate-500 mb-1">Quoted £</label>
+        <input name="quoted_price" value="{{ order.quoted_price }}" class="w-full border rounded px-3 py-2 text-sm">
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-slate-500 mb-1">Total £</label>
+        <input name="total_price" value="{{ order.total_price }}" class="w-full border rounded px-3 py-2 text-sm">
+      </div>
+    </div>
+    <div>
+      <label class="block text-xs font-semibold text-slate-500 mb-1">DNS provider</label>
+      <select name="dns_provider" class="w-full border rounded px-3 py-2 text-sm">
+        {% for value, label in dns_choices %}
+        <option value="{{ value }}" {% if order.dns_provider == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="flex gap-4">
+      <label class="inline-flex items-center gap-2 text-sm"><input type="checkbox" name="privacy_enabled" {% if order.privacy_enabled %}checked{% endif %}> Privacy</label>
+      <label class="inline-flex items-center gap-2 text-sm"><input type="checkbox" name="auto_renew" {% if order.auto_renew %}checked{% endif %}> Auto-renew</label>
+    </div>
+  </div>
+
+  <div class="bg-white border border-slate-200 rounded-xl p-5 space-y-3 shadow-sm">
+    <h3 class="font-semibold text-slate-900">Contacts &amp; registrar</h3>
+    <div>
+      <label class="block text-xs font-semibold text-slate-500 mb-1">Registration contact (also sets admin/tech/billing)</label>
+      <select name="registration_contact_id" class="w-full border rounded px-3 py-2 text-sm">
+        {% for c in contacts %}
+        <option value="{{ c.pk }}" {% if c.pk == order.registration_contact_id %}selected{% endif %}>{{ c.label }} — {{ c.name }} ({{ c.email }})</option>
+        {% empty %}
+        <option value="">No contacts for this user</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs font-semibold text-slate-500 mb-1">Registrar order ID</label>
+      <input name="registrar_order_id" value="{{ order.registrar_order_id }}" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="Empty until registered at ResellerClub">
+    </div>
+    <div>
+      <label class="block text-xs font-semibold text-slate-500 mb-1">Last error / notes</label>
+      <textarea name="last_error" rows="5" class="w-full border rounded px-3 py-2 text-sm font-mono">{{ order.last_error }}</textarea>
+    </div>
+    <dl class="text-xs text-slate-500 grid grid-cols-2 gap-2 pt-2 border-t">
+      <div><dt>Created</dt><dd class="text-slate-800">{{ order.created_at }}</dd></div>
+      <div><dt>Updated</dt><dd class="text-slate-800">{{ order.updated_at }}</dd></div>
+      <div><dt>Completed</dt><dd class="text-slate-800">{{ order.completed_at|default:"—" }}</dd></div>
+      <div><dt>TLD</dt><dd class="text-slate-800">{{ order.tld }}</dd></div>
+    </dl>
+  </div>
+
+  <div class="lg:col-span-2">
+    <button type="submit" class="px-5 py-2.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-sm font-semibold">Save changes</button>
+  </div>
+</form>
+{% endblock %}

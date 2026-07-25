@@ -5,6 +5,7 @@ from . import billing_views
 from . import content_views
 from . import operations_views
 from . import manual_order_views
+from . import domain_order_views
 
 app_name = "admin_tools"
 
@@ -54,6 +55,13 @@ urlpatterns = [
         "domains/manual-register/<int:order_id>/hosting/",
         manual_order_views.manual_domain_add_hosting,
         name="manual_domain_add_hosting",
+    ),
+    path("domains/orders/", domain_order_views.domain_orders_list, name="domain_orders_list"),
+    path("domains/orders/<int:pk>/", domain_order_views.domain_order_detail, name="domain_order_detail"),
+    path(
+        "domains/orders/<int:pk>/<str:action>/",
+        domain_order_views.domain_order_action,
+        name="domain_order_action",
     ),
     path("domains/", operations_views.domains_list, name="domains_list"),
     path("domains/new/", operations_views.domains_create, name="domains_create"),

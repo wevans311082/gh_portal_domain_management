@@ -1,0 +1,121 @@
+{% extends "base_admin.html" %}
+{% block title %}Domain orders · {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Domain orders{% endblock %}
+
+{% block content %}
+<div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+  <div>
+    <p class="text-sm text-slate-600">
+      Platform registration queue (not ResellerClub’s order list).
+      <strong>{{ open_count }}</strong> open · <strong>{{ total_count }}</strong> total
+    </p>
+  </div>
+  <div class="flex flex-wrap gap-2">
+    <a href="{% url 'admin_tools:manual_domain_register' %}" class="px-3 py-1.5 rounded bg-emerald-600 text-white text-xs font-semibold">Manual register</a>
+    <a href="{% url 'admin_tools:domains_list' %}" class="px-3 py-1.5 rounded border border-slate-300 text-slate-700 text-xs">Domains</a>
+  </div>
+</div>
+
+<form method="get" class="flex flex-wrap gap-2 mb-4 items-end">
+  <div>
+    <label class="block text-xs font-semibold text-slate-500 mb-1">Search</label>
+    <input name="q" value="{{ search_q }}" placeholder="Domain, email, error…"
+           class="border border-slate-300 rounded px-3 py-2 text-sm w-64">
+  </div>
+  <div>
+    <label class="block text-xs font-semibold text-slate-500 mb-1">Status</label>
+    <select name="status" class="border border-slate-300 rounded px-3 py-2 text-sm">
+      <option value="open" {% if status_filter == 'open' %}selected{% endif %}>Open (default)</option>
+      <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All</option>
+      {% for value, label in status_choices %}
+      <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <button class="px-4 py-2 bg-slate-800 text-white rounded text-sm">Filter</button>
+</form>
+
+<div class="flex flex-wrap gap-2 mb-4 text-xs">
+  <a href="?status=open" class="px-2 py-1 rounded {% if status_filter == 'open' %}bg-sky-600 text-white{% else %}bg-slate-100 text-slate-700{% endif %}">Open {{ open_count }}</a>
+  <a href="?status=pending_payment" class="px-2 py-1 rounded {% if status_filter == 'pending_payment' %}bg-amber-600 text-white{% else %}bg-slate-100{% endif %}">Pending payment {{ counts.pending_payment|default:0 }}</a>
+  <a href="?status=paid" class="px-2 py-1 rounded {% if status_filter == 'paid' %}bg-emerald-700 text-white{% else %}bg-slate-100{% endif %}">Paid {{ counts.paid|default:0 }}</a>
+  <a href="?status=failed" class="px-2 py-1 rounded {% if status_filter == 'failed' %}bg-rose-600 text-white{% else %}bg-slate-100{% endif %}">Failed {{ counts.failed|default:0 }}</a>
+  <a href="?status=paused" class="px-2 py-1 rounded {% if status_filter == 'paused' %}bg-violet-600 text-white{% else %}bg-slate-100{% endif %}">Paused {{ counts.paused|default:0 }}</a>
+  <a href="?status=processing" class="px-2 py-1 rounded {% if status_filter == 'processing' %}bg-indigo-600 text-white{% else %}bg-slate-100{% endif %}">Processing {{ counts.processing|default:0 }}</a>
+  <a href="?status=all" class="px-2 py-1 rounded {% if status_filter == 'all' %}bg-slate-800 text-white{% else %}bg-slate-100{% endif %}">All</a>
+</div>
+
+<div class="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-slate-50 text-slate-600">
+        <tr>
+          <th class="px-3 py-2 text-left">#</th>
+          <th class="px-3 py-2 text-left">Domain</th>
+          <th class="px-3 py-2 text-left">Client</th>
+          <th class="px-3 py-2 text-left">Status</th>
+          <th class="px-3 py-2 text-left">Invoice</th>
+          <th class="px-3 py-2 text-left">Yrs</th>
+          <th class="px-3 py-2 text-left">Created</th>
+          <th class="px-3 py-2 text-left">Error / note</th>
+          <th class="px-3 py-2 text-right">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
+        {% for o in page_obj %}
+        <tr class="hover:bg-slate-50 align-top">
+          <td class="px-3 py-2 text-slate-500">{{ o.pk }}</td>
+          <td class="px-3 py-2 font-mono font-medium">
+            <a href="{% url 'admin_tools:domain_order_detail' o.pk %}" class="text-sky-700 hover:underline">{{ o.domain_name }}</a>
+            {% if o.domain_id %}<div class="text-[11px] text-emerald-700">→ domain #{{ o.domain_id }}</div>{% endif %}
+          </td>
+          <td class="px-3 py-2">{{ o.user.email }}</td>
+          <td class="px-3 py-2">
+            <span class="px-2 py-0.5 rounded-full text-xs font-semibold
+              {% if o.status == 'failed' %}bg-rose-100 text-rose-800
+              {% elif o.status == 'completed' %}bg-emerald-100 text-emerald-800
+              {% elif o.status == 'paused' %}bg-violet-100 text-violet-800
+              {% elif o.status == 'pending_payment' %}bg-amber-100 text-amber-900
+              {% elif o.status == 'paid' or o.status == 'processing' %}bg-sky-100 text-sky-900
+              {% elif o.status == 'cancelled' %}bg-slate-200 text-slate-600
+              {% else %}bg-slate-100 text-slate-700{% endif %}">
+              {{ o.get_status_display }}
+            </span>
+          </td>
+          <td class="px-3 py-2 text-xs">
+            {% if o.invoice_id %}
+              <a href="{% url 'admin_tools:invoice_edit' o.invoice_id %}" class="text-sky-700 hover:underline">{{ o.invoice.number }}</a>
+              <div class="text-slate-500">{{ o.invoice.get_status_display }}</div>
+            {% else %}
+              <span class="text-slate-400">—</span>
+            {% endif %}
+          </td>
+          <td class="px-3 py-2">{{ o.registration_years }}</td>
+          <td class="px-3 py-2 text-xs text-slate-500 whitespace-nowrap">{{ o.created_at|date:"Y-m-d H:i" }}</td>
+          <td class="px-3 py-2 text-xs text-rose-700 max-w-xs truncate" title="{{ o.last_error }}">{{ o.last_error|default:"—"|truncatechars:80 }}</td>
+          <td class="px-3 py-2 text-right whitespace-nowrap">
+            <a href="{% url 'admin_tools:domain_order_detail' o.pk %}" class="text-xs text-sky-700 hover:underline mr-2">Open</a>
+            {% if o.status != 'completed' and o.status != 'cancelled' %}
+            <form method="post" action="{% url 'admin_tools:domain_order_action' o.pk 'process' %}" class="inline">{% csrf_token %}
+              <button class="text-xs text-emerald-700 hover:underline mr-1" type="submit">Process</button>
+            </form>
+            <form method="post" action="{% url 'admin_tools:domain_order_action' o.pk 'cancel' %}" class="inline" onsubmit="return confirm('Cancel order {{ o.domain_name }}?');">{% csrf_token %}
+              <button class="text-xs text-amber-700 hover:underline mr-1" type="submit">Cancel</button>
+            </form>
+            {% endif %}
+            {% if o.status != 'completed' %}
+            <form method="post" action="{% url 'admin_tools:domain_order_action' o.pk 'delete' %}" class="inline" onsubmit="return confirm('Delete platform order #{{ o.pk }}?');">{% csrf_token %}
+              <button class="text-xs text-rose-600 hover:underline" type="submit">Delete</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="9" class="px-4 py-10 text-center text-slate-500">No orders match this filter.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% include "admin_tools/_pagination.html" with page_obj=page_obj %}
+{% endblock %}

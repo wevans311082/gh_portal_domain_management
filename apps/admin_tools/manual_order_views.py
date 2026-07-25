@@ -277,10 +277,20 @@ def manual_domain_register(request):
     if Domain.objects.filter(name__iexact=domain_name).exists():
         messages.error(request, f"{domain_name} already exists in the portal.")
         return render(request, "admin_tools/manual_domain_register.html", context)
-    if DomainOrder.objects.filter(domain_name__iexact=domain_name).exclude(
-        status=DomainOrder.STATUS_CANCELLED
-    ).exists():
-        messages.error(request, f"An open order already exists for {domain_name}.")
+    blocking = (
+        DomainOrder.objects.filter(domain_name__iexact=domain_name)
+        .exclude(status=DomainOrder.STATUS_CANCELLED)
+        .order_by("-id")
+        .first()
+    )
+    if blocking:
+        messages.error(
+            request,
+            f"An open platform order already exists for {domain_name} "
+            f"(order #{blocking.pk}, status: {blocking.get_status_display()}). "
+            f"Open Domain orders to process, cancel, or delete it first.",
+        )
+        context["blocking_order"] = blocking
         return render(request, "admin_tools/manual_domain_register.html", context)
 
     package = None

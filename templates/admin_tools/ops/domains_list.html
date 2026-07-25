@@ -5,6 +5,7 @@
 <div class="flex items-center justify-between mb-4">
   <form method="get" class="flex gap-2"><input name="q" value="{{ search_q }}" placeholder="Search domain/email/status" class="border rounded px-3 py-2 text-sm w-72"><button class="px-4 py-2 bg-slate-800 text-white rounded text-sm">Search</button></form>
   <div class="flex gap-2">
+    <a href="{% url 'admin_tools:domain_orders_list' %}" class="px-4 py-2 bg-violet-600 text-white rounded text-sm font-semibold">Domain orders</a>
     <a href="{% url 'admin_tools:manual_domain_register' %}" class="px-4 py-2 bg-emerald-600 text-white rounded text-sm font-semibold">Manual register</a>
     <a href="{% url 'admin_tools:domains_create' %}" class="px-4 py-2 bg-sky-600 text-white rounded text-sm">New domain record</a>
   </div>

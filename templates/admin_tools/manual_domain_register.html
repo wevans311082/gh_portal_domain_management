@@ -9,7 +9,17 @@
     Register a domain directly with ResellerClub for an existing client.
     <strong>No invoice is required</strong> — use this for cash / offline orders.
     You can generate an invoice afterwards.
+    Manage stuck platform orders under
+    <a href="{% url 'admin_tools:domain_orders_list' %}" class="text-sky-700 hover:underline font-medium">Domain orders</a>.
   </p>
+  {% if blocking_order %}
+  <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+    Blocking order:
+    <a class="font-semibold text-sky-800 hover:underline" href="{% url 'admin_tools:domain_order_detail' blocking_order.pk %}">
+      #{{ blocking_order.pk }} {{ blocking_order.domain_name }} ({{ blocking_order.get_status_display }})
+    </a>
+  </div>
+  {% endif %}
 
   <form method="post" class="space-y-6 bg-white border border-slate-200 rounded-xl shadow-sm p-6">
     {% csrf_token %}

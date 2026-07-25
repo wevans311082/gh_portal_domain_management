@@ -214,6 +214,7 @@ class DomainOrder(TimeStampedModel):
     STATUS_PENDING_PAYMENT = "pending_payment"
     STATUS_PAID = "paid"
     STATUS_PROCESSING = "processing"
+    STATUS_PAUSED = "paused"
     STATUS_COMPLETED = "completed"
     STATUS_FAILED = "failed"
     STATUS_CANCELLED = "cancelled"
@@ -223,10 +224,21 @@ class DomainOrder(TimeStampedModel):
         (STATUS_PENDING_PAYMENT, "Pending payment"),
         (STATUS_PAID, "Paid"),
         (STATUS_PROCESSING, "Processing"),
+        (STATUS_PAUSED, "Paused"),
         (STATUS_COMPLETED, "Completed"),
         (STATUS_FAILED, "Failed"),
         (STATUS_CANCELLED, "Cancelled"),
     ]
+
+    # Platform-side open work (not completed/cancelled at registrar handoff)
+    OPEN_STATUSES = (
+        STATUS_DRAFT,
+        STATUS_PENDING_PAYMENT,
+        STATUS_PAID,
+        STATUS_PROCESSING,
+        STATUS_PAUSED,
+        STATUS_FAILED,
+    )
 
     user = models.ForeignKey(User, on_delete=models.PROTECT, related_name="domain_orders")
     invoice = models.ForeignKey("billing.Invoice", on_delete=models.PROTECT, related_name="domain_orders", null=True, blank=True)
