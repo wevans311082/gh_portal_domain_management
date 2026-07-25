@@ -18,8 +18,11 @@ from apps.billing.services import LineItemSpec, create_invoice
 from apps.domains.models import Domain, DomainContact, DomainOrder, TLDPricing
 from apps.domains.tasks import register_domain_order
 from apps.products.models import Package
+from apps.provisioning.models import WHMPackageSnapshot
 from apps.provisioning.tasks import create_provisioning_job
+from apps.provisioning.whm_client import WHMClient, WHMClientError
 from apps.services.models import Service
+from django.utils.text import slugify
 
 logger = logging.getLogger(__name__)
 
@@ -104,18 +107,128 @@ def _price_for_tld(tld: str, years: int) -> Decimal:
     return (pricing.registration_price * Decimal(years)).quantize(Decimal("0.01"))
 
 
+def _extract_whm_pkg_name(row) -> str:
+    if isinstance(row, str):
+        return row.strip()
+    if not isinstance(row, dict):
+        return ""
+    for key in ("name", "pkg", "package", "pkgname", "plan"):
+        val = row.get(key)
+        if val:
+            return str(val).strip()
+    return ""
+
+
+def _load_whm_hosting_packages() -> tuple[list[dict], str]:
+    """Return hosting package options for the dropdown.
+
+    Prefer the last WHM inventory snapshot (safe if WHM is briefly down).
+    If that is empty, attempt a live ``listpkgs`` call.
+    """
+    source = "snapshot"
+    names: list[str] = list(
+        WHMPackageSnapshot.objects.filter(is_active=True)
+        .order_by("name")
+        .values_list("name", flat=True)
+    )
+
+    # Live refresh when snapshot is empty (or as a soft top-up if WHM responds).
+    live_names: list[str] = []
+    live_error = ""
+    try:
+        client = WHMClient()
+        for row in client.list_packages() or []:
+            name = _extract_whm_pkg_name(row)
+            if name:
+                live_names.append(name)
+    except (WHMClientError, Exception) as exc:
+        live_error = str(exc)
+        logger.warning("Live WHM package list failed: %s", exc)
+
+    if live_names:
+        # Merge live into snapshot set so dropdown matches the server right now.
+        merged = sorted(set(names) | set(live_names), key=str.lower)
+        names = merged
+        source = "whm+snapshot" if names and WHMPackageSnapshot.objects.exists() else "whm"
+        # Keep snapshot warm for next time (best-effort, no full sync).
+        for name in live_names:
+            WHMPackageSnapshot.objects.update_or_create(
+                name=name,
+                defaults={"is_active": True},
+            )
+    elif not names and live_error:
+        source = f"unavailable ({live_error[:120]})"
+
+    portal_by_whm = {
+        (p.whm_package_name or "").strip(): p
+        for p in Package.objects.filter(is_active=True).exclude(whm_package_name="")
+    }
+    options = []
+    for name in names:
+        portal = portal_by_whm.get(name)
+        label = name
+        if portal:
+            label = f"{name} · portal: {portal.name} (£{portal.price_annually}/yr)"
+        else:
+            label = f"{name} · WHM package"
+        options.append({"name": name, "label": label, "portal_package": portal})
+    return options, source
+
+
+def _resolve_package_for_whm_name(whm_package_name: str) -> Package:
+    """Map a WHM package name to a portal Package (create a lightweight row if needed)."""
+    name = (whm_package_name or "").strip()
+    if not name:
+        raise ValueError("WHM package name is required.")
+
+    existing = Package.objects.filter(whm_package_name__iexact=name).order_by("-is_active", "id").first()
+    if existing:
+        if not existing.is_active:
+            existing.is_active = True
+            existing.save(update_fields=["is_active", "updated_at"])
+        return existing
+
+    # Also match if portal package name equals the WHM plan name.
+    by_name = Package.objects.filter(name__iexact=name).order_by("id").first()
+    if by_name:
+        if not by_name.whm_package_name:
+            by_name.whm_package_name = name
+            by_name.save(update_fields=["whm_package_name", "updated_at"])
+        return by_name
+
+    base_slug = slugify(name)[:40] or "whm-package"
+    slug = base_slug
+    i = 2
+    while Package.objects.filter(slug=slug).exists():
+        slug = f"{base_slug}-{i}"[:50]
+        i += 1
+
+    return Package.objects.create(
+        name=name,
+        slug=slug,
+        description=f"Auto-created from WHM package “{name}” (manual registration tool).",
+        price_monthly=Decimal("0.00"),
+        price_annually=Decimal("0.00"),
+        whm_package_name=name,
+        is_active=True,
+        show_on_homepage=False,
+        is_quotable=False,
+    )
+
+
 @staff_member_required
 def manual_domain_register(request):
     """Simple staff form: register domain for a client, optional hosting, no invoice required."""
     users = User.objects.filter(is_active=True).order_by("email")[:500]
-    packages = Package.objects.filter(is_active=True).order_by("sort_order", "name")
+    whm_packages, whm_packages_source = _load_whm_hosting_packages()
     contacts_by_user = {}
     for c in DomainContact.objects.select_related("user").order_by("user__email", "label")[:1000]:
         contacts_by_user.setdefault(c.user_id, []).append(c)
 
     context = {
         "users": users,
-        "packages": packages,
+        "whm_packages": whm_packages,
+        "whm_packages_source": whm_packages_source,
         "contacts_by_user": contacts_by_user,
         "year_choices": list(range(1, 11)),
         "form": {},
@@ -131,7 +244,7 @@ def manual_domain_register(request):
         "privacy_enabled": request.POST.get("privacy_enabled") == "on",
         "auto_renew": request.POST.get("auto_renew") == "on",
         "create_hosting": request.POST.get("create_hosting") == "on",
-        "package_id": (request.POST.get("package_id") or "").strip(),
+        "whm_package_name": (request.POST.get("whm_package_name") or "").strip(),
         "create_invoice": request.POST.get("create_invoice") == "on",
         "invoice_amount": (request.POST.get("invoice_amount") or "").strip(),
         "notes": (request.POST.get("notes") or "").strip(),
@@ -172,12 +285,14 @@ def manual_domain_register(request):
 
     package = None
     if form["create_hosting"]:
-        package = Package.objects.filter(pk=form["package_id"], is_active=True).first()
-        if not package:
-            messages.error(request, "Select a hosting package or uncheck Create WHM hosting.")
+        whm_name = form["whm_package_name"]
+        if not whm_name:
+            messages.error(request, "Select a WHM hosting package or uncheck Create WHM hosting.")
             return render(request, "admin_tools/manual_domain_register.html", context)
-        if not package.whm_package_name:
-            messages.error(request, f"Package “{package.name}” has no WHM package name configured.")
+        try:
+            package = _resolve_package_for_whm_name(whm_name)
+        except ValueError as exc:
+            messages.error(request, str(exc))
             return render(request, "admin_tools/manual_domain_register.html", context)
 
     contact = _ensure_contact(user, request.POST)
@@ -318,7 +433,7 @@ def manual_domain_result(request, order_id):
         pk=order_id,
     )
     services = Service.objects.filter(user=order.user, domain_name=order.domain_name).select_related("package")
-    packages = Package.objects.filter(is_active=True).order_by("sort_order", "name")
+    whm_packages, whm_packages_source = _load_whm_hosting_packages()
     return render(
         request,
         "admin_tools/manual_domain_result.html",
@@ -326,7 +441,8 @@ def manual_domain_result(request, order_id):
             "order": order,
             "domain": order.domain,
             "services": services,
-            "packages": packages,
+            "whm_packages": whm_packages,
+            "whm_packages_source": whm_packages_source,
         },
     )
 
@@ -405,12 +521,14 @@ def manual_domain_add_hosting(request, order_id):
         messages.error(request, "Domain is not registered yet — cannot create hosting.")
         return redirect("admin_tools:manual_domain_result", order_id=order.pk)
 
-    package = Package.objects.filter(pk=request.POST.get("package_id"), is_active=True).first()
-    if not package:
-        messages.error(request, "Select a hosting package.")
+    whm_name = (request.POST.get("whm_package_name") or "").strip()
+    if not whm_name:
+        messages.error(request, "Select a WHM hosting package.")
         return redirect("admin_tools:manual_domain_result", order_id=order.pk)
-    if not package.whm_package_name:
-        messages.error(request, f"Package “{package.name}” has no WHM package name.")
+    try:
+        package = _resolve_package_for_whm_name(whm_name)
+    except ValueError as exc:
+        messages.error(request, str(exc))
         return redirect("admin_tools:manual_domain_result", order_id=order.pk)
 
     if Service.objects.filter(user=order.user, domain_name=domain.name, status=Service.STATUS_ACTIVE).exists():

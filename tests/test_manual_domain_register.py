@@ -17,6 +17,27 @@ def test_manual_register_page_requires_staff(client, django_user_model):
 
 
 @pytest.mark.django_db
+def test_manual_register_whm_package_dropdown_uses_snapshot(client, django_user_model, monkeypatch):
+    from apps.provisioning.models import WHMPackageSnapshot
+
+    staff = django_user_model.objects.create_user(email="admin-pkg@example.com", password="x", is_staff=True)
+    client.force_login(staff)
+    WHMPackageSnapshot.objects.create(name="starter", is_active=True)
+    WHMPackageSnapshot.objects.create(name="business", is_active=True)
+
+    class BoomWHM:
+        def list_packages(self):
+            raise RuntimeError("WHM offline")
+
+    monkeypatch.setattr("apps.admin_tools.manual_order_views.WHMClient", BoomWHM)
+    resp = client.get(reverse("admin_tools:manual_domain_register"))
+    assert resp.status_code == 200
+    body = resp.content.decode()
+    assert "starter" in body
+    assert "business" in body
+
+
+@pytest.mark.django_db
 def test_manual_register_creates_domain_without_invoice(client, django_user_model, monkeypatch, settings):
     staff = django_user_model.objects.create_user(email="admin@example.com", password="x", is_staff=True)
     customer = django_user_model.objects.create_user(email="buyer@example.com", password="x")
