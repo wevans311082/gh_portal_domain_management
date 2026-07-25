@@ -1,0 +1,55 @@
+# Git / VCS
+.git
+.gitignore
+.gitattributes
+
+# Python envs & caches
+.venv
+venv
+__pycache__
+**/__pycache__
+*.py[cod]
+*.egg-info
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.coverage
+htmlcov
+pytest_out.txt
+
+# Local runtime data (not needed in image)
+.env
+.env.*
+!.env.example
+db.sqlite3
+*.sqlite3
+staticfiles
+media
+.DS_Store
+
+# Huge optional template libraries (bind-mount or volume in runtime if needed)
+website_templates/extracted
+website_templates/Website Templates
+website_templates/**/*.zip
+
+# Docs, examples, local tooling
+docs
+example_code
+src_images
+*.md
+!README.md
+
+# IDE / editor
+.idea
+.vscode
+*.swp
+*~
+
+# Tests not required in runtime image (install deps separately if needed)
+# Keep tests/ out of image to shrink context; run tests on host or a test stage.
+tests
+
+# Nested docker noise
+**/Dockerfile*
+!Dockerfile
+!Dockerfile.prod

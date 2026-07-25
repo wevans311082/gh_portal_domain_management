@@ -1,4 +1,31 @@
-version: '3.9'
+# Cyber Ask Domains — local / lab stack
+# Build once (shared image), reuse for web + celery + beat.
+
+x-app-build: &app-build
+  context: .
+  dockerfile: Dockerfile
+  args:
+    REQUIREMENTS_FILE: requirements/development.txt
+    # Set to "0" for a faster image when invoice PDFs are not needed in lab
+    INSTALL_WKHTMLTOPDF: "1"
+
+x-app-common: &app-common
+  image: cyberask-domains:local
+  build: *app-build
+  env_file:
+    - .env
+  environment: &app-env
+    DJANGO_SETTINGS_MODULE: cyberask_domains.settings.development
+    MIGRATION_LOCK_ID: "8453201"
+  volumes:
+    - .:/app
+    - media_files:/app/media
+  depends_on:
+    db:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  restart: unless-stopped
 
 services:
   db:
@@ -12,84 +39,74 @@ services:
       POSTGRES_PASSWORD: grumpy_pass
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U grumpy -d grumpy_portal"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
     volumes:
       - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 3s
+    restart: unless-stopped
 
   web:
-    build: .
-    command: python manage.py runserver 0.0.0.0:8000
+    <<: *app-common
+    command: ["python", "manage.py", "runserver", "0.0.0.0:8000"]
     volumes:
       - .:/app
       - static_files:/app/staticfiles
       - media_files:/app/media
     ports:
       - "8000:8000"
-    env_file:
-      - .env
     environment:
-      - DJANGO_SETTINGS_MODULE=cyberask_domains.settings.development
-      - RUN_STARTUP_MIGRATIONS=1
-      - MIGRATION_LEADER=1
-      - MIGRATION_LOCK_ID=8453201
-      - AUTO_MAKEMIGRATIONS=1
-      - RUN_COLLECTSTATIC=1
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      <<: *app-env
+      RUN_STARTUP_MIGRATIONS: "1"
+      MIGRATION_LEADER: "1"
+      AUTO_MAKEMIGRATIONS: "0"
+      RUN_COLLECTSTATIC: "1"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/', timeout=3)",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
 
   celery:
-    build: .
-    command: celery -A cyberask_domains worker -l info
-    volumes:
-      - .:/app
-      - media_files:/app/media
-    env_file:
-      - .env
+    <<: *app-common
+    command: ["celery", "-A", "cyberask_domains", "worker", "-l", "info"]
     environment:
-      - DJANGO_SETTINGS_MODULE=cyberask_domains.settings.development
-      - RUN_STARTUP_MIGRATIONS=0
-      - MIGRATION_LEADER=0
-      - MIGRATION_LOCK_ID=8453201
-      - AUTO_MAKEMIGRATIONS=0
-      - RUN_COLLECTSTATIC=0
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      <<: *app-env
+      RUN_STARTUP_MIGRATIONS: "0"
+      MIGRATION_LEADER: "0"
+      AUTO_MAKEMIGRATIONS: "0"
+      RUN_COLLECTSTATIC: "0"
 
   celery-beat:
-    build: .
-    command: celery -A cyberask_domains beat -l info
+    <<: *app-common
+    command: ["celery", "-A", "cyberask_domains", "beat", "-l", "info"]
     volumes:
       - .:/app
-    env_file:
-      - .env
     environment:
-      - DJANGO_SETTINGS_MODULE=cyberask_domains.settings.development
-      - RUN_STARTUP_MIGRATIONS=0
-      - MIGRATION_LEADER=0
-      - MIGRATION_LOCK_ID=8453201
-      - AUTO_MAKEMIGRATIONS=0
-      - RUN_COLLECTSTATIC=0
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      <<: *app-env
+      RUN_STARTUP_MIGRATIONS: "0"
+      MIGRATION_LEADER: "0"
+      AUTO_MAKEMIGRATIONS: "0"
+      RUN_COLLECTSTATIC: "0"
 
   nginx:
     image: nginx:1.25-alpine
@@ -101,7 +118,9 @@ services:
       - static_files:/app/staticfiles:ro
       - media_files:/app/media:ro
     depends_on:
-      - web
+      web:
+        condition: service_started
+    restart: unless-stopped
 
 volumes:
   postgres_data:

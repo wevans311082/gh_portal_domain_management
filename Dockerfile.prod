@@ -1,40 +1,75 @@
-FROM python:3.12-slim
+# syntax=docker/dockerfile:1.7
+#
+# Production image: same fast multi-stage pattern as Dockerfile, production
+# requirements only, gunicorn entrypoint.
 
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
+ARG PYTHON_IMAGE=python:3.12-slim-bookworm
 
-# Install wkhtmltopdf via the patched-Qt .deb (preserves header/footer support).
-# Plain `apt install wkhtmltopdf` ships an unpatched build that drops --header-html/--footer-html.
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    libpq-dev \
-    libffi-dev \
-    libssl-dev \
-    wget \
-    ca-certificates \
-    fontconfig \
-    fonts-liberation \
-    fonts-dejavu \
-    libjpeg62-turbo \
-    libxrender1 \
-    libxext6 \
-    libx11-6 \
-    xfonts-75dpi \
-    xfonts-base \
-  && wget -q https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6.1-3/wkhtmltox_0.12.6.1-3.bookworm_amd64.deb \
-  && (dpkg -i wkhtmltox_0.12.6.1-3.bookworm_amd64.deb || apt-get install -y -f) \
-  && rm wkhtmltox_0.12.6.1-3.bookworm_amd64.deb \
-  && rm -rf /var/lib/apt/lists/*
+FROM ${PYTHON_IMAGE} AS builder
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_DEFAULT_TIMEOUT=60
+
+WORKDIR /build
+COPY requirements/ requirements/
+
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --prefix=/install -r requirements/production.txt
+
+FROM ${PYTHON_IMAGE} AS runtime
+
+ARG INSTALL_WKHTMLTOPDF=1
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    DJANGO_SETTINGS_MODULE=cyberask_domains.settings.production
 
 WORKDIR /app
 
-COPY requirements/ requirements/
-RUN pip install --no-cache-dir -r requirements/production.txt
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+    ; \
+    if [ "${INSTALL_WKHTMLTOPDF}" = "1" ]; then \
+        apt-get install -y --no-install-recommends \
+            fontconfig \
+            fonts-liberation \
+            fonts-dejavu-core \
+            libjpeg62-turbo \
+            libxrender1 \
+            libxext6 \
+            libx11-6 \
+            xfonts-75dpi \
+            xfonts-base \
+            wget \
+        ; \
+        ARCH="$(dpkg --print-architecture)"; \
+        wget -q -O /tmp/wkhtmltox.deb \
+          "https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6.1-3/wkhtmltox_0.12.6.1-3.bookworm_${ARCH}.deb"; \
+        dpkg -i /tmp/wkhtmltox.deb || apt-get install -y -f --no-install-recommends; \
+        rm -f /tmp/wkhtmltox.deb; \
+        apt-get purge -y wget; \
+        apt-get autoremove -y; \
+    fi; \
+    rm -rf /var/lib/apt/lists/*
 
-COPY . .
+COPY --from=builder /install /usr/local
 
-RUN chmod +x scripts/entrypoint-prod.sh
+COPY manage.py ./
+COPY cyberask_domains/ cyberask_domains/
+COPY apps/ apps/
+COPY templates/ templates/
+COPY static/ static/
+COPY scripts/ scripts/
+
+RUN chmod +x scripts/entrypoint-prod.sh \
+    && useradd --create-home --shell /bin/bash --uid 10001 appuser \
+    && mkdir -p /app/staticfiles /app/media \
+    && chown -R appuser:appuser /app
 
 EXPOSE 8000
-
 ENTRYPOINT ["/app/scripts/entrypoint-prod.sh"]

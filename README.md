@@ -17,11 +17,36 @@ Internal Python package: `cyberask_domains`.
 ```bash
 cp .env.example .env
 # edit secrets: DJANGO_SECRET_KEY, ResellerClub, WHM, etc.
-docker compose up --build
+docker compose up --build -d
 ```
 
 - App (direct): http://localhost:8000  
 - Nginx: http://localhost  
+- Health: http://localhost:8000/health/
+
+### Why builds are fast
+
+The Docker setup is tuned for short rebuilds:
+
+| Technique | Effect |
+|-----------|--------|
+| `.dockerignore` | Drops `website_templates/extracted` (~hundreds of MB), `.venv`, tests, caches from the build context |
+| Multi-stage `Dockerfile` | Installs wheels only — **no `build-essential`/gcc** (psycopg2-binary, Pillow, cryptography all ship wheels) |
+| Pin `python:3.12-slim-bookworm` | Matches the wkhtmltopdf bookworm `.deb` (avoids slow `apt -f` repair on Trixie) |
+| BuildKit pip cache | `RUN --mount=type=cache,target=/root/.cache/pip` reuses downloads across builds |
+| Shared image | `web` / `celery` / `celery-beat` all use `cyberask-domains:local` — **one** build, three services |
+| Optional PDF engine | `docker compose build --build-arg INSTALL_WKHTMLTOPDF=0` skips wkhtmltopdf for the fastest lab image |
+
+```bash
+# normal rebuild (one shared image)
+docker compose build
+
+# fastest lab image (no invoice PDF binary)
+docker compose build --build-arg INSTALL_WKHTMLTOPDF=0
+
+# production image
+docker build -f Dockerfile.prod -t cyberask-domains:prod .
+```
 
 ## Container startup migrations
 
