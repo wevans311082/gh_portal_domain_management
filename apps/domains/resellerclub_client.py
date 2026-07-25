@@ -51,9 +51,13 @@ class ResellerClubClient:
     """
 
     def __init__(self):
-        self.reseller_id = get_runtime_setting("RESELLERCLUB_RESELLER_ID", "")
-        self.api_key = get_runtime_setting("RESELLERCLUB_API_KEY", "")
-        self.base_url = get_runtime_setting("RESELLERCLUB_API_URL", "https://httpapi.com/api").rstrip("/")
+        self.reseller_id = self._clean_secret(get_runtime_setting("RESELLERCLUB_RESELLER_ID", ""))
+        self.api_key = self._clean_secret(get_runtime_setting("RESELLERCLUB_API_KEY", ""))
+        self.base_url = self._clean_secret(
+            get_runtime_setting("RESELLERCLUB_API_URL", "https://httpapi.com/api")
+        ).rstrip("/")
+        if not self.base_url:
+            self.base_url = "https://httpapi.com/api"
         self.session = _build_session()
         # LogicBoxes API requires these on EVERY request as query/form params
         self._auth_params = {
@@ -63,6 +67,29 @@ class ResellerClubClient:
         # Lazy caches populated on first pricing/classkey lookup
         self._pricing_catalog = None  # full customer-price.json catalog
         self._tld_classkeys = {}      # tld -> classkey mapping
+        if not self.reseller_id or not self.api_key:
+            logger.error(
+                "ResellerClub credentials missing (reseller_id=%s, api_key_set=%s). "
+                "Set RESELLERCLUB_RESELLER_ID and RESELLERCLUB_API_KEY in .env or Admin → Integrations.",
+                bool(self.reseller_id),
+                bool(self.api_key),
+            )
+
+    @staticmethod
+    def _clean_secret(value) -> str:
+        """Strip whitespace and accidental surrounding quotes from env/DB values."""
+        text = str(value or "").strip()
+        if len(text) >= 2 and text[0] == text[-1] and text[0] in {"'", '"'}:
+            text = text[1:-1].strip()
+        return text
+
+    def ensure_configured(self):
+        """Raise a clear error before making API calls without credentials."""
+        if not self.reseller_id or not self.api_key:
+            raise ResellerClubError(
+                "ResellerClub is not configured. Set Reseller ID and API key under "
+                "Admin Tools → Integrations (or RESELLERCLUB_* in .env)."
+            )
 
     @staticmethod
     def _normalize_domain_labels(domain_names: list) -> list:
@@ -124,6 +151,7 @@ class ResellerClubClient:
 
     def _get(self, endpoint: str, params: dict = None) -> dict:
         """Make an authenticated GET request to the ResellerClub API."""
+        self.ensure_configured()
         normalized_endpoint = self._normalize_endpoint(endpoint)
         url = f"{self.base_url}/{normalized_endpoint}"
         merged_params = {**self._auth_params, **(params or {})}
@@ -206,6 +234,7 @@ class ResellerClubClient:
 
     def _post(self, endpoint: str, data: dict = None) -> dict:
         """Make an authenticated POST request to the ResellerClub API."""
+        self.ensure_configured()
         normalized_endpoint = self._normalize_endpoint(endpoint)
         url = f"{self.base_url}/{normalized_endpoint}"
         merged_data = {**self._auth_params, **(data or {})}

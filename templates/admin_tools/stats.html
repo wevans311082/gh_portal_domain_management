@@ -39,7 +39,7 @@
         {% if revenue_labels %}
         <div class="h-40 flex items-end gap-1">
             {% for label, value in revenue_labels|zip_lists:revenue_values %}
-            <div class="flex-1 flex flex-col items-center gap-1" title="{{ label }}: £{{ value|floatformat:2 }}">
+            <div class="flex-1 flex flex-col items-center gap-1" title="{{ label }}: Â£{{ value|floatformat:2 }}">
                 <div class="w-full bg-sky-500 rounded-t" style="height: {{ value|floatformat:0 }}px; max-height: 120px; min-height: 2px"></div>
                 <span class="text-[9px] text-gray-400 rotate-45 origin-left mt-1 block">{{ label }}</span>
             </div>

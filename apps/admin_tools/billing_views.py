@@ -267,8 +267,35 @@ def invoice_edit(request, pk):
     branding = BillingDocumentBranding.get_solo()
 
     if request.method == "POST":
+        new_status = (request.POST.get("status") or "").strip()
+
+        # Staff selecting "Paid" in the form should use the full paid pipeline.
+        if new_status == Invoice.STATUS_PAID and invoice.status != Invoice.STATUS_PAID:
+            try:
+                mark_invoice_paid(invoice, send_email=False)
+                messages.success(request, f"Invoice {invoice.number} marked paid.")
+            except Exception as exc:
+                messages.error(request, f"Could not mark paid: {exc}")
+            return redirect("admin_tools:invoice_edit", pk=invoice.pk)
+
+        if new_status == Invoice.STATUS_VOID and invoice.status != Invoice.STATUS_VOID:
+            try:
+                mark_invoice_void(
+                    invoice,
+                    reason=(request.POST.get("notes") or "Voided by staff via invoice form"),
+                    by_user=request.user,
+                )
+                messages.success(request, f"Invoice {invoice.number} voided.")
+            except ValueError as exc:
+                messages.error(request, str(exc))
+            return redirect("admin_tools:invoice_edit", pk=invoice.pk)
+
         if not invoice.is_editable:
-            messages.error(request, "This invoice is locked and cannot be edited.")
+            messages.error(
+                request,
+                "This invoice is locked (paid/void). Use Mark paid / Void actions for status, "
+                "or create a credit note for paid invoices.",
+            )
             return redirect("admin_tools:invoice_edit", pk=invoice.pk)
 
         line_items = _parse_line_items(request.POST)
@@ -291,11 +318,13 @@ def invoice_edit(request, pk):
                 invoice.due_date = timezone.datetime.strptime(due_date_raw, "%Y-%m-%d").date()
             except ValueError:
                 pass
-        new_status = (request.POST.get("status") or "").strip()
-        # Only allow safe status transitions via the edit form.
-        # PAID and VOID must go through invoice_action (mark_paid / void)
-        # so that paid_at, amount_paid, and provisioning queuing are handled.
-        _EDITABLE_STATUSES = {Invoice.STATUS_DRAFT, Invoice.STATUS_UNPAID, Invoice.STATUS_OVERDUE}
+        # Only allow safe status transitions via the edit form for draft/unpaid/overdue.
+        _EDITABLE_STATUSES = {
+            Invoice.STATUS_DRAFT,
+            Invoice.STATUS_UNPAID,
+            Invoice.STATUS_OVERDUE,
+            Invoice.STATUS_PARTIALLY_PAID,
+        }
         if new_status and new_status in _EDITABLE_STATUSES:
             invoice.status = new_status
         invoice.save()
@@ -346,8 +375,16 @@ def invoice_action(request, pk, action):
         except Exception as exc:
             messages.error(request, f"Email failed: {exc}")
     elif action == "mark_paid":
-        mark_invoice_paid(invoice)
-        messages.success(request, f"Invoice {invoice.number} marked paid.")
+        try:
+            # Do not fail the paid transition if outbound email/DNS is broken.
+            mark_invoice_paid(invoice, send_email=False)
+            messages.success(
+                request,
+                f"Invoice {invoice.number} marked paid. "
+                "(Receipt email skipped — use Email to customer when mail is configured.)",
+            )
+        except Exception as exc:
+            messages.error(request, f"Could not mark invoice paid: {exc}")
     elif action == "void":
         try:
             mark_invoice_void(

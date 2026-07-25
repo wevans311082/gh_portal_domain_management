@@ -211,6 +211,7 @@ WEBSITE_TEMPLATES_EXTRACTED_ROOT = env(
 )
 
 EMAIL_BACKEND = env("EMAIL_BACKEND", default="apps.notifications.email_backend.MicrosoftGraphEmailBackend")
+# Prefer console when SMTP is not configured (avoids socket.gaierror on password reset).
 M365_GRAPH_FALLBACK_EMAIL_BACKEND = env(
     "M365_GRAPH_FALLBACK_EMAIL_BACKEND",
     default="django.core.mail.backends.console.EmailBackend",

@@ -31,7 +31,7 @@
         <div class="rounded-lg {% if unpaid_amount %}bg-rose-50 text-rose-600{% else %}bg-emerald-50 text-emerald-600{% endif %} p-2.5">{% octicon "credit-card" classes="w-5 h-5" %}</div>
         <div class="flex-1 min-w-0">
             <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Outstanding Balance</h3>
-            <p class="text-3xl font-bold mt-1 {% if unpaid_amount %}text-rose-600{% else %}text-slate-900{% endif %}">£{{ unpaid_amount }}</p>
+            <p class="text-3xl font-bold mt-1 {% if unpaid_amount %}text-rose-600{% else %}text-slate-900{% endif %}">Â£{{ unpaid_amount }}</p>
             <p class="text-xs text-slate-500 mt-1">{{ unpaid_invoices_count }} unpaid invoices</p>
         </div>
     </div>
@@ -47,7 +47,7 @@
         <div class="rounded-lg bg-emerald-50 text-emerald-600 p-2.5">{% octicon "graph" classes="w-5 h-5" %}</div>
         <div class="flex-1 min-w-0">
             <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Paid Last 30 Days</h3>
-            <p class="text-3xl font-bold mt-1 text-emerald-700">£{{ paid_last_30_days_amount }}</p>
+            <p class="text-3xl font-bold mt-1 text-emerald-700">Â£{{ paid_last_30_days_amount }}</p>
             <p class="text-xs text-slate-500 mt-1">Cash collection snapshot</p>
         </div>
     </div>
@@ -193,7 +193,7 @@
                     #{{ ticket.id }}: {{ ticket.subject }}
                 </a>
                 <p class="text-xs text-slate-500 mt-1">
-                    <span class="capitalize">{{ ticket.status }}</span> —
+                    <span class="capitalize">{{ ticket.status }}</span> Â—
                     <span class="capitalize">{{ ticket.priority }}</span> priority
                 </p>
             </li>

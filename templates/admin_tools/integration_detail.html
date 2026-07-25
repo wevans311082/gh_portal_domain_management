@@ -251,11 +251,11 @@
                         {% for row in whm_context.reconciliation.orphaned_accounts %}
                         <tr class="border-t border-slate-100">
                             <td class="px-4 py-2 font-medium text-slate-800">{{ row.username }}</td>
-                            <td class="px-4 py-2 text-slate-600">{{ row.domain|default:"â€”" }}</td>
+                            <td class="px-4 py-2 text-slate-600">{{ row.domain|default:"—" }}</td>
                             <td class="px-4 py-2 text-slate-600">{{ row.registrar_status|default:"Not found" }}</td>
                             <td class="px-4 py-2 text-slate-600">{{ row.reason }}</td>
                             <td class="px-4 py-2 text-slate-600">
-                                {% if row.service_id %}#{{ row.service_id }}{% else %}â€”{% endif %}
+                                {% if row.service_id %}#{{ row.service_id }}{% else %}—{% endif %}
                             </td>
                             <td class="px-4 py-2">
                                 <form method="post" onsubmit="return confirm('Terminate WHM account {{ row.username }}? This removes the cPanel account.')" class="flex items-center gap-2">
@@ -294,9 +294,9 @@
                             {% for row in whm_context.reconciliation.registrar_only_domains %}
                             <tr class="border-t border-slate-100">
                                 <td class="px-4 py-2 font-medium text-slate-800">{{ row.domain }}</td>
-                                <td class="px-4 py-2 text-slate-600">{{ row.registrar_order.orderid|default:"â€”" }}</td>
-                                <td class="px-4 py-2 text-slate-600">{% if row.local_domain_id %}#{{ row.local_domain_id }}{% else %}â€”{% endif %}</td>
-                                <td class="px-4 py-2 text-slate-600">{% if row.service_id %}#{{ row.service_id }}{% else %}â€”{% endif %}</td>
+                                <td class="px-4 py-2 text-slate-600">{{ row.registrar_order.orderid|default:"—" }}</td>
+                                <td class="px-4 py-2 text-slate-600">{% if row.local_domain_id %}#{{ row.local_domain_id }}{% else %}—{% endif %}</td>
+                                <td class="px-4 py-2 text-slate-600">{% if row.service_id %}#{{ row.service_id }}{% else %}—{% endif %}</td>
                             </tr>
                             {% endfor %}
                         </tbody>

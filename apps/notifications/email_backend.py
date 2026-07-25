@@ -1,5 +1,6 @@
 """Django email backend that sends via Microsoft Graph when enabled."""
 import logging
+import socket
 
 from django.conf import settings
 from django.core.mail.backends.base import BaseEmailBackend
@@ -16,6 +17,19 @@ from apps.notifications.m365_graph import (
 logger = logging.getLogger(__name__)
 
 
+def _smtp_host_usable() -> bool:
+    """Return False when EMAIL_HOST is empty or DNS cannot resolve it."""
+    host = (getattr(settings, "EMAIL_HOST", "") or "").strip()
+    if not host:
+        return False
+    try:
+        socket.getaddrinfo(host, None)
+        return True
+    except OSError as exc:
+        logger.warning("EMAIL_HOST %r is not resolvable (%s); using console email backend", host, exc)
+        return False
+
+
 class MicrosoftGraphEmailBackend(BaseEmailBackend):
     """Send Django EmailMessage objects using Microsoft Graph sendMail."""
 
@@ -30,13 +44,16 @@ class MicrosoftGraphEmailBackend(BaseEmailBackend):
                 "M365_GRAPH_FALLBACK_EMAIL_BACKEND",
                 "django.core.mail.backends.console.EmailBackend",
             )
+            # Never attempt SMTP against a bad/empty hostname (gaierror).
+            if backend.endswith("smtp.EmailBackend") and not _smtp_host_usable():
+                backend = "django.core.mail.backends.console.EmailBackend"
             self._fallback_connection = get_connection(backend=backend, fail_silently=self.fail_silently)
         return self._fallback_connection
 
     def send_messages(self, email_messages):
         config = MicrosoftGraphMailConfig.load()
         if not config.enabled:
-            return self._fallback().send_messages(email_messages)
+            return self._safe_fallback_send(email_messages)
 
         sent = 0
         client = MicrosoftGraphMailClient(config)
@@ -48,13 +65,29 @@ class MicrosoftGraphEmailBackend(BaseEmailBackend):
                 client.send_mail(mailbox=mailbox, message=self._graph_message(message))
                 sent += 1
             except Exception as exc:
-                if self.fail_silently:
-                    logger.warning("Microsoft Graph mail send failed silently: %s", exc)
-                    continue
-                if isinstance(exc, MicrosoftGraphMailError):
-                    raise
-                raise MicrosoftGraphMailError(str(exc)) from exc
+                logger.warning("Microsoft Graph mail failed (%s); trying fallback backend", exc)
+                try:
+                    return self._safe_fallback_send(email_messages)
+                except Exception as fallback_exc:
+                    if self.fail_silently:
+                        logger.warning("Fallback mail send failed silently: %s", fallback_exc)
+                        return 0
+                    if isinstance(exc, MicrosoftGraphMailError):
+                        raise
+                    raise MicrosoftGraphMailError(str(exc)) from exc
         return sent
+
+    def _safe_fallback_send(self, email_messages):
+        try:
+            return self._fallback().send_messages(email_messages)
+        except OSError as exc:
+            # socket.gaierror is an OSError subclass
+            logger.error("Email send failed (network/DNS): %s — writing to console instead", exc)
+            console = get_connection(
+                backend="django.core.mail.backends.console.EmailBackend",
+                fail_silently=self.fail_silently,
+            )
+            return console.send_messages(email_messages)
 
     def _purpose_for(self, message) -> str:
         headers = getattr(message, "extra_headers", {}) or {}

@@ -31,7 +31,7 @@
     </div>
     <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
         <p class="text-xs text-slate-500 font-medium uppercase tracking-wide mb-1">Revenue (30d)</p>
-        <p class="text-3xl font-bold text-slate-800">£{{ revenue_30d|floatformat:2 }}</p>
+        <p class="text-3xl font-bold text-slate-800">Â£{{ revenue_30d|floatformat:2 }}</p>
     </div>
 </div>
 
@@ -48,7 +48,7 @@
     <a href="{% url 'admin_tools:quote_list' %}" class="bg-white rounded-xl border {% if quotes_open %}border-sky-300{% else %}border-slate-200{% endif %} shadow-sm p-5 hover:shadow-md transition-shadow">
         <p class="text-xs text-slate-500 font-medium uppercase tracking-wide mb-1">Open Quotes</p>
         <p class="text-3xl font-bold {% if quotes_open %}text-sky-600{% else %}text-slate-800{% endif %}">{{ quotes_open }}</p>
-        <p class="text-xs text-slate-500 mt-1">£{{ quotes_pipeline_value|floatformat:0 }} pipeline · {{ quotes_conversion_30d }}% conv (30d)</p>
+        <p class="text-xs text-slate-500 mt-1">Â£{{ quotes_pipeline_value|floatformat:0 }} pipeline Â· {{ quotes_conversion_30d }}% conv (30d)</p>
     </a>
     <a href="{% url 'admin_tools:tickets_list' %}" class="bg-white rounded-xl border {% if open_tickets %}border-indigo-300{% else %}border-slate-200{% endif %} shadow-sm p-5 hover:shadow-md transition-shadow">
         <p class="text-xs text-slate-500 font-medium uppercase tracking-wide mb-1">Open Support Tickets</p>
@@ -70,7 +70,7 @@
     <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
         <div class="flex items-center justify-between mb-3">
             <h3 class="font-semibold text-slate-800 text-sm">Recent Users</h3>
-            <a href="{% url 'admin_tools:users' %}" class="text-xs text-indigo-600 hover:underline">View all →</a>
+            <a href="{% url 'admin_tools:users' %}" class="text-xs text-indigo-600 hover:underline">View all â†’</a>
         </div>
         <ul class="space-y-2">
             {% for u in recent_users %}
@@ -92,7 +92,7 @@
     <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
         <div class="flex items-center justify-between mb-3">
             <h3 class="font-semibold text-slate-800 text-sm">Recent Support Tickets</h3>
-            <a href="{% url 'admin_tools:tickets_list' %}" class="text-xs text-indigo-600 hover:underline">View all →</a>
+            <a href="{% url 'admin_tools:tickets_list' %}" class="text-xs text-indigo-600 hover:underline">View all â†’</a>
         </div>
         <ul class="space-y-2">
             {% for ticket in recent_tickets %}
@@ -119,13 +119,13 @@
     <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
         <div class="flex items-center justify-between mb-3">
             <h3 class="font-semibold text-slate-800 text-sm">Recent Audit Events</h3>
-            <a href="{% url 'admin_tools:security' %}" class="text-xs text-indigo-600 hover:underline">View all →</a>
+            <a href="{% url 'admin_tools:security' %}" class="text-xs text-indigo-600 hover:underline">View all â†’</a>
         </div>
         <ul class="space-y-2">
             {% for log in recent_audit %}
             <li class="text-xs">
                 <p class="font-medium text-slate-700 truncate">{{ log.action }}</p>
-                <p class="text-slate-400">{{ log.user.email|default:"anon" }} · {{ log.created_at|timesince }} ago</p>
+                <p class="text-slate-400">{{ log.user.email|default:"anon" }} Â· {{ log.created_at|timesince }} ago</p>
             </li>
             {% empty %}
             <li class="text-xs text-slate-400">No audit records yet.</li>
@@ -139,7 +139,7 @@
     <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
         <div class="flex items-center justify-between mb-4">
             <h3 class="font-semibold text-slate-800 text-sm">Task Outcomes — Last 7 days</h3>
-            <a href="{{ task_result_admin_url }}" class="text-xs text-indigo-600 hover:underline">Django admin →</a>
+            <a href="{{ task_result_admin_url }}" class="text-xs text-indigo-600 hover:underline">Django admin â†’</a>
         </div>
         <div class="flex items-end gap-5 h-32">
             {% for bar in task_chart_bars %}
@@ -159,7 +159,7 @@
             <li class="flex justify-between py-2 text-sm"><span class="text-slate-500">Interval schedules</span><span class="font-semibold text-slate-800">{{ interval_schedules }}</span></li>
             <li class="flex justify-between py-2 text-sm"><span class="text-slate-500">Crontab schedules</span><span class="font-semibold text-slate-800">{{ crontab_schedules }}</span></li>
         </ul>
-        <a href="{{ periodic_task_admin_url }}" class="mt-3 block text-xs text-indigo-600 hover:underline">Edit schedules in Django admin →</a>
+        <a href="{{ periodic_task_admin_url }}" class="mt-3 block text-xs text-indigo-600 hover:underline">Edit schedules in Django admin â†’</a>
     </div>
 </div>
 {% endblock %}

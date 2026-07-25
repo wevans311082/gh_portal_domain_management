@@ -1,22 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 96" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-labelledby="title">
   <title id="title">Cyber Ask Domains</title>
-  <desc id="desc">Cyber Ask Domains wordmark with connected network mark.</desc>
   <defs>
-    <linearGradient id="mark" x1="8" y1="8" x2="84" y2="84" gradientUnits="userSpaceOnUse">
+    <linearGradient id="g" x1="12" y1="12" x2="84" y2="84" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#38bdf8"/>
-      <stop offset="0.55" stop-color="#0078d4"/>
-      <stop offset="1" stop-color="#106ebe"/>
+      <stop offset="1" stop-color="#0369a1"/>
     </linearGradient>
   </defs>
-  <rect width="320" height="96" rx="8" fill="#0b1a2a"/>
-  <rect x="1" y="1" width="318" height="94" rx="7" fill="none" stroke="#1e3a5f"/>
-  <g>
-    <path d="M25 64V32l28-16 28 16v32L53 80 25 64Z" fill="none" stroke="url(#mark)" stroke-width="4" stroke-linejoin="round"/>
-    <path d="M36 55l17-25 17 25M43 45h20" fill="none" stroke="#e0f2fe" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-    <circle cx="25" cy="64" r="3" fill="#38bdf8"/>
-    <circle cx="81" cy="64" r="3" fill="#0078d4"/>
-    <circle cx="53" cy="16" r="3" fill="#60a5fa"/>
-  </g>
-  <text x="104" y="42" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="24" font-weight="700" fill="#f8fafc">Cyber Ask</text>
-  <text x="105" y="66" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="15" font-weight="600" letter-spacing="2.2" fill="#7dd3fc">DOMAINS</text>
+  <rect width="96" height="96" rx="18" fill="#0b1a2a"/>
+  <!-- Shield -->
+  <path d="M48 16 L74 28 V50 C74 66 62 76 48 82 C34 76 22 66 22 50 V28 Z"
+        fill="none" stroke="url(#g)" stroke-width="4.5" stroke-linejoin="round"/>
+  <!-- Check / network node -->
+  <path d="M36 49 L44 57 L62 37" fill="none" stroke="#e0f2fe" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="48" cy="28" r="3.2" fill="#38bdf8"/>
+  <circle cx="28" cy="54" r="2.6" fill="#7dd3fc"/>
+  <circle cx="68" cy="54" r="2.6" fill="#7dd3fc"/>
 </svg>

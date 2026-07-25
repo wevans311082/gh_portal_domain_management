@@ -19,24 +19,35 @@
   <a href="{% url 'admin_tools:invoice_pdf' invoice.pk %}" class="px-3 py-1.5 rounded bg-slate-700 text-white text-xs">Download PDF</a>
   <form method="post" action="{% url 'admin_tools:invoice_action' invoice.pk 'send' %}" class="inline-flex">
     {% csrf_token %}
-    <button class="px-3 py-1.5 rounded bg-sky-600 text-white text-xs">Email to customer</button>
+    <button type="submit" class="px-3 py-1.5 rounded bg-sky-600 text-white text-xs">Email to customer</button>
   </form>
-  {% if invoice.status != 'paid' %}
-    <form method="post" action="{% url 'admin_tools:invoice_action' invoice.pk 'mark_paid' %}" class="inline-flex">{% csrf_token %}
-      <button class="px-3 py-1.5 rounded bg-emerald-600 text-white text-xs">Mark paid</button>
+  {% if invoice.status != 'paid' and invoice.status != 'void' %}
+    <form method="post" action="{% url 'admin_tools:invoice_action' invoice.pk 'mark_paid' %}" class="inline-flex">
+      {% csrf_token %}
+      <button type="submit" class="px-3 py-1.5 rounded bg-emerald-600 text-white text-xs font-semibold">Mark paid</button>
     </form>
-    <form method="post" action="{% url 'admin_tools:invoice_action' invoice.pk 'void' %}" class="inline-flex" onsubmit="return confirm('Void this invoice?');">{% csrf_token %}
+    <form method="post" action="{% url 'admin_tools:invoice_action' invoice.pk 'void' %}" class="inline-flex" onsubmit="return confirm('Void this invoice?');">
+      {% csrf_token %}
       <input type="hidden" name="reason" value="Voided by staff">
-      <button class="px-3 py-1.5 rounded bg-amber-600 text-white text-xs">Void</button>
+      <button type="submit" class="px-3 py-1.5 rounded bg-amber-600 text-white text-xs">Void</button>
     </form>
   {% endif %}
   {% if invoice.status == 'draft' %}
-    <form method="post" action="{% url 'admin_tools:invoice_action' invoice.pk 'delete' %}" class="inline-flex" onsubmit="return confirm('Delete this draft invoice?');">{% csrf_token %}
-      <button class="px-3 py-1.5 rounded bg-rose-600 text-white text-xs">Delete</button>
+    <form method="post" action="{% url 'admin_tools:invoice_action' invoice.pk 'delete' %}" class="inline-flex" onsubmit="return confirm('Delete this draft invoice?');">
+      {% csrf_token %}
+      <button type="submit" class="px-3 py-1.5 rounded bg-rose-600 text-white text-xs">Delete</button>
     </form>
   {% endif %}
-  <span class="ml-auto text-xs text-slate-500">Source: {{ invoice.get_source_kind_display }}</span>
+  <span class="ml-auto text-xs text-slate-500">Status: <strong>{{ invoice.get_status_display }}</strong> · Source: {{ invoice.get_source_kind_display }}</span>
 </div>
+{% if not invoice.is_editable %}
+<div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+  This invoice is <strong>{{ invoice.get_status_display|lower }}</strong> and line items are locked.
+  {% if invoice.status != 'paid' and invoice.status != 'void' %}
+  Use the <strong>Mark paid</strong> button above (or set Status to Paid and save).
+  {% endif %}
+</div>
+{% endif %}
 {% endif %}
 
 <form method="post" action="{{ form_action }}" x-data="invoiceForm()" x-init="init()" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
