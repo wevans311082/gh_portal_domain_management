@@ -232,7 +232,15 @@ def register_domain_order(self, order_id):
             "Manual domain orders without an invoice must be marked paid before registration."
         )
 
-    if not settings.RESELLERCLUB_CUSTOMER_ID:
+    from apps.core.runtime_settings import get_runtime_setting
+    from apps.domains.resellerclub_client import ResellerClubError
+
+    customer_id = (
+        get_runtime_setting("RESELLERCLUB_CUSTOMER_ID", "")
+        or getattr(settings, "RESELLERCLUB_CUSTOMER_ID", "")
+        or ""
+    ).strip()
+    if not customer_id:
         order.status = DomainOrder.STATUS_FAILED
         order.last_error = "RESELLERCLUB_CUSTOMER_ID is not configured."
         order.save(update_fields=["status", "last_error", "updated_at"])
@@ -258,15 +266,33 @@ def register_domain_order(self, order_id):
     order.save(update_fields=["status", "last_error", "updated_at"])
 
     try:
-        registration_contact_id = contact_service.sync_remote_contact(order.registration_contact, settings.RESELLERCLUB_CUSTOMER_ID)
-        admin_contact_id = contact_service.sync_remote_contact(order.admin_contact, settings.RESELLERCLUB_CUSTOMER_ID)
-        tech_contact_id = contact_service.sync_remote_contact(order.tech_contact, settings.RESELLERCLUB_CUSTOMER_ID)
-        billing_contact_id = contact_service.sync_remote_contact(order.billing_contact, settings.RESELLERCLUB_CUSTOMER_ID)
+        # Same contact reused for all roles → sync once when IDs match.
+        contact_ids = {}
+        for role, contact in (
+            ("reg", order.registration_contact),
+            ("admin", order.admin_contact),
+            ("tech", order.tech_contact),
+            ("billing", order.billing_contact),
+        ):
+            key = contact.pk
+            if key not in contact_ids:
+                contact_ids[key] = contact_service.sync_remote_contact(
+                    contact, customer_id, tld=order.tld
+                )
+            # bind role for clarity below
+            if role == "reg":
+                registration_contact_id = contact_ids[key]
+            elif role == "admin":
+                admin_contact_id = contact_ids[key]
+            elif role == "tech":
+                tech_contact_id = contact_ids[key]
+            else:
+                billing_contact_id = contact_ids[key]
 
         registration_response = registrar_client.register_domain(
             domain_name=order.domain_name,
             years=order.registration_years,
-            customer_id=settings.RESELLERCLUB_CUSTOMER_ID,
+            customer_id=customer_id,
             reg_contact_id=registration_contact_id,
             admin_contact_id=admin_contact_id,
             tech_contact_id=tech_contact_id,
@@ -275,6 +301,8 @@ def register_domain_order(self, order_id):
             purchase_privacy=order.privacy_enabled,
             auto_renew=order.auto_renew,
         )
+        if not isinstance(registration_response, dict):
+            registration_response = {"entityid": registration_response}
         registrar_order_id = str(
             registration_response.get("entityid")
             or registration_response.get("orderid")
@@ -316,6 +344,11 @@ def register_domain_order(self, order_id):
         order.last_error = str(exc)
         order.save(update_fields=["status", "last_error", "updated_at"])
         logger.exception("Domain order registration failed for order %s", order.id)
+        # Do not Celery-retry permanent API / validation failures (HTTP 500 payload issues).
+        permanent = isinstance(exc, (ResellerClubError, ValueError))
+        msg = str(exc).lower()
+        if permanent or "http 500" in msg or "too many 500" in msg or "invalid" in msg:
+            raise
         raise self.retry(exc=exc)
 
 

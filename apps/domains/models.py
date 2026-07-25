@@ -192,20 +192,60 @@ class DomainContact(TimeStampedModel):
     def is_registrant_validated(self) -> bool:
         return self.registrant_validation_status == self.VALIDATION_VALIDATED
 
-    def as_resellerclub_payload(self, customer_id: str) -> dict:
+    def contact_type_for_tld(self, tld: str = "") -> str:
+        """LogicBoxes contact type — required by contacts/add.json."""
+        tld = (tld or "").strip().lower().lstrip(".")
+        if tld in {"uk", "co.uk", "org.uk", "me.uk", "ltd.uk", "plc.uk"}:
+            return "UkContact"
+        if tld == "ca":
+            return "CaContact"
+        if tld == "eu":
+            return "EuContact"
+        if tld == "de":
+            return "DeContact"
+        if tld == "us":
+            return "Contact"
+        return "Contact"
+
+    def as_resellerclub_payload(self, customer_id: str, tld: str = "") -> dict:
+        """Build contacts/add payload with required LogicBoxes fields.
+
+        ResellerClub frequently returns HTTP 500 when ``type`` is missing or
+        ``company`` is empty — treat those as hard requirements.
+        """
+        import re
+
+        name = (self.name or "").strip() or "Registrant"
+        company = (self.company or "").strip() or "N/A"
+        email = (self.email or "").strip()
+        address1 = (self.address_line1 or "").strip() or "Address not provided"
+        city = (self.city or "").strip() or "London"
+        state = (self.state or "").strip() or city
+        zipcode = (self.postcode or "").strip() or "00000"
+        country = (self.country or "GB").strip().upper()[:2]
+        phone_cc = re.sub(r"\D", "", str(self.phone_country_code or "44")) or "44"
+        phone = re.sub(r"\D", "", str(self.phone or ""))
+        # LogicBoxes: phone 4–12 digits; strip leading 0 after UK country code
+        if phone_cc == "44" and phone.startswith("0"):
+            phone = phone[1:]
+        if len(phone) < 4:
+            phone = (phone + "0000")[:4]
+        phone = phone[:12]
+
         return {
-            "customer-id": customer_id,
-            "name": self.name,
-            "company": self.company,
-            "email": self.email,
-            "address-line-1": self.address_line1,
-            "address-line-2": self.address_line2,
-            "city": self.city,
-            "state": self.state,
-            "zipcode": self.postcode,
-            "country": self.country,
-            "phone-cc": self.phone_country_code,
-            "phone": self.phone,
+            "customer-id": str(customer_id).strip(),
+            "type": self.contact_type_for_tld(tld),
+            "name": name[:255],
+            "company": company[:255],
+            "email": email,
+            "address-line-1": address1[:64],
+            "address-line-2": (self.address_line2 or "")[:64],
+            "city": city[:64],
+            "state": state[:64],
+            "zipcode": zipcode[:16],
+            "country": country,
+            "phone-cc": phone_cc[:3],
+            "phone": phone,
         }
 
 

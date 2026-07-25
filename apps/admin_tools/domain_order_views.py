@@ -245,7 +245,8 @@ def _action_process(request, order: DomainOrder):
         order.save(update_fields=["status", "last_error", "updated_at"])
 
     try:
-        domain_id = register_domain_order.apply(args=[order.id]).get(timeout=180)
+        # throw=True avoids Celery wrapping permanent API failures in Retry noise.
+        domain_id = register_domain_order.apply(args=[order.id], throw=True).get(timeout=180)
         order.refresh_from_db()
         messages.success(
             request,
@@ -255,7 +256,13 @@ def _action_process(request, order: DomainOrder):
     except Exception as exc:
         order.refresh_from_db()
         logger.exception("Process domain order %s failed", order.pk)
-        messages.error(request, f"Process failed: {order.last_error or exc}")
+        detail = order.last_error or str(exc)
+        if "too many 500" in detail or "HTTP 500" in detail:
+            detail += (
+                " — usually invalid contact payload (missing type/company) or wrong "
+                "ResellerClub API URL/customer id. See order error and Integrations debug."
+            )
+        messages.error(request, f"Process failed: {detail}")
     return redirect("admin_tools:domain_order_detail", pk=order.pk)
 
 

@@ -34,22 +34,43 @@ class DomainContactService:
         defaults["is_default"] = True
         return DomainContact.objects.create(**defaults)
 
-    def sync_remote_contact(self, contact, customer_id):
-        payload = contact.as_resellerclub_payload(customer_id=customer_id)
+    def sync_remote_contact(self, contact, customer_id, tld: str = ""):
+        if not customer_id:
+            raise ValueError(
+                "RESELLERCLUB_CUSTOMER_ID is not set — cannot create registrar contacts."
+            )
+        payload = contact.as_resellerclub_payload(customer_id=customer_id, tld=tld)
         client = self.client or ResellerClubClient()
         if contact.registrar_contact_id:
-            client.update_contact(contact.registrar_contact_id, payload)
-            return contact.registrar_contact_id
+            try:
+                client.update_contact(contact.registrar_contact_id, payload)
+                return contact.registrar_contact_id
+            except Exception:
+                # Stale remote ID — fall through and create a fresh contact.
+                contact.registrar_contact_id = ""
+                contact.save(update_fields=["registrar_contact_id", "updated_at"])
 
         result = client.create_contact(payload)
-        registrar_contact_id = str(
-            result.get("contact_id")
-            or result.get("id")
-            or result.get("contactid")
-            or result.get("entityid")
-            or ""
-        )
-        if registrar_contact_id:
-            contact.registrar_contact_id = registrar_contact_id
-            contact.save(update_fields=["registrar_contact_id", "updated_at"])
+        if isinstance(result, (int, float)):
+            registrar_contact_id = str(int(result))
+        elif isinstance(result, str) and result.strip().isdigit():
+            registrar_contact_id = result.strip()
+        elif isinstance(result, dict):
+            registrar_contact_id = str(
+                result.get("contact_id")
+                or result.get("id")
+                or result.get("contactid")
+                or result.get("entityid")
+                or ""
+            ).strip()
+        else:
+            registrar_contact_id = ""
+
+        if not registrar_contact_id:
+            raise ValueError(
+                f"ResellerClub contacts/add did not return a contact id (response={result!r}). "
+                "Check API credentials, customer-id, and contact type/company fields."
+            )
+        contact.registrar_contact_id = registrar_contact_id
+        contact.save(update_fields=["registrar_contact_id", "updated_at"])
         return registrar_contact_id

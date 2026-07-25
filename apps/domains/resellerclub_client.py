@@ -23,13 +23,22 @@ class ResellerClubError(Exception):
 
 
 def _build_session() -> requests.Session:
-    """Build a requests Session with retry logic and sensible timeouts."""
+    """Build a requests Session with retry logic and sensible timeouts.
+
+    Important: do **not** auto-retry POST/mutations on HTTP 500. ResellerClub
+    often returns 500 for bad contact payloads; urllib3 retries then surface as
+    ``too many 500 error responses`` and hammer the API.
+    """
     session = requests.Session()
     retry = Retry(
-        total=3,
+        total=2,
+        connect=2,
+        read=2,
         backoff_factor=0.5,
-        status_forcelist=[429, 500, 502, 503, 504],
-        allowed_methods=["GET", "POST"],
+        # Omit 500 — treat upstream application errors as final.
+        status_forcelist=[429, 502, 503, 504],
+        allowed_methods=frozenset(["GET", "HEAD", "OPTIONS"]),
+        raise_on_status=False,
     )
     adapter = HTTPAdapter(max_retries=retry)
     session.mount("https://", adapter)
@@ -238,12 +247,25 @@ class ResellerClubClient:
         normalized_endpoint = self._normalize_endpoint(endpoint)
         url = f"{self.base_url}/{normalized_endpoint}"
         merged_data = {**self._auth_params, **(data or {})}
+        # Ensure all values are strings/ints suitable for form encoding
+        safe_data = {}
+        for key, value in merged_data.items():
+            if value is None:
+                continue
+            if isinstance(value, bool):
+                safe_data[key] = "true" if value else "false"
+            elif isinstance(value, (list, tuple)):
+                # LogicBoxes often wants repeated keys; requests handles list values
+                safe_data[key] = list(value)
+            else:
+                safe_data[key] = value
         try:
             response = self.session.post(
                 url,
-                data=merged_data,
+                data=safe_data,
                 timeout=(_CONNECT_TIMEOUT, _READ_TIMEOUT),
             )
+            body_text = response.text or ""
             self._capture_debug(
                 request_data={
                     "method": "POST",
@@ -252,18 +274,47 @@ class ResellerClubClient:
                     "body": response.request.body.decode("utf-8", errors="replace")
                     if isinstance(response.request.body, bytes)
                     else (response.request.body or ""),
-                    "data": merged_data,
+                    "data": {k: ("***" if k == "api-key" else v) for k, v in safe_data.items()},
                     "endpoint": normalized_endpoint,
                 },
                 response_data={
                     "status_code": response.status_code,
                     "reason": response.reason,
                     "headers": dict(response.headers),
-                    "text": response.text,
+                    "text": body_text[:4000],
                 },
             )
+            if response.status_code >= 500:
+                snippet = body_text[:400].replace("\n", " ")
+                logger.error(
+                    "ResellerClub POST %s HTTP %s: %s",
+                    normalized_endpoint,
+                    response.status_code,
+                    snippet,
+                )
+                raise ResellerClubError(
+                    f"ResellerClub HTTP {response.status_code} on {normalized_endpoint}: "
+                    f"{snippet or response.reason}. "
+                    "This is often a bad/missing contact field (type, company, phone) "
+                    "or wrong API environment (live vs test.httpapi.com)."
+                )
             response.raise_for_status()
-            result = response.json()
+            # Contact add returns a bare integer ID in many LogicBoxes versions.
+            try:
+                result = response.json()
+            except ValueError:
+                result = body_text.strip()
+            if isinstance(result, (int, float)) or (isinstance(result, str) and result.isdigit()):
+                result = {"contact_id": str(result), "id": str(result)}
+            if isinstance(result, str):
+                # Sometimes a bare quoted number
+                stripped = result.strip().strip('"')
+                if stripped.isdigit():
+                    result = {"contact_id": stripped, "id": stripped}
+                else:
+                    raise ResellerClubError(f"Unexpected non-JSON response from {normalized_endpoint}: {stripped[:200]}")
+        except ResellerClubError:
+            raise
         except requests.HTTPError as e:
             status_code = getattr(getattr(e, "response", None), "status_code", None)
             body = (getattr(getattr(e, "response", None), "text", "") or "")[:300]
@@ -279,7 +330,7 @@ class ResellerClubClient:
                         if isinstance(getattr(req, "body", None), bytes)
                         else (getattr(req, "body", "") or "")
                     ),
-                    "data": merged_data,
+                    "data": {k: ("***" if k == "api-key" else v) for k, v in safe_data.items()},
                     "endpoint": normalized_endpoint,
                 },
                 response_data={
@@ -292,7 +343,9 @@ class ResellerClubClient:
             )
             if status_code and status_code >= 500:
                 logger.error("ResellerClub POST %s server error %s: %s", normalized_endpoint, status_code, body)
-                raise ResellerClubError("ResellerClub returned a server error while processing the request.") from e
+                raise ResellerClubError(
+                    f"ResellerClub HTTP {status_code} on {normalized_endpoint}: {body or e}"
+                ) from e
             logger.error(f"ResellerClub POST {normalized_endpoint} failed: {e}")
             raise ResellerClubError(f"API POST failed: {e}") from e
         except requests.RequestException as e:
@@ -302,13 +355,21 @@ class ResellerClubClient:
                     "url": url,
                     "headers": {},
                     "body": "",
-                    "data": merged_data,
+                    "data": {k: ("***" if k == "api-key" else v) for k, v in safe_data.items()},
                     "endpoint": normalized_endpoint,
                 },
                 response_data=None,
                 error=str(e),
             )
             logger.error(f"ResellerClub POST {normalized_endpoint} failed: {e}")
+            # Unwrap RetryError messaging for operators
+            msg = str(e)
+            if "too many 500" in msg or "RetryError" in type(e).__name__:
+                raise ResellerClubError(
+                    f"ResellerClub POST {normalized_endpoint} failed after retries: {msg}. "
+                    "HTTP 500 usually means invalid contact payload or API/credentials issue — "
+                    "not a transient network blip."
+                ) from e
             raise ResellerClubError(f"API POST failed: {e}") from e
         return self._check_response(result, normalized_endpoint)
 

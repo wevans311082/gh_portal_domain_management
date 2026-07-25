@@ -300,3 +300,19 @@ def test_contact_create_company_without_number_rejected(client, django_user_mode
     assert response.status_code == 302
     contact = DomainContact.objects.get(user=user, label="Primary")
     assert contact.registrant_validation_status == DomainContact.VALIDATION_REJECTED
+
+
+@pytest.mark.django_db
+def test_resellerclub_payload_includes_required_type_and_company(django_user_model):
+    user = make_user(django_user_model)
+    contact = make_contact(user)
+    contact.company = ""
+    contact.save()
+    payload = contact.as_resellerclub_payload("999", tld="co.uk")
+    assert payload["type"] == "UkContact"
+    assert payload["company"] == "N/A"
+    assert payload["customer-id"] == "999"
+    assert payload["phone-cc"] == "44"
+    # UK leading 0 stripped for LogicBoxes
+    assert not payload["phone"].startswith("0")
+    assert len(payload["phone"]) >= 4
