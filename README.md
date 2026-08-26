@@ -26,15 +26,15 @@ docker compose up --build -d
 
 This stack is meant to sit beside other services on the same host. Published ports use a `7` prefix (`7000` / `7001` / `780`) so they do not collide with `:80` / `:8000`.
 
-If the host already runs nginx on port 80, install the drop-in vhost (do **not** publish this compose nginx on 80):
+If the **public website nginx is a container** (ca_public_website on :80), do not proxy to `127.0.0.1:7000` from inside that container. This compose joins `ca_public_website_frontend` as `cyberask-domains`. That nginx should use `http://cyberask-domains:7000` (`ca_public_website/nginx/sites/domains.conf`).
 
 ```bash
-sudo cp nginx/host-dropin/domains.cyberask.co.uk.conf /etc/nginx/conf.d/domains.cyberask.co.uk.conf
-# or: /etc/nginx/sites-available/ + sites-enabled symlink
-sudo nginx -t && sudo systemctl reload nginx
+# public site must be up first so the shared network exists
+docker compose up -d
+docker compose -f ../ca_public_website/docker-compose.yml exec nginx nginx -s reload
 ```
 
-That file proxies `domains.cyberask.co.uk` to `127.0.0.1:7000`.
+If the edge nginx runs on the host OS instead, copy `nginx/host-dropin/domains.cyberask.co.uk.conf` and point the upstream at `127.0.0.1:7000`.
 
 ### Why builds are fast
 

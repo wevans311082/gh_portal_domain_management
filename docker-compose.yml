@@ -70,6 +70,12 @@ services:
       # Direct app :7000. Loopback :7001 for local tools. Compose nginx :780.
       - "7000:7000"
       - "127.0.0.1:7001:7000"
+    networks:
+      default:
+      edge:
+        aliases:
+          # Name the public-site nginx container uses: http://cyberask-domains:7000
+          - cyberask-domains
     environment:
       <<: *app-env
       RUN_STARTUP_MIGRATIONS: "1"
@@ -124,9 +130,20 @@ services:
       web:
         condition: service_started
     restart: unless-stopped
+    networks:
+      - default
 
 volumes:
   postgres_data:
   redis_data:
   static_files:
   media_files:
+
+networks:
+  # Join the public website nginx network so that container can proxy
+  # to http://cyberask-domains:7000 (127.0.0.1 inside that container is itself).
+  # Override if `docker network ls` shows a different name:
+  #   EDGE_NETWORK=some_other_frontend docker compose up -d
+  edge:
+    name: ${EDGE_NETWORK:-ca_public_website_frontend}
+    external: true
