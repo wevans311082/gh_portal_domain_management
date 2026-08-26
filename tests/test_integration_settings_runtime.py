@@ -124,3 +124,61 @@ def test_list_domain_orders_normalizes_alternate_domain_fields(monkeypatch):
     assert rows[1]["domainname"] == "other.example"
     assert rows[1]["orderid"] == "67890"
     assert rows[1]["currentstatus"] == "Active"
+
+
+def test_list_domain_orders_flattens_logicboxes_dotted_keys(monkeypatch):
+    client = ResellerClubClient()
+
+    def fake_get(endpoint, params=None):
+        assert endpoint == "domains/search"
+        assert "status" not in (params or {}) or params.get("status") != "All"
+        return {
+            "recsonpage": "1",
+            "recsindb": "1",
+            "1": {
+                "orders.orderid": "99901",
+                "entity.description": "Dotted.Example",
+                "entity.currentstatus": "Active",
+                "entity.customerid": "77",
+                "orders.creationtime": 1735689600,
+                "orders.endtime": 1767225600,
+                "orders.ns1": "ns1.cyberask.co.uk",
+                "orders.ns2": "ns2.cyberask.co.uk",
+            },
+        }
+
+    monkeypatch.setattr(client, "_get", fake_get)
+
+    rows = client.list_domain_orders(page_no=1, no_of_records=50, status="All")
+
+    assert len(rows) == 1
+    assert rows[0]["domainname"] == "dotted.example"
+    assert rows[0]["orderid"] == "99901"
+    assert rows[0]["currentstatus"] == "Active"
+    assert rows[0]["customerid"] == "77"
+    assert rows[0]["nameservers"] == ["ns1.cyberask.co.uk", "ns2.cyberask.co.uk"]
+    assert rows[0]["expiry_date"] == "2026-01-01"
+
+
+def test_list_all_domain_orders_omits_invalid_all_status(monkeypatch):
+    client = ResellerClubClient()
+    seen_params = []
+
+    def fake_get(endpoint, params=None):
+        seen_params.append(params or {})
+        return {
+            "recsonpage": "1",
+            "recsindb": "1",
+            "1": {
+                "orders.orderid": "1",
+                "entity.description": "a.com",
+                "entity.currentstatus": "Active",
+            },
+        }
+
+    monkeypatch.setattr(client, "_get", fake_get)
+
+    rows = client.list_all_domain_orders(status="All", no_of_records=50, max_pages=1)
+
+    assert rows[0]["domainname"] == "a.com"
+    assert "status" not in seen_params[0]

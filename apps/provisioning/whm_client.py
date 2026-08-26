@@ -342,38 +342,96 @@ class WHMClient:
 
         return names
 
-    # ── cPanel UAPI proxy methods ────────────────────────────────────────────
-    # WHM can proxy cPanel UAPI calls on behalf of any user via:
-    #   GET /execute/{Module}/{function}?cpanel_user={username}
+    # ── cPanel UAPI / API2 proxy via WHM json-api/cpanel ─────────────────────
+    # Cadence/cPanel WHM on :2087 does NOT serve /execute/Module/function
+    # (that path is the cPanel port 2083 UAPI). From WHM we must impersonate:
+    #   GET /json-api/cpanel?cpanel_jsonapi_user=...&cpanel_jsonapi_apiversion=3
+    #   &cpanel_jsonapi_module=Email&cpanel_jsonapi_func=list_pops_with_disk
+
+    _API2_FUNC_ALIASES = {
+        ("Email", "list_pops_with_disk"): ("Email", "listpopswithdisk"),
+        ("Email", "list_pops"): ("Email", "listpops"),
+        ("Email", "add_pop"): ("Email", "addpop"),
+        ("Email", "delete_pop"): ("Email", "delpop"),
+        ("Mysql", "list_databases"): ("MysqlFE", "listdbs"),
+        ("Quota", "get_quota_info"): ("DiskUsage", "fetchdiskusage"),
+        ("DiskUsage", "get_quota"): ("DiskUsage", "fetchdiskusage"),
+    }
+
+    @staticmethod
+    def _unwrap_cpanel_payload(data: dict):
+        """Normalize WHM-proxied UAPI and API2 payloads to a data value."""
+        if not isinstance(data, dict):
+            return data
+        if data.get("status") == 0 and data.get("data") is None:
+            errors = data.get("errors") or ["Unknown cPanel error"]
+            raise WHMClientError(f"cPanel error: {errors[0]}")
+        if "cpanelresult" in data and isinstance(data["cpanelresult"], dict):
+            result = data["cpanelresult"]
+            event = result.get("event") if isinstance(result.get("event"), dict) else {}
+            if str(event.get("result")) in {"0", "false"}:
+                raise WHMClientError(result.get("error") or "cPanel API2 call failed")
+            payload = result.get("data")
+            return payload if payload is not None else result
+        inner = data.get("data")
+        if isinstance(inner, dict) and "result" in inner:
+            result = inner["result"]
+            if isinstance(result, dict):
+                if str(result.get("status")) in {"0", "false"}:
+                    errors = result.get("errors") or ["Unknown cPanel error"]
+                    raise WHMClientError(f"cPanel error: {errors[0]}")
+                return result.get("data")
+            return result
+        if isinstance(inner, dict) and "data" in inner:
+            return inner.get("data")
+        if inner is not None:
+            return inner
+        return data.get("data", data)
 
     def _cpanel_call(self, cpanel_username: str, module: str, function: str, params: dict = None) -> dict:
-        """Proxy a cPanel UAPI call on behalf of *cpanel_username* via WHM."""
-        url = f"https://{self.host}:{self.port}/execute/{module}/{function}"
-        query = {"cpanel_user": cpanel_username}
-        if params:
-            query.update(params)
+        """Proxy a cPanel UAPI/API2 call via WHM ``json-api/cpanel``."""
+        attempts = [(3, module, function)]
+        alias = self._API2_FUNC_ALIASES.get((module, function))
+        if alias:
+            attempts.append((2, alias[0], alias[1]))
+        attempts.append((2, module, function.replace("_", "")))
 
-        try:
-            response = self.session.get(url, params=query, timeout=30)
-            response.raise_for_status()
-            data = response.json()
-        except requests.RequestException as e:
-            logger.error(f"cPanel UAPI request failed ({module}/{function}): {e}")
-            raise WHMClientError(f"cPanel UAPI request failed: {e}") from e
+        errors: list[str] = []
+        seen: set[tuple] = set()
+        for api_version, mod, func in attempts:
+            key = (api_version, mod, func)
+            if key in seen:
+                continue
+            seen.add(key)
+            query = {
+                "cpanel_jsonapi_user": cpanel_username,
+                "cpanel_jsonapi_apiversion": api_version,
+                "cpanel_jsonapi_module": mod,
+                "cpanel_jsonapi_func": func,
+            }
+            if params:
+                query.update(params)
+            try:
+                data = self._call("cpanel", query)
+                payload = self._unwrap_cpanel_payload(data)
+                return {"data": payload, "status": 1, "raw": data}
+            except WHMClientError as exc:
+                errors.append(f"{mod}/{func} (v{api_version}): {exc}")
+                continue
 
-        if data.get("status") == 0:
-            errors = data.get("errors") or ["Unknown cPanel error"]
-            logger.error(f"cPanel UAPI error {module}/{function}: {errors}")
-            raise WHMClientError(f"cPanel error: {errors[0]}")
-
-        return data
+        raise WHMClientError(
+            "cPanel call failed via WHM json-api/cpanel: " + " | ".join(errors)
+        )
 
     # ── Email accounts ───────────────────────────────────────────────────────
 
     def list_email_accounts(self, cpanel_username: str) -> list[dict]:
         """Return all email accounts with disk usage for *cpanel_username*."""
         data = self._cpanel_call(cpanel_username, "Email", "list_pops_with_disk")
-        return data.get("data", [])
+        payload = data.get("data", []) if isinstance(data, dict) else data
+        if isinstance(payload, dict):
+            payload = payload.get("data") or payload.get("pops") or []
+        return payload if isinstance(payload, list) else []
 
     def create_email_account(
         self,
@@ -412,7 +470,10 @@ class WHMClient:
     def list_databases(self, cpanel_username: str) -> list[dict]:
         """Return all MySQL databases for *cpanel_username*."""
         data = self._cpanel_call(cpanel_username, "Mysql", "list_databases")
-        return data.get("data", [])
+        payload = data.get("data", []) if isinstance(data, dict) else data
+        if isinstance(payload, dict):
+            payload = payload.get("data") or payload.get("databases") or []
+        return payload if isinstance(payload, list) else []
 
     def create_database(self, cpanel_username: str, db_name: str) -> dict:
         """Create a MySQL database (name is prefixed with the cPanel username)."""
@@ -426,13 +487,66 @@ class WHMClient:
 
     # ── Disk / quota ─────────────────────────────────────────────────────────
 
-    def get_quota(self, cpanel_username: str) -> dict:
-        """Return disk quota info for *cpanel_username* via cPanel UAPI.
+    @staticmethod
+    def _size_to_mb(value) -> float:
+        """Parse WHM sizes such as ``152``, ``152.3M``, ``1.2G``, ``unlimited``."""
+        text = str(value or "").strip().lower().replace(",", "").replace(" ", "")
+        if text in {"", "unlimited", "none", "null", "n/a", "na"}:
+            return 0.0
+        multiplier = 1.0
+        if text.endswith("t"):
+            multiplier = 1024 * 1024
+            text = text[:-1]
+        elif text.endswith("g"):
+            multiplier = 1024.0
+            text = text[:-1]
+        elif text.endswith("m"):
+            multiplier = 1.0
+            text = text[:-1]
+        elif text.endswith("k"):
+            multiplier = 1.0 / 1024.0
+            text = text[:-1]
+        elif text.endswith("b"):
+            multiplier = 1.0 / (1024.0 * 1024.0)
+            text = text[:-1]
+        try:
+            return float(text) * multiplier
+        except (TypeError, ValueError):
+            return 0.0
 
-        Some servers expose quota via ``Quota/get_quota_info`` while others
-        still rely on ``DiskUsage/get_quota``. Try the modern endpoint first,
-        then fall back for compatibility.
+    def _account_summary_record(self, cpanel_username: str) -> dict:
+        summary = self.get_account_summary(cpanel_username)
+        payload = summary.get("data") if isinstance(summary.get("data"), dict) else summary
+        acct = payload.get("acct") if isinstance(payload, dict) else None
+        if isinstance(acct, list) and acct and isinstance(acct[0], dict):
+            return acct[0]
+        if isinstance(acct, dict):
+            return acct
+        return payload if isinstance(payload, dict) else {}
+
+    def get_quota(self, cpanel_username: str) -> dict:
+        """Return disk quota for *cpanel_username*.
+
+        Prefer WHM ``accountsummary`` (API 1 on :2087) because Cadence WHM
+        does not expose ``/execute/Quota/...``. Fall back to proxied UAPI.
         """
+        try:
+            summary = self._account_summary_record(cpanel_username)
+            used = summary.get("diskused") or summary.get("disk_used") or summary.get("diskusage")
+            limit = summary.get("disklimit") or summary.get("disk_limit") or summary.get("diskquota")
+            if used not in (None, ""):
+                used_mb = self._size_to_mb(used)
+                limit_mb = self._size_to_mb(limit)
+                return {
+                    "megabytes_used": used_mb,
+                    "megabytes_limit": limit_mb,
+                    "bytesused": int(used_mb * 1024 * 1024),
+                    "bytelimit": int(limit_mb * 1024 * 1024) if limit_mb else "unlimited",
+                    "source": "accountsummary",
+                }
+        except WHMClientError as exc:
+            logger.info("accountsummary quota lookup failed for %s: %s", cpanel_username, exc)
+
         errors = []
         for module, function in (("Quota", "get_quota_info"), ("DiskUsage", "get_quota")):
             cache_key = (self.host, self.port, module, function)
@@ -441,10 +555,11 @@ class WHMClient:
             try:
                 data = self._cpanel_call(cpanel_username, module, function)
                 self._uapi_support_cache[cache_key] = True
-                return data.get("data", {}) if isinstance(data, dict) else {}
+                payload = data.get("data", {}) if isinstance(data, dict) else {}
+                if isinstance(payload, list) and payload and isinstance(payload[0], dict):
+                    payload = payload[0]
+                return payload if isinstance(payload, dict) else {}
             except WHMClientError as exc:
-                # If endpoint is missing on this server, mark unsupported to
-                # prevent repeated noisy 404 calls on future sync runs.
                 if "404" in str(exc):
                     self._uapi_support_cache[cache_key] = False
                 errors.append(f"{module}/{function}: {exc}")
@@ -480,21 +595,14 @@ class WHMClient:
             "errors": [],
         }
         try:
-            stats["quota"] = self.get_quota(cpanel_username) or {}
-        except WHMClientError as exc:
-            stats["errors"].append(f"Quota: {exc}")
-        try:
-            summary = self.get_account_summary(cpanel_username)
-            payload = summary.get("data") if isinstance(summary.get("data"), dict) else summary
-            acct = payload.get("acct") if isinstance(payload, dict) else None
-            if isinstance(acct, list) and acct:
-                stats["summary"] = acct[0] if isinstance(acct[0], dict) else {}
-            elif isinstance(acct, dict):
-                stats["summary"] = acct
-            elif isinstance(payload, dict):
-                stats["summary"] = payload
+            stats["summary"] = self._account_summary_record(cpanel_username) or {}
         except WHMClientError as exc:
             stats["errors"].append(f"Account summary: {exc}")
+        try:
+            stats["quota"] = self.get_quota(cpanel_username) or {}
+        except WHMClientError as exc:
+            if not stats["summary"]:
+                stats["errors"].append(f"Quota: {exc}")
         try:
             bw = self.get_disk_usage(cpanel_username)
             payload = bw.get("data") if isinstance(bw.get("data"), dict) else bw
@@ -508,13 +616,19 @@ class WHMClient:
         except WHMClientError as exc:
             stats["errors"].append(f"Bandwidth: {exc}")
         try:
-            stats["emails"] = self.list_email_accounts(cpanel_username) or []
+            emails = self.list_email_accounts(cpanel_username) or []
+            if isinstance(emails, dict):
+                emails = emails.get("data") or emails.get("pops") or []
+            stats["emails"] = emails if isinstance(emails, list) else []
         except WHMClientError as exc:
-            stats["errors"].append(f"Email: {exc}")
+            logger.info("Email list unavailable for %s: %s", cpanel_username, exc)
         try:
-            stats["databases"] = self.list_databases(cpanel_username) or []
+            databases = self.list_databases(cpanel_username) or []
+            if isinstance(databases, dict):
+                databases = databases.get("data") or []
+            stats["databases"] = databases if isinstance(databases, list) else []
         except WHMClientError as exc:
-            stats["errors"].append(f"Databases: {exc}")
+            logger.info("Database list unavailable for %s: %s", cpanel_username, exc)
         return stats
 
 

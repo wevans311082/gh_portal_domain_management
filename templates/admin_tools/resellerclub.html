@@ -2,7 +2,8 @@
 {% block title %}ResellerClub inventory — {{ SITE_NAME }}{% endblock %}
 {% block page_title %}ResellerClub inventory{% endblock %}
 {% block header_actions %}
-<form method="post">{% csrf_token %}<input type="hidden" name="action" value="refresh"><button class="btn-primary text-xs">Refresh from registrar</button></form>
+<form method="post" class="inline">{% csrf_token %}<input type="hidden" name="action" value="refresh"><button class="btn-secondary text-xs">Refresh list</button></form>
+<form method="post" class="inline">{% csrf_token %}<input type="hidden" name="action" value="sync_all"><button class="btn-primary text-xs">Sync WHM + ResellerClub</button></form>
 {% endblock %}
 {% block content %}
 {% if error %}
@@ -16,14 +17,23 @@
   <div class="bg-white rounded-xl border border-slate-200 p-4"><p class="text-xs text-slate-500 uppercase">WHM / hosting match</p><p class="text-2xl font-bold">{{ whm_linked_count }}</p></div>
 </div>
 
-<p class="text-sm text-slate-500 mb-4">Pulls live ResellerClub orders, matches them to portal domains and WHM accounts, and lets you import or re-sync state.</p>
+<p class="text-sm text-slate-500 mb-4">
+  Live ResellerClub orders (all statuses, paged) matched against portal domains and WHM <code>listaccts</code>.
+  <strong>Sync WHM + ResellerClub</strong> refreshes WHM snapshots, then writes registrar status, expiry, nameservers and order IDs onto matching portal domains.
+</p>
+
+<form method="get" class="mb-4 flex gap-2">
+  <input type="search" name="q" value="{{ query }}" placeholder="Filter domain, order ID, email, status" class="flex-1 max-w-md border border-slate-300 rounded px-3 py-2 text-sm">
+  <button class="btn-secondary text-xs">Filter</button>
+</form>
 
 <div class="fluent-table-wrap">
-  <table class="fluent-table min-w-[960px]">
+  <table class="fluent-table min-w-[1080px]">
     <thead>
       <tr>
         <th>Domain</th>
         <th>Registrar</th>
+        <th>Nameservers</th>
         <th>Portal</th>
         <th>WHM / hosting</th>
         <th>Customer</th>
@@ -34,10 +44,15 @@
       {% for row in rows %}
       <tr>
         <td class="font-medium">
-          {{ row.domain_name }}
+          {{ row.domain_name|default:"—" }}
           <span class="block text-xs text-slate-400">{{ row.status }}{% if row.expiry %} · exp {{ row.expiry }}{% endif %}</span>
         </td>
         <td class="font-mono text-xs">{{ row.order_id|default:"—" }}</td>
+        <td class="font-mono text-xs text-slate-600">
+          {% for ns in row.nameservers %}
+          <span class="block">{{ ns }}</span>
+          {% empty %}—{% endfor %}
+        </td>
         <td>
           {% if row.local_domain %}
           <span class="chip chip-success">{{ row.local_domain.user.email }}</span>
@@ -47,7 +62,7 @@
           {% endif %}
         </td>
         <td>
-          {% if row.whm_account %}
+          {% if row.whm_account.username %}
           <span class="font-mono text-xs">{{ row.whm_account.username }}</span>
           <span class="block text-xs text-slate-500">{{ row.whm_account.plan }}</span>
           {% elif row.hosting_services %}
@@ -62,7 +77,7 @@
           {{ row.customer_name|default:"" }}
           <span class="block text-slate-500">{{ row.customer_email|default:"" }}</span>
         </td>
-        <td class="text-right">
+        <td class="text-right whitespace-nowrap">
           {% if row.local_domain %}
           <form method="post" class="inline">{% csrf_token %}
             <input type="hidden" name="action" value="sync_order">
@@ -87,7 +102,7 @@
         </td>
       </tr>
       {% empty %}
-      <tr><td colspan="6" class="text-sm text-slate-500 py-6">No registrar domains returned. Check ResellerClub credentials and refresh.</td></tr>
+      <tr><td colspan="7" class="text-sm text-slate-500 py-6">No registrar domains returned. Check ResellerClub credentials, IP whitelist, and use Refresh list.</td></tr>
       {% endfor %}
     </tbody>
   </table>

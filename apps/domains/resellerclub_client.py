@@ -719,7 +719,16 @@ class ResellerClubClient:
 
     def get_order_details(self, order_id: str) -> dict:
         """Get details for a domain order."""
-        return self._get("domains/details", {"order-id": order_id, "options": "All"})
+        payload = self._get("domains/details", {"order-id": order_id, "options": "All"})
+        return self._flatten_logicboxes_record(payload) if isinstance(payload, dict) else payload
+
+    def get_order_details_by_name(self, domain_name: str) -> dict:
+        """Get details for a domain order by its full domain name."""
+        payload = self._get(
+            "domains/details-by-name",
+            {"domain-name": domain_name, "options": "All"},
+        )
+        return self._flatten_logicboxes_record(payload) if isinstance(payload, dict) else payload
 
     @staticmethod
     def _epoch_to_iso(value):
@@ -732,19 +741,45 @@ class ResellerClubClient:
         return datetime.fromtimestamp(epoch, tz=timezone.utc).date().isoformat()
 
     @staticmethod
-    def _first_text_from_order(record: dict, *keys: str) -> str:
+    def _flatten_logicboxes_record(record: dict) -> dict:
+        """Copy dotted LogicBoxes keys (``orders.orderid``) to short aliases (``orderid``)."""
         if not isinstance(record, dict):
-            return ""
-        for key in keys:
-            value = record.get(key)
-            if value not in (None, ""):
-                return str(value).strip()
+            return {}
+        out = dict(record)
+        for key, value in record.items():
+            text = str(key)
+            if "." not in text:
+                continue
+            short = text.split(".")[-1]
+            if short and (short not in out or out[short] in (None, "")):
+                out[short] = value
         details = record.get("order_details")
         if isinstance(details, dict):
+            for key, value in details.items():
+                text = str(key)
+                short = text.split(".")[-1] if "." in text else text
+                if short and (short not in out or out[short] in (None, "")):
+                    out[short] = value
+        return out
+
+    @classmethod
+    def _first_text_from_order(cls, record: dict, *keys: str) -> str:
+        if not isinstance(record, dict):
+            return ""
+        wanted = {str(key).lower() for key in keys}
+        sources = [record]
+        details = record.get("order_details")
+        if isinstance(details, dict):
+            sources.append(details)
+        for source in sources:
             for key in keys:
-                value = details.get(key)
+                value = source.get(key)
                 if value not in (None, ""):
                     return str(value).strip()
+            for rec_key, rec_val in source.items():
+                short = str(rec_key).split(".")[-1].lower()
+                if short in wanted and rec_val not in (None, ""):
+                    return str(rec_val).strip()
         return ""
 
     @classmethod
@@ -783,136 +818,181 @@ class ResellerClubClient:
             "order_status",
         )
 
+    _SEARCH_META_KEYS = {
+        "recsonpage",
+        "recsindb",
+        "status",
+        "message",
+        "error",
+        "errorcode",
+    }
+    _SEARCH_RECORD_MARKERS = (
+        "domainname",
+        "domain-name",
+        "domain_name",
+        "domain",
+        "description",
+        "orderid",
+        "order-id",
+        "order_id",
+        "entityid",
+        "currentstatus",
+        "current-status",
+        "current_status",
+        "status",
+        "endtime",
+        "creationtime",
+        "orders.orderid",
+        "entity.description",
+        "entity.currentstatus",
+        "entity.entityid",
+        "orders.endtime",
+        "orders.creationtime",
+    )
+    _SEARCH_STATUSES = (
+        "Active",
+        "InActive",
+        "Inactive",
+        "Suspended",
+        "Pending Delete Restorable",
+        "PendingDeleteRestorable",
+        "Deleted",
+        "Archived",
+    )
+
+    def _search_params(self, page_no: int, no_of_records: int, status: str | None) -> dict:
+        params = {"page-no": page_no, "no-of-records": no_of_records}
+        if status and str(status).strip().lower() not in {"all", "*"}:
+            params["status"] = status
+        return params
+
+    def _records_from_search_payload(self, payload) -> list[dict]:
+        if isinstance(payload, list):
+            return [row for row in payload if isinstance(row, dict)]
+        if not isinstance(payload, dict):
+            return []
+        extracted = payload.get("orders") or payload.get("data") or payload.get("results")
+        if isinstance(extracted, list):
+            return [row for row in extracted if isinstance(row, dict)]
+        if isinstance(extracted, dict):
+            return [v for v in extracted.values() if isinstance(v, dict)]
+
+        records = []
+        for key, value in payload.items():
+            if str(key).lower() in self._SEARCH_META_KEYS:
+                continue
+            if not isinstance(value, dict):
+                continue
+            if not any(marker in value for marker in self._SEARCH_RECORD_MARKERS):
+                # Still accept numbered LogicBoxes rows after flattening.
+                flattened = self._flatten_logicboxes_record(value)
+                if not any(marker in flattened for marker in self._SEARCH_RECORD_MARKERS):
+                    continue
+                value = flattened
+            row = self._flatten_logicboxes_record(value)
+            if not row.get("orderid") and str(key).isdigit():
+                row["orderid"] = str(key)
+            records.append(row)
+        return records
+
+    def _normalize_order_record(self, record: dict) -> dict:
+        item = self._flatten_logicboxes_record(record)
+        domain_name = self._extract_domain_name_from_order(item)
+        order_id = self._extract_order_id_from_order(item)
+        current_status = self._extract_status_from_order(item)
+        if domain_name:
+            item["domainname"] = domain_name
+        if order_id:
+            item["orderid"] = order_id
+        if current_status:
+            item["currentstatus"] = current_status
+        item["expiry_date"] = self._epoch_to_iso(item.get("endtime"))
+        item["creation_date"] = self._epoch_to_iso(item.get("creationtime"))
+        item["customerid"] = self._first_text_from_order(
+            item, "customerid", "customer-id", "customer_id"
+        )
+        ns_list = []
+        raw_ns = item.get("ns") or item.get("nserver") or item.get("nameservers")
+        if isinstance(raw_ns, list):
+            for entry in raw_ns:
+                host = entry.get("ns") if isinstance(entry, dict) else str(entry or "")
+                if host:
+                    ns_list.append(host.strip().lower())
+        for idx in range(1, 5):
+            host = self._first_text_from_order(item, f"ns{idx}", f"nameserver{idx}")
+            if host:
+                ns_list.append(host.lower())
+            item[f"ns{idx}"] = host.lower() if host else item.get(f"ns{idx}", "")
+        seen = []
+        for host in ns_list:
+            if host and host not in seen:
+                seen.append(host)
+        item["nameservers"] = seen
+        return item
+
     def list_domain_orders(
         self,
         page_no: int = 1,
-        no_of_records: int = 100,
+        no_of_records: int = 50,
         status: str = "Active",
         include_details: bool = False,
         max_details: int = 100,
     ) -> list[dict]:
         """Return registrar domain orders with normalized dates and optional full details."""
-        payload = self._get(
-            "domains/search",
-            {
-                "page-no": page_no,
-                "no-of-records": no_of_records,
-                "status": status,
-            },
-        )
-
-        if isinstance(payload, list):
-            records = payload
-        elif isinstance(payload, dict):
-            extracted = payload.get("orders") or payload.get("data") or payload.get("results")
-            if isinstance(extracted, list):
-                records = extracted
-            elif isinstance(extracted, dict):
-                # Some LogicBoxes responses return a map keyed by order id.
-                records = [v for v in extracted.values() if isinstance(v, dict)]
-            else:
-                # Fallback for payloads that are themselves an order-id keyed map.
-                records = []
-                for key, value in payload.items():
-                    if not isinstance(value, dict):
-                        continue
-                    if not any(
-                        marker in value
-                        for marker in (
-                            "domainname",
-                            "domain-name",
-                            "domain_name",
-                            "domain",
-                            "description",
-                            "orderid",
-                            "order-id",
-                            "order_id",
-                            "entityid",
-                            "currentstatus",
-                            "current-status",
-                            "current_status",
-                            "status",
-                            "endtime",
-                            "creationtime",
-                        )
-                    ):
-                        continue
-                    row = dict(value)
-                    if not row.get("orderid") and str(key).isdigit():
-                        row["orderid"] = str(key)
-                    records.append(row)
-        else:
-            records = []
+        payload = self._get("domains/search", self._search_params(page_no, no_of_records, status))
+        records = self._records_from_search_payload(payload)
 
         normalized = []
         for idx, record in enumerate(records):
             if not isinstance(record, dict):
                 continue
-            item = dict(record)
-            domain_name = self._extract_domain_name_from_order(item)
-            order_id = self._extract_order_id_from_order(item)
-            current_status = self._extract_status_from_order(item)
-            if domain_name:
-                item["domainname"] = domain_name
-            if order_id:
-                item["orderid"] = order_id
-            if current_status:
-                item["currentstatus"] = current_status
-            item["expiry_date"] = self._epoch_to_iso(record.get("endtime"))
-            item["creation_date"] = self._epoch_to_iso(record.get("creationtime"))
+            item = self._normalize_order_record(record)
 
             if include_details and idx < max_details:
                 order_id = str(item.get("orderid") or "").strip()
-                if order_id:
-                    try:
+                domain_name = str(item.get("domainname") or "").strip()
+                details = None
+                try:
+                    if order_id:
                         details = self.get_order_details(order_id)
-                        item["order_details"] = details
-                        # Backfill common fields from details if list payload omits them.
-                        if isinstance(details, dict):
-                            detail_domain = self._extract_domain_name_from_order(details)
-                            detail_status = self._extract_status_from_order(details)
-                            if detail_domain:
-                                item["domainname"] = item.get("domainname") or detail_domain
-                            if detail_status:
-                                item["currentstatus"] = item.get("currentstatus") or detail_status
-                            item.setdefault("recurring", details.get("recurring"))
-                            item.setdefault("endtime", details.get("endtime"))
-                            item.setdefault("creationtime", details.get("creationtime"))
-                            item["expiry_date"] = item["expiry_date"] or self._epoch_to_iso(details.get("endtime"))
-                            item["creation_date"] = item["creation_date"] or self._epoch_to_iso(details.get("creationtime"))
-                    except Exception as exc:
-                        item["order_details_error"] = str(exc)
-
+                    elif domain_name:
+                        details = self.get_order_details_by_name(domain_name)
+                except Exception as exc:
+                    item["order_details_error"] = str(exc)
+                if isinstance(details, dict):
+                    item["order_details"] = details
+                    merged = self._normalize_order_record({**item, **details})
+                    merged["order_details"] = details
+                    item = merged
             normalized.append(item)
         return normalized
 
-    def list_all_domain_orders(
+    def _paginate_domain_orders(
         self,
-        no_of_records: int = 100,
-        status: str = "All",
-        include_details: bool = False,
-        max_details: int = 100,
-        max_pages: int = 50,
+        *,
+        status: str | None,
+        no_of_records: int,
+        include_details: bool,
+        max_details: int,
+        max_pages: int,
     ) -> list[dict]:
-        """Return all registrar domain orders across pages with best-effort dedupe."""
         all_rows: list[dict] = []
         seen_keys: set[str] = set()
         details_budget = max_details
+        page_size = min(max(int(no_of_records or 50), 1), 50)
 
         for page_no in range(1, max_pages + 1):
             rows = self.list_domain_orders(
                 page_no=page_no,
-                no_of_records=no_of_records,
-                status=status,
+                no_of_records=page_size,
+                status=status or "",
                 include_details=include_details and details_budget > 0,
                 max_details=max(0, details_budget),
             )
             if not rows:
                 break
-
             if include_details:
                 details_budget = max(0, details_budget - len(rows))
-
             for row in rows:
                 key = str(row.get("orderid") or row.get("domainname") or "").strip().lower()
                 if key and key in seen_keys:
@@ -920,11 +1000,69 @@ class ResellerClubClient:
                 if key:
                     seen_keys.add(key)
                 all_rows.append(row)
-
-            if len(rows) < no_of_records:
+            if len(rows) < page_size:
                 break
-
         return all_rows
+
+    def list_all_domain_orders(
+        self,
+        no_of_records: int = 50,
+        status: str = "All",
+        include_details: bool = False,
+        max_details: int = 100,
+        max_pages: int = 50,
+    ) -> list[dict]:
+        """Return all registrar domain orders across pages with best-effort dedupe.
+
+        LogicBoxes does not accept ``status=All``. We first search with no status
+        filter, then union the documented status values if that returns nothing.
+        """
+        wanted = (status or "").strip()
+        if wanted.lower() in {"", "all", "*"}:
+            try:
+                rows = self._paginate_domain_orders(
+                    status=None,
+                    no_of_records=no_of_records,
+                    include_details=include_details,
+                    max_details=max_details,
+                    max_pages=max_pages,
+                )
+                if rows:
+                    return rows
+            except ResellerClubError:
+                rows = []
+            combined: list[dict] = []
+            seen: set[str] = set()
+            remaining_details = max_details
+            for st in self._SEARCH_STATUSES:
+                try:
+                    chunk = self._paginate_domain_orders(
+                        status=st,
+                        no_of_records=no_of_records,
+                        include_details=include_details,
+                        max_details=remaining_details,
+                        max_pages=max_pages,
+                    )
+                except ResellerClubError:
+                    continue
+                if include_details:
+                    remaining_details = max(0, remaining_details - len(chunk))
+                for row in chunk:
+                    key = str(row.get("orderid") or row.get("domainname") or "").strip().lower()
+                    if key and key in seen:
+                        continue
+                    if key:
+                        seen.add(key)
+                    combined.append(row)
+            return combined
+
+        return self._paginate_domain_orders(
+            status=wanted,
+            no_of_records=no_of_records,
+            include_details=include_details,
+            max_details=max_details,
+            max_pages=max_pages,
+        )
 
     def modify_nameservers(self, order_id: str, nameservers: list) -> dict:
         """Update the nameservers for a domain."""
@@ -953,19 +1091,24 @@ class ResellerClubClient:
             {"page-no": page_no, "no-of-records": no_of_records},
         )
         if isinstance(payload, list):
-            return [row for row in payload if isinstance(row, dict)]
+            return [self._flatten_logicboxes_record(row) for row in payload if isinstance(row, dict)]
         if isinstance(payload, dict):
             extracted = payload.get("customers") or payload.get("data") or payload.get("results")
             if isinstance(extracted, list):
-                return [row for row in extracted if isinstance(row, dict)]
+                return [self._flatten_logicboxes_record(row) for row in extracted if isinstance(row, dict)]
             rows = []
             for key, value in payload.items():
-                if isinstance(value, dict) and any(
-                    marker in value for marker in ("username", "emailaddr", "email", "customerid", "name")
+                if str(key).lower() in self._SEARCH_META_KEYS or not isinstance(value, dict):
+                    continue
+                row = self._flatten_logicboxes_record(value)
+                if not any(
+                    marker in row or marker in value
+                    for marker in ("username", "emailaddr", "email", "customerid", "name", "company")
                 ):
-                    row = dict(value)
-                    row.setdefault("customerid", str(key))
-                    rows.append(row)
+                    continue
+                if not row.get("customerid") and str(key).isdigit():
+                    row["customerid"] = str(key)
+                rows.append(row)
             return rows
         return []
 

@@ -151,16 +151,68 @@ def test_invoice_preview_page(client, django_user_model):
 def test_resellerclub_hub_page(client, django_user_model):
     staff = _staff(django_user_model, "rc@example.com")
     client.force_login(staff)
-    with patch("apps.admin_tools.resellerclub_views.ResellerClubClient") as mock_cls:
+    with patch("apps.admin_tools.resellerclub_views.ResellerClubClient") as mock_cls, patch(
+        "apps.admin_tools.resellerclub_views.WHMClient"
+    ) as mock_whm:
         inst = MagicMock()
         inst.list_all_domain_orders.return_value = [
-            {"domainname": "example.com", "orderid": "99", "currentstatus": "Active", "expiry_date": "2027-01-01"}
+            {
+                "domainname": "example.com",
+                "orderid": "99",
+                "currentstatus": "Active",
+                "expiry_date": "2027-01-01",
+                "nameservers": ["ns1.example.com", "ns2.example.com"],
+                "ns1": "ns1.example.com",
+                "ns2": "ns2.example.com",
+            }
         ]
         inst.list_customers.return_value = []
         mock_cls.return_value = inst
+        mock_whm.return_value.list_accounts.return_value = [
+            {"user": "exuser", "domain": "example.com", "plan": "business", "email": "client@example.com"}
+        ]
         response = client.get(reverse("admin_tools:resellerclub_hub"))
     assert response.status_code == 200
-    assert b"example.com" in response.content
+    body = response.content.decode()
+    assert "example.com" in body
+    assert "ns1.example.com" in body
+    assert "exuser" in body
+
+
+@pytest.mark.django_db
+def test_resellerclub_hub_sync_all(client, django_user_model):
+    from apps.domains.models import Domain
+
+    staff = _staff(django_user_model, "rc-sync@example.com")
+    owner = _user(django_user_model, "owner-sync@example.com")
+    Domain.objects.create(user=owner, name="syncme.com", tld="com", status=Domain.STATUS_PENDING)
+    client.force_login(staff)
+    with patch("apps.admin_tools.resellerclub_views.ResellerClubClient") as mock_cls, patch(
+        "apps.admin_tools.resellerclub_views.WHMClient"
+    ) as mock_whm, patch("apps.admin_tools.resellerclub_views.WHMSyncService") as mock_sync:
+        inst = MagicMock()
+        inst.list_all_domain_orders.return_value = [
+            {
+                "domainname": "syncme.com",
+                "orderid": "555",
+                "currentstatus": "Active",
+                "expiry_date": "2028-04-01",
+                "ns1": "ns1.cyberask.co.uk",
+                "ns2": "ns2.cyberask.co.uk",
+                "nameservers": ["ns1.cyberask.co.uk", "ns2.cyberask.co.uk"],
+            }
+        ]
+        inst.list_customers.return_value = []
+        inst.get_order_details.return_value = {}
+        mock_cls.return_value = inst
+        mock_whm.return_value.list_accounts.return_value = []
+        mock_sync.return_value.sync_all.return_value = {"account_count": 3}
+        response = client.post(reverse("admin_tools:resellerclub_hub"), {"action": "sync_all"})
+    assert response.status_code == 302
+    domain = Domain.objects.get(name="syncme.com")
+    assert domain.registrar_id == "555"
+    assert domain.status == Domain.STATUS_ACTIVE
+    assert domain.nameserver1 == "ns1.cyberask.co.uk"
 
 
 @pytest.mark.django_db

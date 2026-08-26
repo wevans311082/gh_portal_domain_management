@@ -518,6 +518,24 @@ def _to_float(value, default=0.0):
         return default
 
 
+def _whm_size_to_mb(value, default=0.0):
+    """Parse WHM size strings such as ``120M`` / ``1.5G`` into megabytes."""
+    if hasattr(value, "_mock_name"):
+        return default
+    text = str(value or "").strip().lower().replace(",", "").replace(" ", "")
+    if text in {"", "unlimited", "none", "null", "n/a", "na"}:
+        return default
+    multiplier = 1.0
+    if text.endswith(("t", "g", "m", "k", "b")) and text[-1] in {"t", "g", "m", "k", "b"}:
+        suffix = text[-1]
+        text = text[:-1]
+        multiplier = {"t": 1024 * 1024, "g": 1024.0, "m": 1.0, "k": 1.0 / 1024.0, "b": 1.0 / (1024.0 * 1024.0)}[suffix]
+    try:
+        return float(text) * multiplier
+    except (TypeError, ValueError):
+        return default
+
+
 def _usage_percent(used, limit):
     if not limit or limit <= 0:
         return 0
@@ -542,26 +560,47 @@ def hosting_usage(request, service_pk):
     summary = stats.get("summary") or {}
     bandwidth = stats.get("bandwidth") or {}
 
-    disk_used = _to_float(
-        quota.get("megabytes_used")
-        or quota.get("bytesused")
-        or summary.get("diskused")
-        or 0
+    def _mb(*candidates):
+        for value in candidates:
+            if value in (None, ""):
+                continue
+            parsed = _whm_size_to_mb(value)
+            if parsed:
+                return parsed
+            numeric = _to_float(value)
+            if numeric:
+                return numeric
+        return 0.0
+
+    disk_used = _mb(
+        quota.get("megabytes_used"),
+        summary.get("diskused"),
+        summary.get("disk_used"),
+        quota.get("bytesused"),
     )
-    if quota.get("bytesused") and not quota.get("megabytes_used"):
-        disk_used = _to_float(quota.get("bytesused")) / (1024 * 1024)
-    disk_limit = _to_float(
-        quota.get("megabytes_limit")
-        or quota.get("bytelimit")
-        or summary.get("disklimit")
-        or service.package.disk_quota_mb
-        or 0
+    if quota.get("bytesused") and not quota.get("megabytes_used") and disk_used > 1024 * 16:
+        disk_used = disk_used / (1024 * 1024)
+    disk_limit = _mb(
+        quota.get("megabytes_limit"),
+        summary.get("disklimit"),
+        summary.get("disk_limit"),
+        service.package.disk_quota_mb,
     )
-    if quota.get("bytelimit") and str(quota.get("bytelimit")).lower() not in {"unlimited", ""} and not quota.get("megabytes_limit"):
+    if quota.get("bytelimit") and str(quota.get("bytelimit")).lower() not in {"unlimited", ""} and not disk_limit:
         disk_limit = _to_float(quota.get("bytelimit")) / (1024 * 1024)
 
-    bw_used = _to_float(bandwidth.get("bwused") or bandwidth.get("totalbytes") or bandwidth.get("usage") or 0)
-    bw_limit = _to_float(bandwidth.get("bwlimit") or bandwidth.get("limit") or service.package.bandwidth_mb or 0)
+    bw_used = _mb(
+        bandwidth.get("bwused"),
+        bandwidth.get("usage"),
+        bandwidth.get("totalbytes"),
+        summary.get("bandwidthused"),
+    )
+    bw_limit = _mb(
+        bandwidth.get("bwlimit"),
+        bandwidth.get("limit"),
+        summary.get("maxbw"),
+        service.package.bandwidth_mb,
+    )
     if bw_used > 1024 * 1024:
         bw_used = bw_used / (1024 * 1024)
     if bw_limit > 1024 * 1024:

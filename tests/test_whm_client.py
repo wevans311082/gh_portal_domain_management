@@ -4,6 +4,49 @@ from apps.provisioning.whm_client import WHMClient, WHMClientError, generate_cpa
 
 
 @pytest.mark.django_db
+def test_get_quota_uses_accountsummary_first(monkeypatch):
+    client = WHMClient()
+
+    def fake_call(function, params=None):
+        assert function == "accountsummary"
+        return {
+            "metadata": {"result": 1},
+            "data": {"acct": [{"user": "thomasth", "diskused": "120M", "disklimit": "2048M"}]},
+        }
+
+    monkeypatch.setattr(client, "_call", fake_call)
+
+    result = client.get_quota("thomasth")
+
+    assert result["megabytes_used"] == 120
+    assert result["megabytes_limit"] == 2048
+    assert result["source"] == "accountsummary"
+
+
+@pytest.mark.django_db
+def test_cpanel_call_uses_whm_json_api_not_execute(monkeypatch):
+    client = WHMClient()
+    captured = {}
+
+    def fake_call(function, params=None):
+        captured["function"] = function
+        captured["params"] = params or {}
+        return {
+            "metadata": {"result": 1},
+            "data": {"result": {"status": 1, "data": [{"email": "info@example.com"}]}},
+        }
+
+    monkeypatch.setattr(client, "_call", fake_call)
+    data = client._cpanel_call("thomasth", "Email", "list_pops_with_disk")
+
+    assert captured["function"] == "cpanel"
+    assert captured["params"]["cpanel_jsonapi_user"] == "thomasth"
+    assert captured["params"]["cpanel_jsonapi_apiversion"] == 3
+    assert captured["params"]["cpanel_jsonapi_module"] == "Email"
+    assert data["data"][0]["email"] == "info@example.com"
+
+
+@pytest.mark.django_db
 def test_get_quota_uses_quota_module_first(monkeypatch):
     client = WHMClient()
     calls = []
@@ -15,6 +58,11 @@ def test_get_quota_uses_quota_module_first(monkeypatch):
         raise AssertionError("Unexpected fallback call")
 
     monkeypatch.setattr(client, "_cpanel_call", fake_cpanel_call)
+
+    def fail_accountsummary(function, params=None):
+        raise WHMClientError("accountsummary unavailable")
+
+    monkeypatch.setattr(client, "_call", fail_accountsummary)
 
     result = client.get_quota("acctdemo")
 
@@ -36,6 +84,7 @@ def test_get_quota_falls_back_to_diskusage_when_quota_module_unavailable(monkeyp
         raise AssertionError("Unexpected endpoint")
 
     monkeypatch.setattr(client, "_cpanel_call", fake_cpanel_call)
+    monkeypatch.setattr(client, "_call", lambda *a, **k: (_ for _ in ()).throw(WHMClientError("no summary")))
 
     result = client.get_quota("acctdemo")
 
@@ -54,6 +103,7 @@ def test_get_quota_raises_when_all_endpoints_fail(monkeypatch):
         raise WHMClientError("404")
 
     monkeypatch.setattr(client, "_cpanel_call", fake_cpanel_call)
+    monkeypatch.setattr(client, "_call", lambda *a, **k: (_ for _ in ()).throw(WHMClientError("no summary")))
 
     with pytest.raises(WHMClientError):
         client.get_quota("acctdemo")
