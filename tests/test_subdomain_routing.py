@@ -1,3 +1,4 @@
+import pytest
 from django.test import RequestFactory, override_settings
 from django.urls import resolve, reverse
 
@@ -10,6 +11,14 @@ def test_subdomain_middleware_selects_portal_urlconf():
     SubdomainURLRoutingMiddleware(lambda req: None)(request)
 
     assert request.urlconf == "cyberask_domains.urls_portal"
+
+
+def test_subdomain_middleware_does_not_override_domains_host():
+    request = RequestFactory().get("/", HTTP_HOST="domains.cyberask.co.uk")
+
+    SubdomainURLRoutingMiddleware(lambda req: None)(request)
+
+    assert getattr(request, "urlconf", None) is None
 
 
 def test_subdomain_roots_resolve_to_service_entrypoints():
@@ -31,6 +40,10 @@ def test_domains_urlconf_keeps_cross_service_links_reversible():
     assert reverse("portal:cart") == "/portal/cart/"
     assert reverse("invoices:list") == "/billing/invoices/"
     assert reverse("payments:saved_cards") == "/billing/payments/cards/"
+    assert reverse("core:pricing") == "/pricing/"
+    assert reverse("core:contact") == "/contact/"
+    assert reverse("core:health_check") == "/health/"
+    assert reverse("provisioning:service_list") == "/hosting/"
 
 
 @override_settings(ROOT_URLCONF="cyberask_domains.urls_billing")
@@ -47,3 +60,12 @@ def test_portal_urlconf_keeps_portal_links_at_root():
     assert reverse("domains:search") == "/domains/"
     assert reverse("invoices:list") == "/billing/invoices/"
     assert reverse("payments:saved_cards") == "/billing/payments/cards/"
+    assert reverse("core:pricing") == "/pricing/"
+    assert reverse("core:health_check") == "/health/"
+
+
+@pytest.mark.django_db
+def test_products_list_redirects_to_shop(client):
+    response = client.get(reverse("products:list"))
+    assert response.status_code == 302
+    assert response.url == reverse("portal:shop")

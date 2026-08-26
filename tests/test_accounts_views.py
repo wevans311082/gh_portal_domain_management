@@ -52,7 +52,7 @@ def test_register_get(client):
 
 
 @pytest.mark.django_db
-def test_register_creates_user_and_logs_in(client, django_user_model):
+def test_register_creates_user_without_logging_in(client, django_user_model):
     data = {
         "email": "newuser@test.com",
         "first_name": "New",
@@ -63,6 +63,10 @@ def test_register_creates_user_and_logs_in(client, django_user_model):
     response = client.post(reverse("accounts_custom:register"), data)
     assert response.status_code == 302
     assert django_user_model.objects.filter(email="newuser@test.com").exists()
+    assert "_auth_user_id" not in client.session
+    from allauth.account.models import EmailAddress
+    record = EmailAddress.objects.get(email="newuser@test.com")
+    assert record.verified is False
 
 
 @pytest.mark.django_db
@@ -87,6 +91,21 @@ def test_register_redirects_authenticated_user(client, django_user_model):
 def test_login_get(client):
     response = client.get(reverse("accounts_custom:login"))
     assert response.status_code == 200
+
+
+@pytest.mark.django_db
+def test_login_rejects_unverified_email(client, django_user_model):
+    from allauth.account.models import EmailAddress
+
+    user = make_user(django_user_model, email="unverified@test.com")
+    EmailAddress.objects.create(user=user, email=user.email, primary=True, verified=False)
+    response = client.post(reverse("accounts_custom:login"), {
+        "email": "unverified@test.com",
+        "password": "pass1234!",
+    })
+    assert response.status_code == 200
+    assert b"Confirm your email" in response.content
+    assert "_auth_user_id" not in client.session
 
 
 @pytest.mark.django_db

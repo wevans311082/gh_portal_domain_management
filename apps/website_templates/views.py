@@ -102,12 +102,10 @@ def preview_file(request, slug, file_path="index.html"):
     mime, _ = mimetypes.guess_type(str(resolved))
     mime = mime or "application/octet-stream"
 
-    # Security: force plain text for HTML so scripts don't run in same-origin
-    # context unless the request is from our preview iframe wrapper.
-    referer = request.META.get("HTTP_REFERER", "")
-    our_origin = request.build_absolute_uri("/")
-    if mime == "text/html" and not referer.startswith(our_origin):
-        raise Http404("Direct HTML access not allowed")
+    # Do not serve untrusted template HTML on the app origin to anonymous users.
+    user = getattr(request, "user", None)
+    if mime == "text/html" and not (user and user.is_authenticated and user.is_staff):
+        raise Http404("Template HTML preview is staff-only")
 
     def _iter_file(path, chunk=64 * 1024):
         with open(path, "rb") as fh:
@@ -120,7 +118,7 @@ def preview_file(request, slug, file_path="index.html"):
     response = StreamingHttpResponse(_iter_file(resolved), content_type=mime)
     # Prevent the template content from navigating the top frame
     response["X-Frame-Options"] = "SAMEORIGIN"
-    response["Content-Security-Policy"] = "sandbox allow-scripts allow-same-origin"
+    response["Content-Security-Policy"] = "sandbox allow-scripts"
     return response
 
 

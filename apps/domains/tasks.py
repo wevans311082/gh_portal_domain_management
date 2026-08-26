@@ -289,26 +289,42 @@ def register_domain_order(self, order_id):
             else:
                 billing_contact_id = contact_ids[key]
 
-        registration_response = registrar_client.register_domain(
-            domain_name=order.domain_name,
-            years=order.registration_years,
-            customer_id=customer_id,
-            reg_contact_id=registration_contact_id,
-            admin_contact_id=admin_contact_id,
-            tech_contact_id=tech_contact_id,
-            billing_contact_id=billing_contact_id,
-            nameservers=nameservers,
-            purchase_privacy=order.privacy_enabled,
-            auto_renew=order.auto_renew,
-        )
-        if not isinstance(registration_response, dict):
-            registration_response = {"entityid": registration_response}
-        registrar_order_id = str(
-            registration_response.get("entityid")
-            or registration_response.get("orderid")
-            or registration_response.get("order-id")
-            or ""
-        )
+        if order.registrar_order_id:
+            registrar_order_id = order.registrar_order_id
+            registration_response = {"entityid": registrar_order_id}
+        else:
+            registration_response = registrar_client.register_domain(
+                domain_name=order.domain_name,
+                years=order.registration_years,
+                customer_id=customer_id,
+                reg_contact_id=registration_contact_id,
+                admin_contact_id=admin_contact_id,
+                tech_contact_id=tech_contact_id,
+                billing_contact_id=billing_contact_id,
+                nameservers=nameservers,
+                purchase_privacy=order.privacy_enabled,
+                auto_renew=order.auto_renew,
+            )
+            if not isinstance(registration_response, dict):
+                registration_response = {"entityid": registration_response}
+            registrar_order_id = str(
+                registration_response.get("entityid")
+                or registration_response.get("orderid")
+                or registration_response.get("order-id")
+                or ""
+            )
+            order.registrar_order_id = registrar_order_id
+            order.save(update_fields=["registrar_order_id", "updated_at"])
+        registered_at = timezone.now().date()
+        from dateutil.relativedelta import relativedelta
+
+        expires_at = registered_at + relativedelta(years=max(1, int(order.registration_years or 1)))
+        existing = Domain.objects.filter(name=order.domain_name).first()
+        if existing and existing.user_id != order.user_id:
+            order.status = DomainOrder.STATUS_FAILED
+            order.last_error = "This domain is already assigned to another account."
+            order.save(update_fields=["status", "last_error", "updated_at"])
+            raise ValueError(order.last_error)
         domain, _ = Domain.objects.update_or_create(
             name=order.domain_name,
             defaults={
@@ -316,7 +332,8 @@ def register_domain_order(self, order_id):
                 "tld": order.tld,
                 "status": Domain.STATUS_ACTIVE,
                 "registrar_id": registrar_order_id,
-                "registered_at": timezone.now().date(),
+                "registered_at": registered_at,
+                "expires_at": expires_at,
                 "auto_renew": order.auto_renew,
                 "dns_provider": order.dns_provider,
                 "nameserver1": nameservers[0] if nameservers else "",
@@ -404,6 +421,13 @@ def execute_domain_renewal(renewal_id: int):
         logger.info("execute_domain_renewal: renewal %s already completed, skipping", renewal_id)
         return
 
+    if renewal.invoice_id and renewal.invoice.status != renewal.invoice.STATUS_PAID:
+        renewal.status = DomainRenewal.STATUS_FAILED
+        renewal.last_error = "Invoice is not paid."
+        renewal.save(update_fields=["status", "last_error"])
+        logger.error("execute_domain_renewal: renewal %s invoice is not paid", renewal_id)
+        return
+
     domain = renewal.domain
 
     if not domain.registrar_id:
@@ -478,6 +502,13 @@ def execute_domain_transfer(transfer_id: int):
 
     if transfer.status == DomainTransfer.STATUS_COMPLETED:
         logger.info("execute_domain_transfer: transfer %s already completed, skipping", transfer_id)
+        return
+
+    if transfer.invoice_id and transfer.invoice.status != transfer.invoice.STATUS_PAID:
+        transfer.status = DomainTransfer.STATUS_FAILED
+        transfer.last_error = "Invoice is not paid."
+        transfer.save(update_fields=["status", "last_error"])
+        logger.error("execute_domain_transfer: transfer %s invoice is not paid", transfer_id)
         return
 
     if not settings.RESELLERCLUB_CUSTOMER_ID:
@@ -563,10 +594,9 @@ def process_auto_renewals(days_ahead: int = 7):
     invoice + DomainRenewal record and fire execute_domain_renewal via the normal
     Stripe webhook path.
 
-    Because the invoice starts as UNPAID we also immediately mark it PAID here
-    (auto-renew means the card on file should be charged separately; this task
-    handles registrar-side renewal for managed accounts).  If you integrate
-    Stripe billing, remove the direct status flip and let the webhook handle it.
+    Creates an unpaid invoice so the customer can pay via Stripe. Registrar
+    renewal runs from the normal paid-invoice webhook — this task never marks
+    invoices paid without a charge.
     """
     from decimal import Decimal
     from apps.billing.models import Invoice, InvoiceLineItem
@@ -590,7 +620,6 @@ def process_auto_renewals(days_ahead: int = 7):
                 DomainRenewal.STATUS_PENDING_PAYMENT,
                 DomainRenewal.STATUS_PAID,
                 DomainRenewal.STATUS_PROCESSING,
-                DomainRenewal.STATUS_COMPLETED,
             ],
         ).exists()
         if has_open_renewal:
@@ -621,19 +650,16 @@ def process_auto_renewals(days_ahead: int = 7):
             source_kind=Invoice.SOURCE_AUTO_RENEWAL,
             vat_rate=Decimal("0.00"),
             due_date=today,
-            status=Invoice.STATUS_PAID,
         )
 
-        renewal = DomainRenewal.objects.create(
+        DomainRenewal.objects.create(
             domain=domain,
             user=domain.user,
             invoice=invoice,
             renewal_years=renewal_years,
             total_price=renewal_price,
-            status=DomainRenewal.STATUS_PAID,
+            status=DomainRenewal.STATUS_PENDING_PAYMENT,
         )
-
-        execute_domain_renewal.delay(renewal.id)
         queued += 1
         logger.info("process_auto_renewals: queued renewal for %s (expiry %s)", domain.name, domain.expires_at)
 

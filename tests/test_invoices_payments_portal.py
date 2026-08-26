@@ -383,6 +383,62 @@ def test_stripe_webhook_unhandled_event_type_200(mock_wh, client, django_user_mo
 
 
 @pytest.mark.django_db
+@patch("apps.payments.views.StripeService.handle_webhook")
+def test_stripe_webhook_retries_unprocessed_event(mock_wh, client, django_user_model):
+    from apps.billing.models import Invoice
+    from apps.payments.models import WebhookEvent
+
+    user = make_user(django_user_model)
+    invoice = make_invoice(user, number="INV-WH-RETRY")
+    payload = _build_webhook_payload("checkout.session.completed", invoice.pk, "retry001")
+    mock_wh.return_value = payload
+    WebhookEvent.objects.create(
+        event_id=payload["id"],
+        provider="stripe",
+        event_type=payload["type"],
+        payload=payload,
+        processed=False,
+        processing_error="previous failure",
+    )
+
+    response = client.post(
+        reverse("payments:stripe_webhook"),
+        data=json.dumps(payload),
+        content_type="application/json",
+        HTTP_STRIPE_SIGNATURE="t=1,v1=dummy",
+    )
+    assert response.status_code == 200
+    invoice.refresh_from_db()
+    assert invoice.status == Invoice.STATUS_PAID
+    event = WebhookEvent.objects.get(event_id=payload["id"])
+    assert event.processed is True
+
+
+@pytest.mark.django_db
+@patch("apps.payments.views.StripeService.handle_webhook")
+def test_stripe_webhook_rejects_amount_mismatch(mock_wh, client, django_user_model):
+    from apps.billing.models import Invoice
+    from apps.payments.models import WebhookEvent
+
+    user = make_user(django_user_model)
+    invoice = make_invoice(user, number="INV-WH-AMT", total="50.00")
+    payload = _build_webhook_payload("checkout.session.completed", invoice.pk, "amt001")
+    mock_wh.return_value = payload
+
+    response = client.post(
+        reverse("payments:stripe_webhook"),
+        data=json.dumps(payload),
+        content_type="application/json",
+        HTTP_STRIPE_SIGNATURE="t=1,v1=dummy",
+    )
+    assert response.status_code == 500
+    invoice.refresh_from_db()
+    assert invoice.status == Invoice.STATUS_UNPAID
+    event = WebhookEvent.objects.get(event_id=payload["id"])
+    assert event.processed is False
+
+
+@pytest.mark.django_db
 @patch("apps.payments.views.StripeService.handle_webhook", side_effect=ValueError("bad sig"))
 def test_stripe_webhook_invalid_signature_400(mock_wh, client):
     response = client.post(

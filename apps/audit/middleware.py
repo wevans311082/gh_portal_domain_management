@@ -18,12 +18,10 @@ _AUDIT_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
 
 def _get_client_ip(request) -> str:
-    """Extract the real client IP, respecting X-Forwarded-For from trusted proxies."""
-    forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR", "")
-    if forwarded_for:
-        # Take the first IP in the chain (the original client)
-        return forwarded_for.split(",")[0].strip()
-    return request.META.get("REMOTE_ADDR", "")
+    """Extract the client IP. Last X-Forwarded-For hop is the trusted proxy peer."""
+    from apps.core.http import get_client_ip
+
+    return get_client_ip(request)
 
 
 class AuditLogMiddleware:

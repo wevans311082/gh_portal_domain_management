@@ -67,9 +67,9 @@ def test_auto_renew_creates_renewal_for_expiring_domain(mock_exec, django_user_m
 
     assert result == 1
     renewal = DomainRenewal.objects.get(domain=domain)
-    assert renewal.status == DomainRenewal.STATUS_PAID
+    assert renewal.status == DomainRenewal.STATUS_PENDING_PAYMENT
     assert renewal.renewal_years == 1
-    mock_exec.delay.assert_called_once_with(renewal.id)
+    mock_exec.delay.assert_not_called()
 
 
 @pytest.mark.django_db
@@ -177,14 +177,17 @@ def test_auto_renew_failed_renewal_gets_re_queued(mock_exec, django_user_model):
     )
 
     result = process_auto_renewals(days_ahead=7)
-    # A new renewal should have been created (not the failed one)
+    # A new unpaid renewal should have been created (not the failed one)
     assert result == 1
-    mock_exec.delay.assert_called_once()
+    mock_exec.delay.assert_not_called()
+    assert DomainRenewal.objects.filter(
+        domain=domain, status=DomainRenewal.STATUS_PENDING_PAYMENT
+    ).exists()
 
 
 @pytest.mark.django_db
 @patch("apps.domains.tasks.execute_domain_renewal")
-def test_auto_renew_creates_paid_invoice(mock_exec, django_user_model):
+def test_auto_renew_creates_unpaid_invoice(mock_exec, django_user_model):
     from apps.domains.tasks import process_auto_renewals
     from apps.domains.models import DomainRenewal
     from apps.billing.models import Invoice
@@ -196,8 +199,9 @@ def test_auto_renew_creates_paid_invoice(mock_exec, django_user_model):
     process_auto_renewals(days_ahead=7)
     renewal = DomainRenewal.objects.get(domain__name="invoicedomain.com")
     invoice = Invoice.objects.get(id=renewal.invoice_id)
-    assert invoice.status == Invoice.STATUS_PAID
+    assert invoice.status == Invoice.STATUS_UNPAID
     assert invoice.line_items.count() == 1
+    mock_exec.delay.assert_not_called()
 
 
 # ─────────────────────────────────────────────

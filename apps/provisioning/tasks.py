@@ -117,13 +117,27 @@ def provision_hosting_account(self, service_id: int, job_id: int):
     job.celery_task_id = self.request.id or ""
     job.save(update_fields=["status", "attempt_count", "celery_task_id"])
 
+    domain = (service.domain_name or "").strip().lower()
+    if not domain or "." not in domain:
+        job.status = ProvisioningJob.STATUS_FAILED
+        job.last_error = "A fully qualified domain name is required before provisioning."
+        job.save(update_fields=["status", "last_error"])
+        service.status = Service.STATUS_FAILED
+        service.save(update_fields=["status"])
+        logger.error("Provisioning job %s missing domain for service %s", job_id, service_id)
+        return
+
     try:
         provider = get_provider_for_service(service)
-        username = generate_cpanel_username(service.domain_name or service.user.email.split("@")[0])
+        username = (service.cpanel_username or "").strip()
+        if not username:
+            username = generate_cpanel_username(domain, unique_suffix=str(service.id))
+            service.cpanel_username = username
+            service.save(update_fields=["cpanel_username"])
         password = generate_secure_password()
 
         result = provider.create_site(
-            domain=service.domain_name,
+            domain=domain,
             username=username,
             password=password,
             package=service.package.whm_package_name,

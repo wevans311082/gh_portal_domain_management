@@ -184,10 +184,20 @@ def test_quote_builder_renders(client):
 @pytest.mark.django_db
 def test_quote_submit_creates_quote_and_redirects(client, mailoutbox):
     from apps.billing.models import Quote
+    from apps.products.models import Package
 
+    package = Package.objects.create(
+        name="Public Plan",
+        slug="quote-submit-plan",
+        price_monthly=Decimal("9.99"),
+        price_annually=Decimal("99.00"),
+        whm_package_name="x",
+        is_active=True,
+        is_quotable=True,
+    )
     payload = {
         "lead": {"name": "Alice", "email": "alice@example.com", "company": "Acme", "phone": "", "notes": ""},
-        "items": [{"description": "Custom build", "quantity": 1, "unit_price": "1500.00"}],
+        "items": [{"description": package.name, "quantity": 1, "package_id": package.pk}],
         "hp": "",
     }
     response = client.post(
@@ -204,6 +214,7 @@ def test_quote_submit_creates_quote_and_redirects(client, mailoutbox):
     assert quote.lead_email == "alice@example.com"
     assert quote.line_items.count() == 1
     assert quote.status == Quote.STATUS_SENT
+    assert quote.line_items.get().unit_price == Decimal("9.99")
 
 
 @pytest.mark.django_db

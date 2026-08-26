@@ -39,10 +39,9 @@ _SUPPORT_LOGIN_CODE_TS_SESSION_KEY = "support_login_code_ts"
 
 
 def _login_rate_key(request) -> str:
-    ip = (
-        request.META.get("HTTP_X_FORWARDED_FOR", "").split(",")[0].strip()
-        or request.META.get("REMOTE_ADDR", "unknown")
-    )
+    from apps.core.http import get_client_ip
+
+    ip = get_client_ip(request) or "unknown"
     return f"login_rl:{ip}"
 
 
@@ -77,6 +76,20 @@ def _issue_support_login_code(request) -> str:
 # Registration
 # ──────────────────────────────────────────────────────────────────────────────
 
+def _email_is_verified(user) -> bool:
+    """Superusers and legacy users without an EmailAddress row may sign in."""
+    if getattr(user, "is_superuser", False):
+        return True
+    try:
+        from allauth.account.models import EmailAddress
+    except Exception:
+        return True
+    record = EmailAddress.objects.filter(user=user, email__iexact=user.email).first()
+    if record is None:
+        return True
+    return bool(record.verified)
+
+
 def register(request):
     if request.user.is_authenticated:
         return redirect("portal:dashboard")
@@ -86,13 +99,25 @@ def register(request):
         if form.is_valid():
             user = form.save()
             ClientProfile.objects.create(user=user)
-            login(request, user, backend="apps.accounts.backends.EmailBackend")
-            messages.success(request, "Account created successfully!")
+            from allauth.account.models import EmailAddress
+            from allauth.account.utils import send_email_confirmation
+
+            EmailAddress.objects.update_or_create(
+                user=user,
+                email=user.email,
+                defaults={"primary": True, "verified": False},
+            )
+            try:
+                send_email_confirmation(request, user, signup=True)
+            except Exception:
+                logger.exception("Failed to send registration confirmation to %s", user.email)
+            messages.success(
+                request,
+                "Account created. Confirm your email address before signing in.",
+            )
             if quote_token:
-                from django.urls import reverse
-                request.session.pop("pending_quote_token", None)
-                return redirect(reverse("billing_public:quote_public_accept_continue", args=[quote_token]))
-            return redirect("portal:dashboard")
+                request.session["pending_quote_token"] = quote_token
+            return redirect("account_login")
     else:
         form = RegistrationForm()
     return render(request, "accounts/register.html", {"form": form, "quote_token": quote_token})
@@ -146,6 +171,20 @@ def custom_login(request):
             try:
                 db_user = User.objects.get(email__iexact=email)
                 if db_user.mfa_enabled and db_user.check_password(password):
+                    if not _email_is_verified(db_user):
+                        messages.error(
+                            request,
+                            "Confirm your email address before signing in. Check your inbox for the link.",
+                        )
+                        return render(
+                            request,
+                            "accounts/login.html",
+                            {
+                                "next": next_url,
+                                "support_email": support_email,
+                                "support_login_code": support_code,
+                            },
+                        )
                     # Password correct, MFA required → redirect to TOTP step.
                     # Increment the counter so attackers cannot silently enumerate
                     # valid passwords for MFA-protected accounts without cost.
@@ -160,6 +199,21 @@ def custom_login(request):
             # Increment failure counter
             cache.set(rl_key, attempts + 1, timeout=_LOGIN_RATE_WINDOW)
             messages.error(request, "Invalid email or password.")
+            return render(
+                request,
+                "accounts/login.html",
+                {
+                    "next": next_url,
+                    "support_email": support_email,
+                    "support_login_code": support_code,
+                },
+            )
+
+        if not _email_is_verified(user):
+            messages.error(
+                request,
+                "Confirm your email address before signing in. Check your inbox for the link.",
+            )
             return render(
                 request,
                 "accounts/login.html",

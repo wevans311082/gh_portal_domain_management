@@ -75,10 +75,9 @@ def _is_valid_label(label: str) -> bool:
 
 def _rate_limit_key(request) -> str:
     """Build a cache key for per-IP domain check rate limiting."""
-    ip = (
-        request.META.get("HTTP_X_FORWARDED_FOR", "").split(",")[0].strip()
-        or request.META.get("REMOTE_ADDR", "unknown")
-    )
+    from apps.core.http import get_client_ip
+
+    ip = get_client_ip(request) or "unknown"
     return f"domain_check_rl:{ip}"
 
 

@@ -60,15 +60,30 @@ Migrations can run automatically on every container start via the entrypoint scr
 
 ## Settings module
 
+Lab:
+
 ```text
 DJANGO_SETTINGS_MODULE=cyberask_domains.settings.development
 ```
 
-Celery:
+Production (do not use `docker compose` / `runserver`):
+
+```text
+DJANGO_SETTINGS_MODULE=cyberask_domains.settings.production
+```
+
+`domains.cyberask.co.uk` uses the full URL map (`cyberask_domains.urls`). Split urlconfs remain for `portal.` / `billing.` only.
+
+Celery worker **and** beat must run in production — domain registration and WHM provisioning are queued after Stripe webhooks.
 
 ```text
 celery -A cyberask_domains worker -l info
+celery -A cyberask_domains beat -l info
 ```
+
+Stripe webhook URL (root urlconf): `/payments/webhooks/stripe/`
+
+Required live config: `WHM_HOST`, `WHM_API_TOKEN`, `WHM_NAMESERVERS`, ResellerClub live `https://httpapi.com/api` (not test), `STRIPE_WEBHOOK_SECRET`, `RESELLERCLUB_DEBUG_MODE=false`.
 
 ## Note on database identity
 

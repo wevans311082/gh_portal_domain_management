@@ -3,6 +3,7 @@ import hashlib
 import hmac
 import logging
 import json
+from decimal import Decimal
 from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
@@ -46,7 +47,13 @@ def stripe_success(request):
     invoice_id = request.GET.get("invoice_id")
     if invoice_id:
         invoice = get_object_or_404(Invoice, pk=invoice_id, user=request.user)
-        messages.success(request, f"Payment received for invoice #{invoice.number}. Thank you!")
+        if invoice.status == Invoice.STATUS_PAID:
+            messages.success(request, f"Payment received for invoice #{invoice.number}. Thank you!")
+        else:
+            messages.info(
+                request,
+                f"Payment for invoice #{invoice.number} is confirming. Refresh this page in a moment.",
+            )
         return redirect("invoices:detail", pk=invoice_id)
     return redirect("portal:dashboard")
 
@@ -67,7 +74,7 @@ def stripe_webhook(request):
     event_id = event["id"]
     event_type = event["type"]
 
-    # Atomic idempotency: use get_or_create to avoid TOCTOU race between workers
+    # Atomic idempotency: skip only when the event was fully processed.
     with transaction.atomic():
         webhook_event, created = WebhookEvent.objects.get_or_create(
             event_id=event_id,
@@ -77,7 +84,7 @@ def stripe_webhook(request):
                 "payload": event,
             },
         )
-        if not created:
+        if not created and webhook_event.processed:
             logger.info(f"Stripe webhook {event_id} already processed, skipping.")
             return HttpResponse(status=200)
 
@@ -85,7 +92,8 @@ def stripe_webhook(request):
         _process_stripe_event(event, webhook_event)
         webhook_event.processed = True
         webhook_event.processed_at = timezone.now()
-        webhook_event.save(update_fields=["processed", "processed_at"])
+        webhook_event.processing_error = ""
+        webhook_event.save(update_fields=["processed", "processed_at", "processing_error"])
     except Exception as e:
         logger.error(f"Error processing Stripe webhook {event_id}: {e}")
         webhook_event.processing_error = str(e)
@@ -123,18 +131,41 @@ def _handle_checkout_completed(session: dict, webhook_event: WebhookEvent):
 
     try:
         invoice = Invoice.objects.get(id=invoice_id)
-        amount = session.get("amount_total", 0) / 100
+        amount_total = session.get("amount_total")
+        currency = (session.get("currency") or "gbp").upper()
+        expected_pence = int((invoice.total * 100).quantize(Decimal("1")))
+        if amount_total is None or int(amount_total) != expected_pence:
+            logger.error(
+                "Stripe amount mismatch for invoice %s: session=%s expected=%s",
+                invoice_id,
+                amount_total,
+                expected_pence,
+            )
+            raise ValueError("Stripe checkout amount does not match invoice total.")
+        if currency != (invoice.currency or "GBP").upper():
+            logger.error(
+                "Stripe currency mismatch for invoice %s: session=%s expected=%s",
+                invoice_id,
+                currency,
+                invoice.currency,
+            )
+            raise ValueError("Stripe checkout currency does not match invoice.")
 
-        Payment.objects.create(
-            user=invoice.user,
-            invoice=invoice,
-            provider=Payment.PROVIDER_STRIPE,
-            status=Payment.STATUS_COMPLETED,
-            amount=amount,
-            currency=session.get("currency", "gbp").upper(),
-            external_id=session.get("payment_intent", ""),
-            provider_data=session,
-        )
+        amount = int(amount_total) / 100
+        external_id = session.get("payment_intent") or session.get("id") or ""
+        defaults = {
+            "user": invoice.user,
+            "invoice": invoice,
+            "provider": Payment.PROVIDER_STRIPE,
+            "status": Payment.STATUS_COMPLETED,
+            "amount": amount,
+            "currency": currency,
+            "provider_data": session,
+        }
+        if external_id:
+            Payment.objects.get_or_create(external_id=external_id, defaults=defaults)
+        else:
+            Payment.objects.create(external_id="", **defaults)
 
         from apps.billing.services import mark_invoice_paid
         mark_invoice_paid(invoice)

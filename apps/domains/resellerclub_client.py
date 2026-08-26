@@ -144,15 +144,38 @@ class ResellerClubClient:
             cleaned = f"{cleaned}.json"
         return cleaned
 
+    @staticmethod
+    def _redact_secrets(value):
+        secret_keys = {"api-key", "api_key", "auth-userid", "auth_userid", "password"}
+        if isinstance(value, dict):
+            redacted = {}
+            for key, item in value.items():
+                if str(key).lower() in secret_keys:
+                    redacted[key] = "[redacted]"
+                else:
+                    redacted[key] = ResellerClubClient._redact_secrets(item)
+            return redacted
+        if isinstance(value, list):
+            return [ResellerClubClient._redact_secrets(item) for item in value]
+        return value
+
     def _capture_debug(self, request_data: dict, response_data: dict = None, error: str = ""):
         debug_mode = str(get_runtime_setting("RESELLERCLUB_DEBUG_MODE", "false")).strip().lower() in (
             "1", "true", "yes", "on"
         )
         if not debug_mode:
             return
+        safe_request = dict(request_data or {})
+        safe_request["params"] = self._redact_secrets(safe_request.get("params") or {})
+        url = str(safe_request.get("url") or "")
+        if self.api_key:
+            url = url.replace(self.api_key, "[redacted]")
+        if self.reseller_id:
+            url = url.replace(str(self.reseller_id), "[redacted]")
+        safe_request["url"] = url
         add_entry(
             {
-                "request": request_data,
+                "request": safe_request,
                 "response": response_data,
                 "error": error,
             }

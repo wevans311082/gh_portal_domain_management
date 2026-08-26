@@ -10,13 +10,21 @@ def site_settings(request):
     content_settings = SiteContentSettings.get_solo()
     legal_links = LegalPage.objects.filter(is_published=True, show_in_footer=True).order_by("sort_order", "title")
 
+    debug_mode = str(get_runtime_setting("RESELLERCLUB_DEBUG_MODE", "false")).strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+    user = getattr(request, "user", None)
+    show_debug = debug_mode and bool(user and getattr(user, "is_authenticated", False) and user.is_staff)
     return {
         "SITE_NAME": settings.SITE_NAME,
         "SITE_DOMAIN": settings.SITE_DOMAIN,
         "STRIPE_PUBLISHABLE_KEY": get_runtime_setting("STRIPE_PUBLISHABLE_KEY", settings.STRIPE_PUBLISHABLE_KEY),
         "DJANGO_ADMIN_URL": getattr(settings, "DJANGO_ADMIN_URL", "admin/"),
-        "RESELLERCLUB_DEBUG_MODE": str(get_runtime_setting("RESELLERCLUB_DEBUG_MODE", "false")).strip().lower() in ("1", "true", "yes", "on"),
-        "RESELLERCLUB_DEBUG_ENTRIES": get_entries(),
+        "RESELLERCLUB_DEBUG_MODE": show_debug,
+        "RESELLERCLUB_DEBUG_ENTRIES": get_entries() if show_debug else [],
         "CONTENT_SETTINGS": content_settings,
         "FOOTER_LEGAL_LINKS": legal_links,
     }

@@ -32,10 +32,9 @@ logger = logging.getLogger(__name__)
 
 
 def _client_ip(request) -> str:
-    fwd = request.META.get("HTTP_X_FORWARDED_FOR", "")
-    if fwd:
-        return fwd.split(",")[0].strip()
-    return request.META.get("REMOTE_ADDR", "") or ""
+    from apps.core.http import get_client_ip
+
+    return get_client_ip(request) or ""
 
 
 def _build_catalogue():
@@ -108,13 +107,22 @@ def quote_submit(request):
     raw_items = payload.get("items") or []
     line_items: List[LineItemSpec] = []
     for idx, item in enumerate(raw_items):
-        desc = (item.get("description") or "").strip()
-        if not desc:
+        package_id = item.get("package_id") or item.get("product_id")
+        if not package_id:
             continue
+        package = Package.objects.filter(pk=package_id, is_active=True, is_quotable=True).first()
+        if not package:
+            continue
+        desc = (item.get("description") or "").strip() or package.name
         try:
             qty = Decimal(str(item.get("quantity") or "1"))
-            price = Decimal(str(item.get("unit_price") or "0"))
         except (InvalidOperation, ValueError):
+            continue
+        if qty <= 0:
+            continue
+        is_setup = "setup" in desc.lower()
+        price = package.setup_fee if is_setup else package.price_monthly
+        if price < 0:
             continue
         line_items.append(
             LineItemSpec(description=desc, quantity=qty, unit_price=price, position=idx)

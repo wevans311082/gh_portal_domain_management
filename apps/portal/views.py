@@ -6,7 +6,8 @@ from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Sum
 from django.http import StreamingHttpResponse
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
@@ -28,6 +29,13 @@ from apps.billing.models import Invoice, Quote
 from apps.support.models import SupportTicket
 
 _PAGE_SIZE = 20
+
+
+def _safe_next(request, fallback: str) -> str:
+    next_url = (request.POST.get("next") or "").strip()
+    if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+        return next_url
+    return fallback
 
 
 def _build_recent_activity(user):
@@ -285,7 +293,7 @@ def cart_add_hosting(request):
         messages.error(request, str(exc))
     else:
         messages.success(request, "Hosting plan added to your cart.")
-    return redirect(request.POST.get("next") or reverse("portal:shop"))
+    return redirect(_safe_next(request, reverse("portal:shop")))
 
 
 @login_required
@@ -305,7 +313,7 @@ def cart_add_domain(request):
         messages.error(request, str(exc))
     else:
         messages.success(request, "Domain added to your cart.")
-    return redirect(request.POST.get("next") or reverse("portal:shop"))
+    return redirect(_safe_next(request, reverse("portal:shop")))
 
 
 @login_required
@@ -321,7 +329,7 @@ def cart_add_renewal(request):
         messages.error(request, str(exc))
     else:
         messages.success(request, "Domain renewal added to your cart.")
-    return redirect(request.POST.get("next") or reverse("portal:shop"))
+    return redirect(_safe_next(request, reverse("portal:shop")))
 
 
 @login_required
@@ -340,7 +348,7 @@ def cart_add_transfer(request):
         messages.error(request, str(exc))
     else:
         messages.success(request, "Domain transfer added to your cart.")
-    return redirect(request.POST.get("next") or reverse("portal:shop"))
+    return redirect(_safe_next(request, reverse("portal:shop")))
 
 
 @login_required
@@ -348,7 +356,7 @@ def cart_add_transfer(request):
 def cart_remove_item(request, pk):
     remove_cart_item(user=request.user, item_id=pk)
     messages.success(request, "Item removed from your cart.")
-    return redirect(request.POST.get("next") or reverse("portal:cart"))
+    return redirect(_safe_next(request, reverse("portal:cart")))
 
 
 @login_required
@@ -387,14 +395,14 @@ def account_statement(request):
     date_from_str = request.GET.get("date_from", "")
     date_to_str = request.GET.get("date_to", "")
 
-    invoices = Invoice.objects.filter(user=request.user).order_by("-issue_date")
+    invoices = Invoice.objects.filter(user=request.user).order_by("-created_at")
 
     try:
         from datetime import date
         if date_from_str:
-            invoices = invoices.filter(issue_date__gte=date.fromisoformat(date_from_str))
+            invoices = invoices.filter(created_at__date__gte=date.fromisoformat(date_from_str))
         if date_to_str:
-            invoices = invoices.filter(issue_date__lte=date.fromisoformat(date_to_str))
+            invoices = invoices.filter(created_at__date__lte=date.fromisoformat(date_to_str))
     except ValueError:
         messages.error(request, "Invalid date format. Use YYYY-MM-DD.")
 
@@ -424,7 +432,7 @@ def _statement_csv_response(invoices):
         for inv in invoices.iterator():
             yield [
                 inv.number,
-                inv.issue_date,
+                inv.created_at.date() if inv.created_at else "",
                 inv.due_date or "",
                 inv.status,
                 inv.total,
@@ -566,7 +574,7 @@ def gdpr_data_export(request):
         },
         "invoices": list(
             Invoice.objects.filter(user=request.user).values(
-                "id", "status", "total", "issued_at", "due_at"
+                "id", "number", "status", "total", "created_at", "due_date"
             )
         ),
         "payments": list(
@@ -576,12 +584,12 @@ def gdpr_data_export(request):
         ),
         "domains": list(
             Domain.objects.filter(user=request.user).values(
-                "domain_name", "status", "expiry_date"
+                "name", "status", "expires_at"
             )
         ),
         "services": list(
             Service.objects.filter(user=request.user).values(
-                "id", "name", "status", "created_at"
+                "id", "domain_name", "status", "created_at"
             )
         ),
     }

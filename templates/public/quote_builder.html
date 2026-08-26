@@ -216,7 +216,8 @@ function quoteBuilder() {
             items: this.cart.map(l => ({
               description: l.description,
               quantity: l.quantity,
-              unit_price: l.unit_price,
+              package_id: l.product_id,
+              product_id: l.product_id,
             })),
           }),
         });

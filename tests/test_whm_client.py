@@ -1,6 +1,6 @@
 import pytest
 
-from apps.provisioning.whm_client import WHMClient, WHMClientError
+from apps.provisioning.whm_client import WHMClient, WHMClientError, generate_cpanel_username
 
 
 @pytest.mark.django_db
@@ -197,3 +197,66 @@ def test_get_quota_skips_known_unsupported_fallback_endpoint(monkeypatch):
 
     # After first 404 detection, both endpoints are cached unsupported and not retried.
     assert calls == []
+
+
+@pytest.mark.django_db
+def test_call_treats_metadata_result_zero_as_error(monkeypatch):
+    client = WHMClient()
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"metadata": {"result": 0, "reason": "Package not found"}}
+
+    monkeypatch.setattr(client.session, "get", lambda *args, **kwargs: FakeResponse())
+
+    with pytest.raises(WHMClientError, match="Package not found"):
+        client._call("listpkgs")
+
+
+@pytest.mark.django_db
+def test_create_cpanel_session_reads_data_url(monkeypatch):
+    client = WHMClient()
+    monkeypatch.setattr(
+        client,
+        "_call",
+        lambda function, params=None: {
+            "metadata": {"result": 1},
+            "data": {"url": "https://cpanel.example:2083/cpsess/login"},
+        },
+    )
+    assert client.create_cpanel_session("alice") == "https://cpanel.example:2083/cpsess/login"
+
+
+@pytest.mark.django_db
+def test_create_account_sends_plan_via_post(monkeypatch):
+    client = WHMClient()
+    captured = {}
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"metadata": {"result": 1}, "data": {"ok": True}}
+
+    def fake_post(url, data=None, timeout=None):
+        captured["url"] = url
+        captured["data"] = data
+        return FakeResponse()
+
+    monkeypatch.setattr(client.session, "post", fake_post)
+    client.create_account("example.com", "examp1", "secret", "starter_pkg", "a@b.c")
+    assert captured["data"]["plan"] == "starter_pkg"
+    assert captured["data"]["pkgname"] == "starter_pkg"
+    assert "password" in captured["data"]
+
+
+def test_generate_cpanel_username_includes_unique_suffix():
+    first = generate_cpanel_username("example.com", unique_suffix="12")
+    second = generate_cpanel_username("example.net", unique_suffix="99")
+    assert first != second
+    assert first[0].isalpha()
+    assert len(first) <= 16

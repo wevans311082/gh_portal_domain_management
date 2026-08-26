@@ -171,7 +171,10 @@ def test_cloudflare_http_error_propagates():
 
 @override_settings(COMPANIES_HOUSE_API_KEY="ch-key")
 def test_companies_house_get_company_success():
+    from django.core.cache import cache
     from apps.companies.services import CompaniesHouseService
+
+    cache.delete("runtime_setting:COMPANIES_HOUSE_API_KEY")
 
     mock_resp = MagicMock()
     mock_resp.status_code = 200
@@ -186,7 +189,10 @@ def test_companies_house_get_company_success():
 
 @override_settings(COMPANIES_HOUSE_API_KEY="ch-key")
 def test_companies_house_get_company_not_found():
+    from django.core.cache import cache
     from apps.companies.services import CompaniesHouseService
+
+    cache.delete("runtime_setting:COMPANIES_HOUSE_API_KEY")
 
     mock_resp = MagicMock()
     mock_resp.status_code = 404
@@ -200,7 +206,10 @@ def test_companies_house_get_company_not_found():
 
 @override_settings(COMPANIES_HOUSE_API_KEY="ch-key")
 def test_companies_house_search():
+    from django.core.cache import cache
     from apps.companies.services import CompaniesHouseService
+
+    cache.delete("runtime_setting:COMPANIES_HOUSE_API_KEY")
 
     mock_resp = MagicMock()
     mock_resp.status_code = 200

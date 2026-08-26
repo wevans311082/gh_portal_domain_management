@@ -110,7 +110,7 @@ def email_delete(request, service_id: int):
         return redirect("provisioning:service_detail", service_id=service_id)
 
     email_user = request.POST.get("email_user", "").strip()
-    domain = request.POST.get("domain", "").strip()
+    domain = (service.domain_name or "").strip()
 
     if not email_user or not domain:
         messages.error(request, "Invalid request.")

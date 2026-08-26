@@ -1,11 +1,18 @@
 from django.urls import include, path
 
-from .urls_subdomains import common_auth_patterns, common_staff_patterns, common_support_patterns, with_debug_static
+from .urls_subdomains import (
+    common_auth_patterns,
+    common_core_aux_patterns,
+    common_staff_patterns,
+    common_support_patterns,
+    with_debug_static,
+)
 
 urlpatterns = [
     *common_auth_patterns,
     *common_support_patterns,
     *common_staff_patterns,
+    *common_core_aux_patterns,
     path("", include("apps.portal.urls")),
     path("domains/", include("apps.domains.urls")),
     path("billing/invoices/", include("apps.invoices.urls")),

@@ -48,6 +48,7 @@ def test_register_view_creates_invoice_and_domain_order(client, django_user_mode
         postcode="SW1A 1AA",
         country="GB",
         is_default=True,
+        registrant_validation_status=DomainContact.VALIDATION_VALIDATED,
     )
 
     client.force_login(user)

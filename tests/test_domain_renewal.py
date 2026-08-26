@@ -39,13 +39,15 @@ def make_pricing(tld="com", renewal_cost=Decimal("8.00")):
     )
 
 
-def make_invoice(user, total=Decimal("10.00")):
+def make_invoice(user, total=Decimal("10.00"), status=Invoice.STATUS_PAID):
     invoice = Invoice.objects.create(
         user=user,
         number=f"RNW-TEST-{timezone.now().timestamp()}",
-        status=Invoice.STATUS_UNPAID,
+        status=status,
         vat_rate=Decimal("0.00"),
         due_date=timezone.now().date(),
+        amount_paid=total if status == Invoice.STATUS_PAID else Decimal("0.00"),
+        paid_at=timezone.now() if status == Invoice.STATUS_PAID else None,
     )
     invoice.calculate_totals()
     return invoice

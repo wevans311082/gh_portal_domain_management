@@ -154,6 +154,8 @@ def test_register_domain_order_creates_domain_and_cloudflare_records(settings, d
     assert order.status == DomainOrder.STATUS_COMPLETED
     assert order.registrar_order_id == "555"
     assert domain.cloudflare_zone_id == "zone-1"
+    assert domain.expires_at is not None
+    assert domain.registered_at is not None
     assert www_record.content == "host.grumpyhosting.co.uk"
 
 

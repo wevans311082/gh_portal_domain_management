@@ -89,10 +89,11 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = "cyberask_domains.urls"
+# Launch host domains.cyberask.co.uk uses ROOT_URLCONF (full app). Split
+# portal/billing urlconfs stay available if those hostnames are used later.
 HOST_URLCONF_MAP = {
     "portal.cyberask.co.uk": "cyberask_domains.urls_portal",
     "billing.cyberask.co.uk": "cyberask_domains.urls_billing",
-    "domains.cyberask.co.uk": "cyberask_domains.urls_domains",
 }
 
 TEMPLATES = [

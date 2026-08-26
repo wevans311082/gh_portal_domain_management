@@ -33,6 +33,8 @@ class WHMClient:
         })
         self.session.verify = True  # Validate SSL in production
 
+    _POST_FUNCTIONS = frozenset({"createacct", "passwd"})
+
     def _call(self, function: str, params: dict = None) -> dict:
         """Make a WHM JSON API call and return the response data."""
         url = f"{self.base_url}/{function}"
@@ -40,18 +42,29 @@ class WHMClient:
         params["api.version"] = 1
 
         try:
-            response = self.session.get(url, params=params, timeout=30)
+            if function in self._POST_FUNCTIONS:
+                response = self.session.post(url, data=params, timeout=30)
+            else:
+                response = self.session.get(url, params=params, timeout=30)
             response.raise_for_status()
             data = response.json()
         except requests.RequestException as e:
             logger.error(f"WHM API request failed: {e}")
             raise WHMClientError(f"WHM API request failed: {e}") from e
 
-        result = data.get("result", data)
+        metadata = data.get("metadata") if isinstance(data, dict) else None
+        if isinstance(metadata, dict) and "result" in metadata:
+            if str(metadata.get("result")) in {"0", "false"}:
+                error = metadata.get("reason") or "Unknown WHM error"
+                logger.error(f"WHM API error for {function}: {error}")
+                raise WHMClientError(f"WHM API error: {error}")
+            return data
+
+        result = data.get("result", data) if isinstance(data, dict) else data
         if isinstance(result, list):
             result = result[0] if result else {}
 
-        if result.get("status") == 0:
+        if isinstance(result, dict) and result.get("status") in (0, "0"):
             error = result.get("statusmsg", "Unknown WHM error")
             logger.error(f"WHM API error for {function}: {error}")
             raise WHMClientError(f"WHM API error: {error}")
@@ -71,9 +84,9 @@ class WHMClient:
             "domain": domain,
             "username": username,
             "password": password,
+            "plan": package,
             "pkgname": package,
             "contactemail": email,
-            "featurelist": "default",
             "ip": "n",
         }
         logger.info(f"Creating cPanel account: username={username}, domain={domain}, package={package}")
@@ -411,21 +424,32 @@ class WHMClient:
     def create_cpanel_session(self, cpanel_username: str) -> str:
         """Create a WHM-authenticated cPanel session and return the login URL."""
         data = self._call("create_user_session", {"user": cpanel_username, "service": "cpaneld"})
-        # WHM returns: {"result": {"url": "https://...", "token": "..."}}
-        result = data.get("result") or data
-        url = result.get("url", "")
+        url = ""
+        payload = data.get("data") if isinstance(data.get("data"), dict) else {}
+        url = payload.get("url") or ""
+        if not url:
+            result = data.get("result") if isinstance(data.get("result"), dict) else data
+            if isinstance(result, dict):
+                url = result.get("url") or ""
+                nested = result.get("data") if isinstance(result.get("data"), dict) else {}
+                url = url or nested.get("url") or ""
         if not url:
             raise WHMClientError("WHM did not return a session URL.")
         return url
 
 
-def generate_cpanel_username(domain: str) -> str:
-    """Generate a valid 8-char cPanel username from a domain name."""
-    base = domain.split(".")[0].lower()
-    base = "".join(c for c in base if c.isalnum())[:8]
+def generate_cpanel_username(domain: str, unique_suffix: str = "") -> str:
+    """Generate a valid cPanel username (letter-start, max 16 chars)."""
+    label = (domain or "").split(".")[0].lower()
+    base = "".join(c for c in label if c.isalnum())
+    suffix = "".join(c for c in str(unique_suffix) if c.isalnum())[-4:]
+    if suffix:
+        base = f"{base[:12]}{suffix}"
+    else:
+        base = base[:16]
     if not base or not base[0].isalpha():
         base = "u" + base
-    return base[:8]
+    return base[:16]
 
 
 def generate_secure_password(length: int = 16) -> str:

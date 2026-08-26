@@ -1,12 +1,9 @@
-from django.shortcuts import render, get_object_or_404
-from .models import Package
+from django.shortcuts import redirect
 
 
 def package_list(request):
-    packages = Package.objects.filter(is_active=True)
-    return render(request, "products/package_list.html", {"packages": packages})
+    return redirect("portal:shop")
 
 
 def package_detail(request, slug):
-    package = get_object_or_404(Package, slug=slug, is_active=True)
-    return render(request, "products/package_detail.html", {"package": package})
+    return redirect("portal:shop")

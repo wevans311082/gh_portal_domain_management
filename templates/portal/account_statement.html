@@ -62,7 +62,7 @@
             {% for invoice in page_obj %}
             <tr class="hover:bg-gray-50">
                 <td class="px-4 py-3 font-mono text-sm">{{ invoice.number }}</td>
-                <td class="px-4 py-3 text-gray-600">{{ invoice.issue_date }}</td>
+                <td class="px-4 py-3 text-gray-600">{{ invoice.created_at|date:"Y-m-d" }}</td>
                 <td class="px-4 py-3 text-gray-600">{{ invoice.due_date|default:"â" }}</td>
                 <td class="px-4 py-3">
                     <span class="px-2 py-0.5 rounded-full text-xs font-medium

@@ -409,9 +409,12 @@ def test_provision_hosting_account_uses_selected_provider(mock_get_provider, moc
     mock_get_provider.assert_called_once()
     selected_service = mock_get_provider.call_args.args[0]
     assert selected_service.id == service.id
+    from apps.provisioning.whm_client import generate_cpanel_username
+
+    expected_username = generate_cpanel_username("provision.example.com", unique_suffix=str(service.id))
     mock_provider.create_site.assert_called_once_with(
         domain="provision.example.com",
-        username="provisio",
+        username=expected_username,
         password=mock_provider.create_site.call_args.kwargs["password"],
         package="starter_pkg",
         email="provision@example.com",
@@ -420,7 +423,7 @@ def test_provision_hosting_account_uses_selected_provider(mock_get_provider, moc
     service.refresh_from_db()
     job.refresh_from_db()
     assert service.status == Service.STATUS_ACTIVE
-    assert service.cpanel_username == "provisio"
+    assert service.cpanel_username == expected_username
     assert job.status == ProvisioningJob.STATUS_COMPLETED
     assert job.result_data["provider"] == "docker_node"
     mock_send_notification.assert_called_once()

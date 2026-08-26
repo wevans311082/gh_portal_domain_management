@@ -39,6 +39,8 @@ def add_hosting_item(*, user, package_id: int, billing_period: str, domain_name:
     cart = get_active_cart(user, created_by_staff=created_by_staff)
     billing_period = billing_period if billing_period in dict(PortalCartItem.BILLING_PERIOD_CHOICES) else PortalCartItem.BILLING_MONTHLY
     domain_name = (domain_name or "").strip().lower()
+    if not domain_name or "." not in domain_name:
+        raise ValueError("A primary domain name is required for hosting (e.g. example.com).")
     unit_price = package.price_annually if billing_period == PortalCartItem.BILLING_ANNUALLY else package.price_monthly
     description = f"{package.name} hosting ({'annual' if billing_period == PortalCartItem.BILLING_ANNUALLY else 'monthly'})"
     if domain_name:
