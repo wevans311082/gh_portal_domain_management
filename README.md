@@ -20,9 +20,21 @@ cp .env.example .env
 docker compose up --build -d
 ```
 
-- App (direct): http://localhost:8000  
-- Nginx: http://localhost  
-- Health: http://localhost:8000/health/
+- App (direct): http://localhost:7000  
+- Compose nginx: http://localhost:780  
+- Health: http://localhost:7000/health/
+
+This stack is meant to sit beside other services on the same host. Published ports use a `7` prefix (`7000` / `7001` / `780`) so they do not collide with `:80` / `:8000`.
+
+If the host already runs nginx on port 80, install the drop-in vhost (do **not** publish this compose nginx on 80):
+
+```bash
+sudo cp nginx/host-dropin/domains.cyberask.co.uk.conf /etc/nginx/conf.d/domains.cyberask.co.uk.conf
+# or: /etc/nginx/sites-available/ + sites-enabled symlink
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+That file proxies `domains.cyberask.co.uk` to `127.0.0.1:7000`.
 
 ### Why builds are fast
 

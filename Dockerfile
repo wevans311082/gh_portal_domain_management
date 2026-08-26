@@ -91,7 +91,7 @@ RUN chmod +x scripts/entrypoint.sh scripts/entrypoint-prod.sh \
     && chown -R appuser:appuser /app
 
 # Keep root for entrypoint migrations in lab; prod compose can drop privileges later.
-EXPOSE 8000
+EXPOSE 7000
 
 ENTRYPOINT ["/app/scripts/entrypoint.sh"]
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+CMD ["python", "manage.py", "runserver", "0.0.0.0:7000"]

@@ -71,5 +71,5 @@ RUN chmod +x scripts/entrypoint-prod.sh \
     && mkdir -p /app/staticfiles /app/media \
     && chown -R appuser:appuser /app
 
-EXPOSE 8000
+EXPOSE 7000
 ENTRYPOINT ["/app/scripts/entrypoint-prod.sh"]

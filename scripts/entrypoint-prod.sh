@@ -47,7 +47,7 @@ fi
 
 echo "Starting gunicorn..."
 exec gunicorn cyberask_domains.wsgi:application \
-    --bind 0.0.0.0:8000 \
+    --bind 0.0.0.0:7000 \
     --workers 4 \
     --worker-class gthread \
     --threads 2 \

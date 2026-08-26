@@ -60,15 +60,16 @@ services:
 
   web:
     <<: *app-common
-    command: ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+    command: ["python", "manage.py", "runserver", "0.0.0.0:7000"]
     volumes:
       - .:/app
       - static_files:/app/staticfiles
       - media_files:/app/media
     ports:
-      # Lab: direct access :8000. Edge (public site nginx) expects host :8001 — see ca_public_website/docs/domains-integration.md
-      - "8000:8000"
-      - "127.0.0.1:8001:8000"
+      # Shared host: avoid :80/:8000 used by other services. Prefix 7.
+      # Direct app :7000. Loopback :7001 for local tools. Compose nginx :780.
+      - "7000:7000"
+      - "127.0.0.1:7001:7000"
     environment:
       <<: *app-env
       RUN_STARTUP_MIGRATIONS: "1"
@@ -81,7 +82,7 @@ services:
           "CMD",
           "python",
           "-c",
-          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/', timeout=3)",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:7000/health/', timeout=3)",
         ]
       interval: 15s
       timeout: 5s
@@ -113,7 +114,7 @@ services:
   nginx:
     image: nginx:1.25-alpine
     ports:
-      - "80:80"
+      - "780:780"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ./nginx/conf.d/sites:/etc/nginx/conf.d/sites:ro
