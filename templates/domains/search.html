@@ -1,4 +1,4 @@
-ï»¿{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% load static core_tags %}
 
 {% block title %}Domain Search - {{ SITE_NAME }}{% endblock %}
@@ -118,7 +118,7 @@
                 class="tld-chip group px-3 py-2 border border-slate-300 rounded-2xl text-left text-sm bg-white hover:bg-sky-50 hover:border-sky-400 transition-colors min-w-[110px]">
                 <span class="block font-semibold">.{{ featured.tld }}</span>
                 <span class="tld-chip-price block text-xs text-slate-500">
-                    {% if featured.price %}from Â£{{ featured.price|floatformat:2 }}/yr{% else %}price pending{% endif %}
+                    {% if featured.price %}from £{{ featured.price|floatformat:2 }}/yr{% else %}price pending{% endif %}
                 </span>
             </button>
             {% endfor %}

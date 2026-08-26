@@ -78,9 +78,17 @@
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.6a1 1 0 01.7.3l5.4 5.4a1 1 0 01.3.7V19a2 2 0 01-2 2z"/></svg>
                 Invoices
             </a>
+            <a href="{% url 'portal:subscriptions' %}" class="portal-nav-link {% if request.resolver_match.url_name == 'subscriptions' %}is-active{% endif %}">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                Subscriptions
+            </a>
+            <a href="{% url 'portal:my_quotes' %}" class="portal-nav-link {% if request.resolver_match.url_name == 'my_quotes' %}is-active{% endif %}">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
+                Quotes
+            </a>
 
             <p class="portal-nav-section">Hosting</p>
-            <a href="{% url 'portal:my_services' %}" class="portal-nav-link {% if request.resolver_match.url_name == 'my_services' or request.resolver_match.url_name == 'hosting_usage' or request.resolver_match.namespace == 'provisioning' %}is-active{% endif %}">
+            <a href="{% url 'portal:my_services' %}" class="portal-nav-link {% if request.resolver_match.url_name == 'my_services' or request.resolver_match.url_name == 'hosting_usage' or request.resolver_match.url_name == 'hosting_manage' or request.resolver_match.namespace == 'provisioning' %}is-active{% endif %}">
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2"/></svg>
                 My hosting
             </a>

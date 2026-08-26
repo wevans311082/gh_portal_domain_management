@@ -19,7 +19,7 @@
     <button type="submit" class="bg-sky-600 text-white px-4 py-2 rounded hover:bg-sky-700 text-sm">Filter</button>
     <a href="?date_from={{ date_from }}&date_to={{ date_to }}&export=csv"
        class="border border-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-50 text-sm">
-        â Export CSV
+        ↓ Export CSV
     </a>
 </form>
 
@@ -28,16 +28,16 @@
 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
     <div class="bg-white rounded-lg shadow p-4 text-center">
         <div class="text-xs text-gray-500 mb-1">Total Invoiced</div>
-        <div class="text-xl font-bold text-gray-900">Â£{{ totals.total_invoiced|floatformat:2 }}</div>
+        <div class="text-xl font-bold text-gray-900">£{{ totals.total_invoiced|floatformat:2 }}</div>
     </div>
     <div class="bg-white rounded-lg shadow p-4 text-center">
         <div class="text-xs text-gray-500 mb-1">Total Paid</div>
-        <div class="text-xl font-bold text-green-700">Â£{{ totals.total_paid|floatformat:2|default:"0.00" }}</div>
+        <div class="text-xl font-bold text-green-700">£{{ totals.total_paid|floatformat:2|default:"0.00" }}</div>
     </div>
     <div class="bg-white rounded-lg shadow p-4 text-center">
         <div class="text-xs text-gray-500 mb-1">Outstanding</div>
         <div class="text-xl font-bold text-red-600">
-            Â£{% widthratio totals.total_invoiced 1 1 as dummy %}{{ totals.total_invoiced|default:0|add:0 }}
+            £{% widthratio totals.total_invoiced 1 1 as dummy %}{{ totals.total_invoiced|default:0|add:0 }}
         </div>
     </div>
 </div>
@@ -63,7 +63,7 @@
             <tr class="hover:bg-gray-50">
                 <td class="px-4 py-3 font-mono text-sm">{{ invoice.number }}</td>
                 <td class="px-4 py-3 text-gray-600">{{ invoice.created_at|date:"Y-m-d" }}</td>
-                <td class="px-4 py-3 text-gray-600">{{ invoice.due_date|default:"â" }}</td>
+                <td class="px-4 py-3 text-gray-600">{{ invoice.due_date|default:"—" }}</td>
                 <td class="px-4 py-3">
                     <span class="px-2 py-0.5 rounded-full text-xs font-medium
                         {% if invoice.status == 'paid' %}bg-green-100 text-green-800
@@ -73,10 +73,10 @@
                         {{ invoice.get_status_display }}
                     </span>
                 </td>
-                <td class="px-4 py-3 text-right font-medium">Â£{{ invoice.total|floatformat:2 }}</td>
+                <td class="px-4 py-3 text-right font-medium">£{{ invoice.total|floatformat:2 }}</td>
                 <td class="px-4 py-3 text-right
                     {% if invoice.amount_outstanding > 0 %}text-red-600 font-medium{% else %}text-gray-400{% endif %}">
-                    Â£{{ invoice.amount_outstanding|floatformat:2 }}
+                    £{{ invoice.amount_outstanding|floatformat:2 }}
                 </td>
                 <td class="px-4 py-3 text-right">
                     <a href="{% url 'invoices:detail' pk=invoice.pk %}"
@@ -97,12 +97,12 @@
 <div class="mt-4 flex justify-center gap-2">
     {% if page_obj.has_previous %}
     <a href="?page={{ page_obj.previous_page_number }}&date_from={{ date_from }}&date_to={{ date_to }}"
-       class="px-3 py-1 border rounded text-sm hover:bg-gray-50">â Prev</a>
+       class="px-3 py-1 border rounded text-sm hover:bg-gray-50">← Prev</a>
     {% endif %}
     <span class="px-3 py-1 text-sm text-gray-600">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
     {% if page_obj.has_next %}
     <a href="?page={{ page_obj.next_page_number }}&date_from={{ date_from }}&date_to={{ date_to }}"
-       class="px-3 py-1 border rounded text-sm hover:bg-gray-50">Next â</a>
+       class="px-3 py-1 border rounded text-sm hover:bg-gray-50">Next →</a>
     {% endif %}
 </div>
 {% endif %}

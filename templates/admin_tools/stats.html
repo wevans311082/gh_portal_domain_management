@@ -36,34 +36,29 @@
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
     <div class="bg-white rounded-lg shadow p-6">
         <h3 class="font-semibold text-gray-900 mb-4">Monthly Revenue (last 12 months)</h3>
-        {% if revenue_labels %}
         <div class="h-40 flex items-end gap-1">
             {% for label, value in revenue_labels|zip_lists:revenue_values %}
-            <div class="flex-1 flex flex-col items-center gap-1" title="{{ label }}: Â£{{ value|floatformat:2 }}">
-                <div class="w-full bg-sky-500 rounded-t" style="height: {{ value|floatformat:0 }}px; max-height: 120px; min-height: 2px"></div>
-                <span class="text-[9px] text-gray-400 rotate-45 origin-left mt-1 block">{{ label }}</span>
+            <div class="flex-1 flex flex-col items-center gap-1" title="{{ label }}: £{{ value|floatformat:2 }}">
+                <div class="w-full bg-sky-500 rounded-t" style="height: {% if revenue_max %}{{ value|pct_of:revenue_max }}{% else %}2{% endif %}%; min-height: 4px"></div>
+                <span class="text-[9px] text-gray-500 mt-1 block truncate w-full text-center">{{ label|slice:":3" }}</span>
             </div>
             {% endfor %}
         </div>
-        {% else %}
-        <p class="text-sm text-gray-400">No paid invoices in the last 12 months.</p>
+        {% if total_revenue_12m == 0 %}
+        <p class="text-sm text-gray-400 mt-2">No paid invoices in the last 12 months yet — the axis still shows each month.</p>
         {% endif %}
     </div>
 
     <div class="bg-white rounded-lg shadow p-6">
         <h3 class="font-semibold text-gray-900 mb-4">New Signups (last 12 months)</h3>
-        {% if signup_labels %}
         <div class="h-40 flex items-end gap-1">
             {% for label, value in signup_labels|zip_lists:signup_values %}
             <div class="flex-1 flex flex-col items-center gap-1" title="{{ label }}: {{ value }} signups">
-                <div class="w-full bg-emerald-500 rounded-t" style="height: {{ value }}0px; max-height: 120px; min-height: 2px"></div>
-                <span class="text-[9px] text-gray-400 rotate-45 origin-left mt-1 block">{{ label }}</span>
+                <div class="w-full bg-emerald-500 rounded-t" style="height: {% if signup_max %}{{ value|pct_of:signup_max }}{% else %}2{% endif %}%; min-height: 4px"></div>
+                <span class="text-[9px] text-gray-500 mt-1 block truncate w-full text-center">{{ label|slice:":3" }}</span>
             </div>
             {% endfor %}
         </div>
-        {% else %}
-        <p class="text-sm text-gray-400">No signups recorded in the last 12 months.</p>
-        {% endif %}
     </div>
 </div>
 

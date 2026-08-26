@@ -5,10 +5,11 @@
 
 {% block header_actions %}
 <a href="{% url 'domains:my_domains' %}" class="btn-secondary text-xs">Back to domains</a>
+<a href="{% url 'domains:renew' pk=domain.pk %}" class="btn-primary text-xs">Renew</a>
 {% endblock %}
 
 {% block content %}
-<div x-data="{ drawer: null }" class="space-y-4">
+<div class="space-y-4">
     <div class="fluent-card p-5">
         <div class="flex flex-wrap items-start justify-between gap-4">
             <div>
@@ -26,15 +27,14 @@
                     {% else %}
                     <span class="chip chip-warning">Transfer unlocked</span>
                     {% endif %}
+                    {% if domain.auto_renew %}
+                    <span class="chip chip-info">Auto-renew on</span>
+                    {% endif %}
                 </div>
             </div>
             <div class="flex flex-wrap gap-2">
-                <button type="button" @click="drawer = 'nameservers'" class="btn-secondary text-xs">Nameservers</button>
-                <button type="button" @click="drawer = 'settings'" class="btn-secondary text-xs">Settings</button>
-                {% if domain.status == 'active' %}
-                <button type="button" @click="drawer = 'auth'" class="btn-secondary text-xs">Auth code</button>
-                {% endif %}
-                <button type="button" @click="drawer = 'renew'" class="btn-primary text-xs">Renew</button>
+                <a href="{% url 'dns:zone_detail' domain.pk %}" class="btn-secondary text-xs">DNS editor</a>
+                <a href="{% url 'domains:renew' pk=domain.pk %}" class="btn-primary text-xs">Renew wizard</a>
             </div>
         </div>
 
@@ -61,60 +61,9 @@
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div class="fluent-card p-5">
             <h3 class="font-semibold mb-3">Nameservers</h3>
-            <ul class="text-sm space-y-2 font-mono">
-                {% if domain.nameserver1 %}<li>{{ domain.nameserver1 }}</li>{% endif %}
-                {% if domain.nameserver2 %}<li>{{ domain.nameserver2 }}</li>{% endif %}
-                {% if domain.nameserver3 %}<li>{{ domain.nameserver3 }}</li>{% endif %}
-                {% if domain.nameserver4 %}<li>{{ domain.nameserver4 }}</li>{% endif %}
-                {% if not domain.nameserver1 %}<li class="text-fluent-muted font-sans">No nameservers configured</li>{% endif %}
-            </ul>
+            <p class="text-sm text-fluent-muted mb-3">Updates the registrar (ResellerClub) and WHM when this domain is hosted.</p>
             {% if domain.status == 'active' %}
-            <button type="button" @click="drawer = 'nameservers'" class="mt-4 text-sm text-brand-600 hover:underline font-medium">Edit nameservers →</button>
-            {% endif %}
-        </div>
-        <div class="fluent-card p-5">
-            <h3 class="font-semibold mb-3">Quick actions</h3>
-            <div class="space-y-2">
-                <form method="post" action="{% url 'portal:cart_add_renewal' %}">
-                    {% csrf_token %}
-                    <input type="hidden" name="domain_id" value="{{ domain.id }}">
-                    <input type="hidden" name="renewal_years" value="1">
-                    <input type="hidden" name="next" value="{% url 'portal:cart' %}">
-                    <button class="w-full text-left px-3 py-2 rounded border border-fluent-border hover:bg-fluent-subtle text-sm">Add 1-year renewal to cart</button>
-                </form>
-                <a href="{% url 'portal:shop' %}?domain={{ domain.name|urlencode }}"
-                   class="block w-full text-left px-3 py-2 rounded border border-fluent-border hover:bg-fluent-subtle text-sm">
-                    Add hosting for this domain
-                </a>
-                <a href="{% url 'domains:contact_list' %}"
-                   class="block w-full text-left px-3 py-2 rounded border border-fluent-border hover:bg-fluent-subtle text-sm">
-                    Manage domain contacts
-                </a>
-            </div>
-        </div>
-    </div>
-
-    <!-- Backdrop -->
-    <div x-show="drawer" x-cloak class="fluent-drawer-backdrop" @click="drawer = null"
-         x-transition:enter="transition-opacity ease-out duration-200"
-         x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
-         x-transition:leave="transition-opacity ease-in duration-150"
-         x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"></div>
-
-    <!-- Nameservers drawer -->
-    <div class="fluent-drawer" :class="drawer === 'nameservers' ? 'is-open' : ''" role="dialog" aria-modal="true">
-        <div class="fluent-drawer-header">
-            <div>
-                <p class="text-xs text-fluent-muted uppercase tracking-wide">Domain</p>
-                <h3 class="text-lg font-semibold">Nameservers</h3>
-            </div>
-            <button type="button" @click="drawer = null" class="text-fluent-muted hover:text-fluent-ink p-1" aria-label="Close">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-            </button>
-        </div>
-        <div class="fluent-drawer-body">
-            {% if domain.status == 'active' %}
-            <form method="post" action="{% url 'domains:update_nameservers' pk=domain.pk %}" class="space-y-3" id="ns-form">
+            <form method="post" action="{% url 'domains:update_nameservers' pk=domain.pk %}" class="space-y-3">
                 {% csrf_token %}
                 <div>
                     <label>Nameserver 1</label>
@@ -132,31 +81,21 @@
                     <label>Nameserver 4 (optional)</label>
                     <input type="text" name="nameserver4" value="{{ domain.nameserver4 }}" placeholder="ns4.example.com" class="font-mono">
                 </div>
+                <div class="flex flex-wrap gap-2">
+                    <button type="submit" class="btn-primary text-xs">Save nameservers</button>
+                    <button type="submit" name="action" value="use_whm" class="btn-secondary text-xs">Use WHM nameservers</button>
+                </div>
             </form>
+            {% if whm_nameservers %}
+            <p class="text-xs text-fluent-muted mt-3">WHM nameservers: {{ whm_nameservers|join:", " }}</p>
+            {% endif %}
             {% else %}
             <p class="text-sm text-fluent-muted">Nameservers can only be updated while the domain is active.</p>
             {% endif %}
         </div>
-        {% if domain.status == 'active' %}
-        <div class="fluent-drawer-footer flex gap-2 justify-end">
-            <button type="button" @click="drawer = null" class="btn-secondary">Cancel</button>
-            <button type="submit" form="ns-form" class="btn-primary">Save nameservers</button>
-        </div>
-        {% endif %}
-    </div>
 
-    <!-- Settings drawer -->
-    <div class="fluent-drawer" :class="drawer === 'settings' ? 'is-open' : ''" role="dialog" aria-modal="true">
-        <div class="fluent-drawer-header">
-            <div>
-                <p class="text-xs text-fluent-muted uppercase tracking-wide">Domain</p>
-                <h3 class="text-lg font-semibold">Settings</h3>
-            </div>
-            <button type="button" @click="drawer = null" class="text-fluent-muted hover:text-fluent-ink p-1" aria-label="Close">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-            </button>
-        </div>
-        <div class="fluent-drawer-body space-y-4">
+        <div class="fluent-card p-5 space-y-4">
+            <h3 class="font-semibold">Settings</h3>
             <div class="flex items-center justify-between p-3 border border-fluent-border rounded">
                 <div>
                     <p class="text-sm font-medium">Auto-renew</p>
@@ -164,12 +103,7 @@
                 </div>
                 <form method="post" action="{% url 'domains:toggle_autorenew' pk=domain.pk %}">
                     {% csrf_token %}
-                    <button type="submit"
-                            class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors
-                                {% if domain.auto_renew %}bg-brand-500{% else %}bg-gray-300{% endif %}">
-                        <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform
-                            {% if domain.auto_renew %}translate-x-6{% else %}translate-x-1{% endif %}"></span>
-                    </button>
+                    <button type="submit" class="btn-secondary text-xs">{% if domain.auto_renew %}Turn off{% else %}Turn on{% endif %}</button>
                 </form>
             </div>
             <div class="flex items-center justify-between p-3 border border-fluent-border rounded">
@@ -180,74 +114,58 @@
                 {% if domain.status == 'active' and domain.registrar_id %}
                 <form method="post" action="{% url 'domains:toggle_lock' pk=domain.pk %}">
                     {% csrf_token %}
-                    <button type="submit"
-                            class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors
-                                {% if domain.is_locked %}bg-emerald-600{% else %}bg-gray-300{% endif %}">
-                        <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform
-                            {% if domain.is_locked %}translate-x-6{% else %}translate-x-1{% endif %}"></span>
-                    </button>
+                    <button type="submit" class="btn-secondary text-xs">{% if domain.is_locked %}Unlock{% else %}Lock{% endif %}</button>
                 </form>
                 {% else %}
                 <span class="text-sm text-fluent-muted">{% if domain.is_locked %}Locked{% else %}Unlocked{% endif %}</span>
                 {% endif %}
             </div>
+
+            <div class="p-3 border border-fluent-border rounded">
+                <p class="text-sm font-medium mb-1">Auth code (EPP)</p>
+                <p class="text-xs text-fluent-muted mb-3">Required to transfer this domain away. Disable the lock first.</p>
+                {% if domain.epp_code %}
+                <code class="block bg-fluent-subtle border border-fluent-border px-3 py-2 rounded text-sm font-mono break-all mb-3">{{ domain.epp_code }}</code>
+                {% endif %}
+                {% if domain.status == 'active' %}
+                <form method="post" action="{% url 'domains:get_auth_code' pk=domain.pk %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn-primary text-xs">{% if domain.epp_code %}Refresh auth code{% else %}Get auth code{% endif %}</button>
+                </form>
+                {% endif %}
+            </div>
         </div>
     </div>
 
-    <!-- Auth code drawer -->
-    <div class="fluent-drawer" :class="drawer === 'auth' ? 'is-open' : ''" role="dialog" aria-modal="true">
-        <div class="fluent-drawer-header">
-            <div>
-                <p class="text-xs text-fluent-muted uppercase tracking-wide">Transfer</p>
-                <h3 class="text-lg font-semibold">Auth code (EPP)</h3>
-            </div>
-            <button type="button" @click="drawer = null" class="text-fluent-muted hover:text-fluent-ink p-1" aria-label="Close">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-            </button>
-        </div>
-        <div class="fluent-drawer-body">
-            <p class="text-sm text-fluent-muted mb-4">Required when transferring this domain to another registrar. Disable the transfer lock first.</p>
-            {% if domain.epp_code %}
-            <div class="flex items-center gap-2 mb-4">
-                <code class="flex-1 bg-fluent-subtle border border-fluent-border px-3 py-2 rounded text-sm font-mono break-all">{{ domain.epp_code }}</code>
-                <button type="button" onclick="navigator.clipboard.writeText('{{ domain.epp_code }}'); this.textContent='Copied';"
-                        class="text-xs text-brand-600 hover:underline shrink-0">Copy</button>
-            </div>
-            {% endif %}
-            <form method="post" action="{% url 'domains:get_auth_code' pk=domain.pk %}">
-                {% csrf_token %}
-                <button type="submit" class="btn-primary w-full">
-                    {% if domain.epp_code %}Refresh auth code{% else %}Get auth code{% endif %}
-                </button>
-            </form>
-        </div>
-    </div>
-
-    <!-- Renew drawer -->
-    <div class="fluent-drawer" :class="drawer === 'renew' ? 'is-open' : ''" role="dialog" aria-modal="true">
-        <div class="fluent-drawer-header">
-            <div>
-                <p class="text-xs text-fluent-muted uppercase tracking-wide">Billing</p>
-                <h3 class="text-lg font-semibold">Renew domain</h3>
-            </div>
-            <button type="button" @click="drawer = null" class="text-fluent-muted hover:text-fluent-ink p-1" aria-label="Close">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-            </button>
-        </div>
-        <div class="fluent-drawer-body">
-            <p class="text-sm text-fluent-muted mb-4">Adds a one-year renewal to your cart. Checkout creates an invoice for payment.</p>
-            <dl class="text-sm space-y-2 mb-6">
-                <div class="flex justify-between"><dt class="text-fluent-muted">Domain</dt><dd class="font-medium">{{ domain.name }}</dd></div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="fluent-card p-5">
+            <h3 class="font-semibold mb-3">Renew</h3>
+            <p class="text-sm text-fluent-muted mb-4">Choose a term, generate an invoice, or add the renewal to your cart.</p>
+            <dl class="text-sm space-y-2 mb-4">
                 <div class="flex justify-between"><dt class="text-fluent-muted">Current expiry</dt><dd class="font-medium">{{ domain.expires_at|default:"—" }}</dd></div>
-                <div class="flex justify-between"><dt class="text-fluent-muted">Term</dt><dd class="font-medium">1 year</dd></div>
+                {% if pricing %}
+                <div class="flex justify-between"><dt class="text-fluent-muted">Renewal / year</dt><dd class="font-medium">£{{ pricing.renewal_price }}</dd></div>
+                {% endif %}
             </dl>
-            <form method="post" action="{% url 'portal:cart_add_renewal' %}">
-                {% csrf_token %}
-                <input type="hidden" name="domain_id" value="{{ domain.id }}">
-                <input type="hidden" name="renewal_years" value="1">
-                <input type="hidden" name="next" value="{% url 'portal:cart' %}">
-                <button class="btn-primary w-full">Add renewal to cart</button>
-            </form>
+            <div class="flex flex-wrap gap-2">
+                <a href="{% url 'domains:renew' pk=domain.pk %}" class="btn-primary text-xs">Open renew wizard</a>
+                <form method="post" action="{% url 'portal:cart_add_renewal' %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="domain_id" value="{{ domain.id }}">
+                    <input type="hidden" name="renewal_years" value="1">
+                    <input type="hidden" name="next" value="{% url 'portal:cart' %}">
+                    <button class="btn-secondary text-xs">Add 1 year to cart</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="fluent-card p-5">
+            <h3 class="font-semibold mb-3">DNS zone</h3>
+            <p class="text-sm text-fluent-muted mb-4">Create, edit, and delete records. Changes sync to WHM, ResellerClub, or Cloudflare depending on the DNS provider.</p>
+            <a href="{% url 'dns:zone_detail' domain.pk %}" class="btn-primary text-xs">Open DNS editor</a>
+            {% if hosting %}
+            <p class="text-xs text-fluent-muted mt-4">Hosted as {{ hosting.package.get_display_name }} ({{ hosting.cpanel_username|default:"pending" }})</p>
+            {% endif %}
         </div>
     </div>
 </div>

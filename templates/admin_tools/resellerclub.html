@@ -1,0 +1,95 @@
+{% extends "base_admin.html" %}
+{% block title %}ResellerClub inventory — {{ SITE_NAME }}{% endblock %}
+{% block page_title %}ResellerClub inventory{% endblock %}
+{% block header_actions %}
+<form method="post">{% csrf_token %}<input type="hidden" name="action" value="refresh"><button class="btn-primary text-xs">Refresh from registrar</button></form>
+{% endblock %}
+{% block content %}
+{% if error %}
+<div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{{ error }}</div>
+{% endif %}
+
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+  <div class="bg-white rounded-xl border border-slate-200 p-4"><p class="text-xs text-slate-500 uppercase">Registrar domains</p><p class="text-2xl font-bold">{{ order_count }}</p></div>
+  <div class="bg-white rounded-xl border border-slate-200 p-4"><p class="text-xs text-slate-500 uppercase">Linked in portal</p><p class="text-2xl font-bold text-emerald-700">{{ linked_count }}</p></div>
+  <div class="bg-white rounded-xl border border-slate-200 p-4"><p class="text-xs text-slate-500 uppercase">Unmatched</p><p class="text-2xl font-bold text-amber-700">{{ unmatched_count }}</p></div>
+  <div class="bg-white rounded-xl border border-slate-200 p-4"><p class="text-xs text-slate-500 uppercase">WHM / hosting match</p><p class="text-2xl font-bold">{{ whm_linked_count }}</p></div>
+</div>
+
+<p class="text-sm text-slate-500 mb-4">Pulls live ResellerClub orders, matches them to portal domains and WHM accounts, and lets you import or re-sync state.</p>
+
+<div class="fluent-table-wrap">
+  <table class="fluent-table min-w-[960px]">
+    <thead>
+      <tr>
+        <th>Domain</th>
+        <th>Registrar</th>
+        <th>Portal</th>
+        <th>WHM / hosting</th>
+        <th>Customer</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <td class="font-medium">
+          {{ row.domain_name }}
+          <span class="block text-xs text-slate-400">{{ row.status }}{% if row.expiry %} · exp {{ row.expiry }}{% endif %}</span>
+        </td>
+        <td class="font-mono text-xs">{{ row.order_id|default:"—" }}</td>
+        <td>
+          {% if row.local_domain %}
+          <span class="chip chip-success">{{ row.local_domain.user.email }}</span>
+          <span class="block text-xs text-slate-500 mt-1">{{ row.local_domain.get_status_display }}</span>
+          {% else %}
+          <span class="chip chip-warning">Not in portal</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if row.whm_account %}
+          <span class="font-mono text-xs">{{ row.whm_account.username }}</span>
+          <span class="block text-xs text-slate-500">{{ row.whm_account.plan }}</span>
+          {% elif row.hosting_services %}
+          {% for svc in row.hosting_services %}
+          <span class="block text-xs">{{ svc.package.get_display_name }} ({{ svc.cpanel_username|default:"pending" }})</span>
+          {% endfor %}
+          {% else %}
+          <span class="text-xs text-slate-400">No WHM match</span>
+          {% endif %}
+        </td>
+        <td class="text-xs">
+          {{ row.customer_name|default:"" }}
+          <span class="block text-slate-500">{{ row.customer_email|default:"" }}</span>
+        </td>
+        <td class="text-right">
+          {% if row.local_domain %}
+          <form method="post" class="inline">{% csrf_token %}
+            <input type="hidden" name="action" value="sync_order">
+            <input type="hidden" name="domain_id" value="{{ row.local_domain.pk }}">
+            <input type="hidden" name="order_id" value="{{ row.order_id }}">
+            <button class="text-xs text-sky-700 hover:underline">Sync</button>
+          </form>
+          {% else %}
+          <form method="post" class="flex items-center justify-end gap-2">{% csrf_token %}
+            <input type="hidden" name="action" value="import_order">
+            <input type="hidden" name="order_id" value="{{ row.order_id }}">
+            <input type="hidden" name="domain_name" value="{{ row.domain_name }}">
+            <select name="user_id" class="text-xs border border-slate-300 rounded px-2 py-1 max-w-[12rem]">
+              <option value="">Link to user…</option>
+              {% for u in users %}
+              <option value="{{ u.pk }}">{{ u.email }}</option>
+              {% endfor %}
+            </select>
+            <button class="text-xs bg-sky-600 text-white px-2 py-1 rounded">Import</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="6" class="text-sm text-slate-500 py-6">No registrar domains returned. Check ResellerClub credentials and refresh.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

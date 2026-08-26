@@ -1,5 +1,5 @@
 {% extends "base_admin.html" %}
-{% block title %}Promo Codes Â· {{ SITE_NAME }}{% endblock %}
+{% block title %}Promo Codes · {{ SITE_NAME }}{% endblock %}
 {% block page_title %}Promo Codes{% endblock %}
 {% block page_actions %}
 <a href="{% url 'admin_tools:promo_code_create' %}" class="px-4 py-2 rounded-lg bg-sky-600 text-white text-sm font-medium hover:bg-sky-700">New Code</a>
@@ -24,9 +24,9 @@
       <tr class="hover:bg-slate-50">
         <td class="px-5 py-3 font-mono font-semibold text-slate-800">{{ code.code }}</td>
         <td class="px-5 py-3 capitalize">{{ code.get_discount_type_display }}</td>
-        <td class="px-5 py-3">{% if code.discount_type == "percent" %}{{ code.discount_value }}%{% else %}Â£{{ code.discount_value }}{% endif %}</td>
+        <td class="px-5 py-3">{% if code.discount_type == "percent" %}{{ code.discount_value }}%{% else %}£{{ code.discount_value }}{% endif %}</td>
         <td class="px-5 py-3">{{ code.uses }}{% if code.max_uses %} / {{ code.max_uses }}{% endif %}</td>
-        <td class="px-5 py-3">{{ code.valid_until|date:"d M Y"|default:"â" }}</td>
+        <td class="px-5 py-3">{{ code.valid_until|date:"d M Y"|default:"—" }}</td>
         <td class="px-5 py-3">
           {% if code.is_valid %}
           <span class="px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-700">Active</span>

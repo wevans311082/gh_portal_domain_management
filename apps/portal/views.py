@@ -323,7 +323,7 @@ def cart_add_renewal(request):
         add_domain_renewal_item(
             user=request.user,
             domain_id=int(request.POST.get("domain_id") or 0),
-            renewal_years=int(request.POST.get("renewal_years") or 1),
+            renewal_years=int(request.POST.get("renewal_years") or request.POST.get("years") or 1),
         )
     except Exception as exc:
         messages.error(request, str(exc))
@@ -508,20 +508,196 @@ def hosting_sso(request, service_pk):
         return redirect("portal:my_services")
 
 
+def _to_float(value, default=0.0):
+    try:
+        text = str(value or "").strip().lower()
+        if text in {"", "unlimited", "none", "null"}:
+            return default
+        return float(text)
+    except (TypeError, ValueError):
+        return default
+
+
+def _usage_percent(used, limit):
+    if not limit or limit <= 0:
+        return 0
+    return max(0, min(100, round((used / limit) * 100)))
+
+
 @login_required
 def hosting_usage(request, service_pk):
-    """Show disk & bandwidth usage for a hosting service."""
+    """Show disk, bandwidth, email, and database usage for a hosting service."""
     from apps.services.models import Service
     from apps.provisioning.whm_client import WHMClient
+
     service = get_object_or_404(Service, pk=service_pk, user=request.user)
-    quota = {}
+    stats = {"quota": {}, "summary": {}, "bandwidth": {}, "emails": [], "databases": [], "errors": []}
     if service.cpanel_username:
         try:
-            client = WHMClient()
-            quota = client.get_quota(service.cpanel_username)
-        except Exception:
-            pass
-    return render(request, "portal/hosting_usage.html", {"service": service, "quota": quota})
+            stats = WHMClient().collect_account_stats(service.cpanel_username)
+        except Exception as exc:
+            stats["errors"].append(str(exc))
+
+    quota = stats.get("quota") or {}
+    summary = stats.get("summary") or {}
+    bandwidth = stats.get("bandwidth") or {}
+
+    disk_used = _to_float(
+        quota.get("megabytes_used")
+        or quota.get("bytesused")
+        or summary.get("diskused")
+        or 0
+    )
+    if quota.get("bytesused") and not quota.get("megabytes_used"):
+        disk_used = _to_float(quota.get("bytesused")) / (1024 * 1024)
+    disk_limit = _to_float(
+        quota.get("megabytes_limit")
+        or quota.get("bytelimit")
+        or summary.get("disklimit")
+        or service.package.disk_quota_mb
+        or 0
+    )
+    if quota.get("bytelimit") and str(quota.get("bytelimit")).lower() not in {"unlimited", ""} and not quota.get("megabytes_limit"):
+        disk_limit = _to_float(quota.get("bytelimit")) / (1024 * 1024)
+
+    bw_used = _to_float(bandwidth.get("bwused") or bandwidth.get("totalbytes") or bandwidth.get("usage") or 0)
+    bw_limit = _to_float(bandwidth.get("bwlimit") or bandwidth.get("limit") or service.package.bandwidth_mb or 0)
+    if bw_used > 1024 * 1024:
+        bw_used = bw_used / (1024 * 1024)
+    if bw_limit > 1024 * 1024:
+        bw_limit = bw_limit / (1024 * 1024)
+
+    emails = stats.get("emails") or []
+    databases = stats.get("databases") or []
+
+    return render(
+        request,
+        "portal/hosting_usage.html",
+        {
+            "service": service,
+            "quota": quota,
+            "summary": summary,
+            "bandwidth": bandwidth,
+            "disk_used_mb": disk_used,
+            "disk_limit_mb": disk_limit,
+            "disk_percent": _usage_percent(disk_used, disk_limit),
+            "bw_used_mb": bw_used,
+            "bw_limit_mb": bw_limit,
+            "bw_percent": _usage_percent(bw_used, bw_limit),
+            "emails": emails,
+            "email_count": len(emails),
+            "email_limit": service.package.email_accounts,
+            "databases": databases,
+            "database_count": len(databases),
+            "database_limit": service.package.databases,
+            "stats_errors": stats.get("errors") or [],
+            "upgrade_packages": Package.objects.filter(is_active=True).exclude(pk=service.package_id).order_by("price_monthly"),
+        },
+    )
+
+
+@login_required
+def hosting_manage(request, service_pk):
+    """Upgrade, change, or request cancellation of a hosting service."""
+    from apps.provisioning.whm_client import WHMClient, WHMClientError
+    from apps.billing.services import create_invoice
+    from decimal import Decimal
+
+    service = get_object_or_404(Service, pk=service_pk, user=request.user)
+    packages = Package.objects.filter(is_active=True).order_by("card_sort_order", "price_monthly")
+
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+        if action == "change_package":
+            new_package = get_object_or_404(Package, pk=request.POST.get("package_id"), is_active=True)
+            old_package = service.package
+            if new_package.pk == old_package.pk:
+                messages.info(request, "That is already your current package.")
+                return redirect("portal:hosting_manage", service_pk=service.pk)
+
+            current_price = old_package.price_monthly if service.billing_period == "monthly" else old_package.price_annually
+            new_price = new_package.price_monthly if service.billing_period == "monthly" else new_package.price_annually
+            difference = (new_price or Decimal("0")) - (current_price or Decimal("0"))
+
+            if difference > 0:
+                invoice = create_invoice(
+                    user=request.user,
+                    line_items=[{
+                        "description": f"Hosting upgrade: {old_package.get_display_name()} → {new_package.get_display_name()} ({service.domain_name or service.cpanel_username})",
+                        "quantity": 1,
+                        "unit_price": difference,
+                    }],
+                    source_kind=Invoice.SOURCE_SERVICE_ORDER,
+                )
+                messages.success(
+                    request,
+                    f"Upgrade invoice {invoice.number} created for £{difference}. Pay it to complete billing; applying the package on the server now.",
+                )
+
+            whm_name = new_package.whm_package_name or new_package.name
+            if service.cpanel_username and whm_name:
+                try:
+                    WHMClient().change_package(service.cpanel_username, whm_name)
+                except WHMClientError as exc:
+                    messages.error(request, f"WHM package change failed: {exc}")
+                    return redirect("portal:hosting_manage", service_pk=service.pk)
+
+            service.package = new_package
+            service.save(update_fields=["package", "updated_at"])
+            messages.success(request, f"Hosting package updated to {new_package.get_display_name()}.")
+            return redirect("portal:hosting_manage", service_pk=service.pk)
+
+        if action == "request_cancel":
+            from apps.support.models import SupportTicket, SupportTicketMessage
+
+            ticket = SupportTicket.objects.create(
+                user=request.user,
+                subject=f"Cancellation request: {service.package.get_display_name()} ({service.domain_name or service.pk})",
+                status=SupportTicket.STATUS_OPEN,
+                related_service=service,
+            )
+            SupportTicketMessage.objects.create(
+                ticket=ticket,
+                user=request.user,
+                content=(request.POST.get("cancel_reason") or "Customer requested hosting cancellation from the portal.").strip(),
+            )
+            messages.success(request, "Cancellation request sent to support. Your service remains active until the request is processed.")
+            return redirect("portal:hosting_manage", service_pk=service.pk)
+
+        if action == "change_period":
+            period = (request.POST.get("billing_period") or "").strip()
+            if period in {"monthly", "annually"}:
+                service.billing_period = period
+                service.save(update_fields=["billing_period", "updated_at"])
+                messages.success(request, f"Billing period set to {period}.")
+            return redirect("portal:hosting_manage", service_pk=service.pk)
+
+    return render(
+        request,
+        "portal/hosting_manage.html",
+        {"service": service, "packages": packages},
+    )
+
+
+@login_required
+def subscriptions(request):
+    """List recurring hosting subscriptions for the signed-in user."""
+    services_qs = (
+        Service.objects.filter(user=request.user)
+        .select_related("package")
+        .order_by("status", "next_due_date", "-created_at")
+    )
+    paginator = Paginator(services_qs, _PAGE_SIZE)
+    page_obj = paginator.get_page(request.GET.get("page"))
+    return render(
+        request,
+        "portal/subscriptions.html",
+        {
+            "page_obj": page_obj,
+            "services": page_obj.object_list,
+            "active_count": services_qs.filter(status=Service.STATUS_ACTIVE).count(),
+        },
+    )
 
 
 @login_required

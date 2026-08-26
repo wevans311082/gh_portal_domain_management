@@ -49,10 +49,28 @@ def user_create(request):
 def user_edit(request, pk):
     user = get_object_or_404(User, pk=pk)
     if request.method == "POST":
+        action = (request.POST.get("action") or "save").strip()
+        if action == "send_password_reset":
+            try:
+                from allauth.account.forms import ResetPasswordForm
+
+                reset_form = ResetPasswordForm(data={"email": user.email})
+                if reset_form.is_valid():
+                    reset_form.save(request)
+                    messages.success(request, f"Password reset email sent to {user.email}.")
+                else:
+                    messages.error(request, "Could not send a password reset email for this account.")
+            except Exception as exc:
+                messages.error(request, f"Password reset email failed: {exc}")
+            return redirect("admin_tools:user_edit", pk=user.pk)
+
         form = AdminUserUpdateForm(request.POST, instance=user)
         if form.is_valid():
             form.save()
-            messages.success(request, f"User {user.email} saved.")
+            if form.cleaned_data.get("new_password1"):
+                messages.success(request, f"User {user.email} saved and password updated.")
+            else:
+                messages.success(request, f"User {user.email} saved.")
             return redirect("admin_tools:user_edit", pk=user.pk)
     else:
         form = AdminUserUpdateForm(instance=user)
@@ -65,12 +83,13 @@ def company_lookup(request):
     if not company_number:
         return JsonResponse({"ok": False, "error": "Please provide a company number."}, status=400)
 
-    payload = CompaniesHouseService().get_company(company_number)
+    service = CompaniesHouseService()
+    payload = service.get_company(company_number)
     if not payload:
         return JsonResponse(
             {
                 "ok": False,
-                "error": "Company not found or Companies House API is not configured.",
+                "error": service.last_error or "Company not found or Companies House API is not configured.",
             },
             status=404,
         )

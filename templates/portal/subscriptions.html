@@ -1,0 +1,52 @@
+{% extends "base_portal.html" %}
+{% block title %}Subscriptions - {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Subscriptions{% endblock %}
+{% block content %}
+<p class="text-sm text-slate-500 mb-5">Recurring hosting services billed through this portal. {{ active_count }} active.</p>
+{% if services %}
+<div class="fluent-table-wrap">
+  <table class="fluent-table min-w-[720px]">
+    <thead>
+      <tr>
+        <th>Subscription</th>
+        <th>Domain</th>
+        <th>Status</th>
+        <th>Period</th>
+        <th>Next due</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for service in services %}
+      <tr>
+        <td>
+          <p class="font-medium">{{ service.package.get_display_name }}</p>
+          <p class="text-xs text-fluent-muted font-mono">{{ service.package.whm_package_name|default:"" }}</p>
+        </td>
+        <td class="text-fluent-muted">{{ service.domain_name|default:"—" }}</td>
+        <td>
+          <span class="chip {% if service.status == 'active' %}chip-success{% elif service.status == 'suspended' %}chip-warning{% else %}chip-neutral{% endif %}">
+            {{ service.get_status_display }}
+          </span>
+        </td>
+        <td class="capitalize text-fluent-muted">{{ service.billing_period }}</td>
+        <td>{{ service.next_due_date|default:"—" }}</td>
+        <td class="text-right whitespace-nowrap">
+          <a href="{% url 'portal:hosting_manage' service.pk %}" class="btn-primary text-xs">Manage</a>
+          {% if service.cpanel_username %}
+          <a href="{% url 'portal:hosting_usage' service.pk %}" class="btn-secondary text-xs ml-1">Usage</a>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="fluent-card p-12 text-center">
+  <h3 class="text-lg font-semibold mb-2">No subscriptions yet</h3>
+  <p class="text-fluent-muted mb-6">Hosting packages appear here once provisioned.</p>
+  <a href="{% url 'portal:shop' %}" class="btn-primary">Shop hosting</a>
+</div>
+{% endif %}
+{% endblock %}

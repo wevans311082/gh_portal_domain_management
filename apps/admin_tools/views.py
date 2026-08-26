@@ -11,6 +11,7 @@ from django.core.paginator import Paginator
 from django.core.validators import validate_email
 from django.db.models import Count, Q, Sum
 from django.db.models.functions import TruncMonth
+from django.http import HttpResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils.text import slugify
@@ -18,7 +19,7 @@ from django.utils import timezone
 from django_celery_beat.models import CrontabSchedule, IntervalSchedule, PeriodicTask
 from django_celery_results.models import TaskResult
 
-from apps.core.runtime_settings import get_runtime_setting
+from apps.core.runtime_settings import get_runtime_setting, get_runtime_setting_with_source
 from apps.accounts.models import User
 from apps.audit.models import AuditLog, EmailLog
 from apps.billing.models import Invoice
@@ -36,50 +37,70 @@ from .decorators import staff_member_required
 
 
 def _build_task_summary():
-    recent_results = TaskResult.objects.order_by("-date_done")[:20]
-    last_week = timezone.now() - timedelta(days=7)
-    recent_week_results = TaskResult.objects.filter(date_done__gte=last_week)
-    status_counts = {
-        "success": recent_week_results.filter(status="SUCCESS").count(),
-        "failure": recent_week_results.filter(status="FAILURE").count(),
-        "started": recent_week_results.filter(status="STARTED").count(),
+    empty = {
+        "recent_results": [],
+        "task_status_counts": {"success": 0, "failure": 0, "started": 0},
+        "task_chart_bars": [
+            {"label": "Successful", "count": 0, "height": 12, "color": "bg-emerald-500"},
+            {"label": "Failed", "count": 0, "height": 12, "color": "bg-rose-500"},
+            {"label": "Started", "count": 0, "height": 12, "color": "bg-amber-500"},
+        ],
+        "enabled_periodic_tasks": 0,
+        "disabled_periodic_tasks": 0,
+        "interval_schedules": 0,
+        "crontab_schedules": 0,
+        "failed_task_results": 0,
+        "periodic_task_admin_url": "#",
+        "interval_schedule_admin_url": "#",
+        "crontab_schedule_admin_url": "#",
+        "task_result_admin_url": "#",
     }
-    max_count = max(status_counts.values(), default=0) or 1
-    chart_bars = [
-        {
-            "label": "Successful",
-            "count": status_counts["success"],
-            "height": max(12, round((status_counts["success"] / max_count) * 100)),
-            "color": "bg-emerald-500",
-        },
-        {
-            "label": "Failed",
-            "count": status_counts["failure"],
-            "height": max(12, round((status_counts["failure"] / max_count) * 100)),
-            "color": "bg-rose-500",
-        },
-        {
-            "label": "Started",
-            "count": status_counts["started"],
-            "height": max(12, round((status_counts["started"] / max_count) * 100)),
-            "color": "bg-amber-500",
-        },
-    ]
-
-    return {
-        "recent_results": recent_results,
-        "task_status_counts": status_counts,
-        "task_chart_bars": chart_bars,
-        "enabled_periodic_tasks": PeriodicTask.objects.filter(enabled=True).count(),
-        "disabled_periodic_tasks": PeriodicTask.objects.filter(enabled=False).count(),
-        "interval_schedules": IntervalSchedule.objects.count(),
-        "crontab_schedules": CrontabSchedule.objects.count(),
-        "failed_task_results": TaskResult.objects.filter(status="FAILURE").count(),
-        "periodic_task_admin_url": reverse("admin:django_celery_beat_periodictask_changelist"),
-        "interval_schedule_admin_url": reverse("admin:django_celery_beat_intervalschedule_changelist"),
-        "crontab_schedule_admin_url": reverse("admin:django_celery_beat_crontabschedule_changelist"),
-        "task_result_admin_url": reverse("admin:django_celery_results_taskresult_changelist"),
-    }
+    try:
+        recent_results = TaskResult.objects.order_by("-date_done")[:20]
+        last_week = timezone.now() - timedelta(days=7)
+        recent_week_results = TaskResult.objects.filter(date_done__gte=last_week)
+        status_counts = {
+            "success": recent_week_results.filter(status="SUCCESS").count(),
+            "failure": recent_week_results.filter(status="FAILURE").count(),
+            "started": recent_week_results.filter(status="STARTED").count(),
+        }
+        max_count = max(status_counts.values(), default=0) or 1
+        chart_bars = [
+            {
+                "label": "Successful",
+                "count": status_counts["success"],
+                "height": max(12, round((status_counts["success"] / max_count) * 100)),
+                "color": "bg-emerald-500",
+            },
+            {
+                "label": "Failed",
+                "count": status_counts["failure"],
+                "height": max(12, round((status_counts["failure"] / max_count) * 100)),
+                "color": "bg-rose-500",
+            },
+            {
+                "label": "Started",
+                "count": status_counts["started"],
+                "height": max(12, round((status_counts["started"] / max_count) * 100)),
+                "color": "bg-amber-500",
+            },
+        ]
+        return {
+            "recent_results": recent_results,
+            "task_status_counts": status_counts,
+            "task_chart_bars": chart_bars,
+            "enabled_periodic_tasks": PeriodicTask.objects.filter(enabled=True).count(),
+            "disabled_periodic_tasks": PeriodicTask.objects.filter(enabled=False).count(),
+            "interval_schedules": IntervalSchedule.objects.count(),
+            "crontab_schedules": CrontabSchedule.objects.count(),
+            "failed_task_results": TaskResult.objects.filter(status="FAILURE").count(),
+            "periodic_task_admin_url": reverse("admin:django_celery_beat_periodictask_changelist"),
+            "interval_schedule_admin_url": reverse("admin:django_celery_beat_intervalschedule_changelist"),
+            "crontab_schedule_admin_url": reverse("admin:django_celery_beat_crontabschedule_changelist"),
+            "task_result_admin_url": reverse("admin:django_celery_results_taskresult_changelist"),
+        }
+    except Exception:
+        return empty
 
 
 @staff_member_required
@@ -150,6 +171,16 @@ def stats(request):
     twelve_months_ago = timezone.now() - timedelta(days=365)
 
     # ── Revenue by month (last 12 months, paid invoices) ─────────────────────
+    month_starts = []
+    cursor = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    for _ in range(12):
+        month_starts.append(cursor)
+        if cursor.month == 1:
+            cursor = cursor.replace(year=cursor.year - 1, month=12)
+        else:
+            cursor = cursor.replace(month=cursor.month - 1)
+    month_starts.reverse()
+
     monthly_revenue = (
         Invoice.objects
         .filter(status=Invoice.STATUS_PAID, paid_at__gte=twelve_months_ago)
@@ -158,8 +189,13 @@ def stats(request):
         .annotate(revenue=Sum("total"))
         .order_by("month")
     )
-    revenue_labels = [r["month"].strftime("%b %Y") for r in monthly_revenue]
-    revenue_values = [float(r["revenue"] or 0) for r in monthly_revenue]
+    revenue_by_month = {}
+    for row in monthly_revenue:
+        key = row["month"].date().replace(day=1) if hasattr(row["month"], "date") else row["month"]
+        if hasattr(key, "year"):
+            revenue_by_month[(key.year, key.month)] = float(row["revenue"] or 0)
+    revenue_labels = [dt.strftime("%b %Y") for dt in month_starts]
+    revenue_values = [revenue_by_month.get((dt.year, dt.month), 0.0) for dt in month_starts]
     total_revenue_12m = sum(revenue_values)
 
     # ── Domain counts by status ───────────────────────────────────────────────
@@ -187,8 +223,13 @@ def stats(request):
         .annotate(count=Count("id"))
         .order_by("month")
     )
-    signup_labels = [r["month"].strftime("%b %Y") for r in monthly_signups]
-    signup_values = [r["count"] for r in monthly_signups]
+    signups_by_month = {}
+    for row in monthly_signups:
+        key = row["month"].date().replace(day=1) if hasattr(row["month"], "date") else row["month"]
+        if hasattr(key, "year"):
+            signups_by_month[(key.year, key.month)] = int(row["count"] or 0)
+    signup_labels = [dt.strftime("%b %Y") for dt in month_starts]
+    signup_values = [signups_by_month.get((dt.year, dt.month), 0) for dt in month_starts]
     total_new_users_12m = sum(signup_values)
 
     # ── Renewal stats ─────────────────────────────────────────────────────────
@@ -207,6 +248,7 @@ def stats(request):
         # Revenue
         "revenue_labels": revenue_labels,
         "revenue_values": revenue_values,
+        "revenue_max": max(revenue_values) if revenue_values else 0,
         "total_revenue_12m": total_revenue_12m,
         # Domains
         "domain_status_counts": list(domain_status_counts),
@@ -216,6 +258,7 @@ def stats(request):
         # Signups
         "signup_labels": signup_labels,
         "signup_values": signup_values,
+        "signup_max": max(signup_values) if signup_values else 0,
         "total_new_users_12m": total_new_users_12m,
         "total_users": User.objects.count(),
         # Renewals
@@ -1821,70 +1864,93 @@ def _redact(key, value):
     return value
 
 
+def _runtime_display(key, default="", secret=False):
+    value, source = get_runtime_setting_with_source(key, default)
+    if secret:
+        present = bool(str(value or "").strip())
+        display = "•••••••• (redacted)" if present else "(not set)"
+        return {"value": display, "source": source, "configured": present}
+    if value in (None, ""):
+        return {"value": default if default not in (None, "") else "(not set)", "source": source, "configured": False}
+    if key in _SECRET_KEYS:
+        return {"value": _redact(key, value), "source": source, "configured": True}
+    return {"value": value, "source": source, "configured": True}
+
+
 @staff_member_required
 def settings_overview(request):
-    """Show non-sensitive application configuration."""
+    """Show the running (DB-first) application configuration."""
     cfg = {
         "General": {
-            "SITE_NAME": settings.SITE_NAME,
-            "SITE_DOMAIN": settings.SITE_DOMAIN,
-            "DEBUG": settings.DEBUG,
-            "TIME_ZONE": settings.TIME_ZONE,
-            "LANGUAGE_CODE": settings.LANGUAGE_CODE,
-            "ALLOWED_HOSTS": ", ".join(settings.ALLOWED_HOSTS),
+            "SITE_NAME": _runtime_display("SITE_NAME", getattr(settings, "SITE_NAME", "")),
+            "SITE_DOMAIN": _runtime_display("SITE_DOMAIN", getattr(settings, "SITE_DOMAIN", "")),
+            "DEBUG": {"value": settings.DEBUG, "source": "environment", "configured": True},
+            "TIME_ZONE": _runtime_display("DJANGO_TIME_ZONE", settings.TIME_ZONE),
+            "LANGUAGE_CODE": {"value": settings.LANGUAGE_CODE, "source": "environment", "configured": True},
+            "ALLOWED_HOSTS": {"value": ", ".join(settings.ALLOWED_HOSTS), "source": "environment", "configured": True},
         },
         "Authentication": {
-            "AUTH_USER_MODEL": settings.AUTH_USER_MODEL,
-            "ACCOUNT_EMAIL_VERIFICATION": getattr(settings, "ACCOUNT_EMAIL_VERIFICATION", "—"),
-            "SESSION_COOKIE_AGE (seconds)": settings.SESSION_COOKIE_AGE,
-            "SESSION_COOKIE_HTTPONLY": settings.SESSION_COOKIE_HTTPONLY,
-            "LOGIN_RATE_LIMIT_MAX_ATTEMPTS": getattr(settings, "LOGIN_RATE_LIMIT_MAX_ATTEMPTS", "—"),
-            "LOGIN_RATE_LIMIT_WINDOW_SECONDS": getattr(settings, "LOGIN_RATE_LIMIT_WINDOW_SECONDS", "—"),
-        },
-        "Security": {
-            "SECURE_CONTENT_TYPE_NOSNIFF": settings.SECURE_CONTENT_TYPE_NOSNIFF,
-            "X_FRAME_OPTIONS": settings.X_FRAME_OPTIONS,
-            "CSP_DEFAULT_SRC": " ".join(getattr(settings, "CSP_DEFAULT_SRC", [])),
-            "CSP_SCRIPT_SRC": " ".join(getattr(settings, "CSP_SCRIPT_SRC", [])),
-            "DJANGO_ADMIN_URL": _redact("DJANGO_ADMIN_URL", getattr(settings, "DJANGO_ADMIN_URL", "—")),
+            "AUTH_USER_MODEL": {"value": settings.AUTH_USER_MODEL, "source": "environment", "configured": True},
+            "ACCOUNT_EMAIL_VERIFICATION": {
+                "value": getattr(settings, "ACCOUNT_EMAIL_VERIFICATION", "—"),
+                "source": "environment",
+                "configured": True,
+            },
+            "SESSION_COOKIE_AGE (seconds)": {
+                "value": settings.SESSION_COOKIE_AGE,
+                "source": "environment",
+                "configured": True,
+            },
+            "SESSION_COOKIE_HTTPONLY": {
+                "value": settings.SESSION_COOKIE_HTTPONLY,
+                "source": "environment",
+                "configured": True,
+            },
+            "LOGIN_RATE_LIMIT_MAX_ATTEMPTS": {
+                "value": getattr(settings, "LOGIN_RATE_LIMIT_MAX_ATTEMPTS", "—"),
+                "source": "environment",
+                "configured": True,
+            },
         },
         "Email": {
-            "EMAIL_BACKEND": settings.EMAIL_BACKEND,
-            "M365_GRAPH_ENABLED": get_runtime_setting("M365_GRAPH_ENABLED", getattr(settings, "M365_GRAPH_ENABLED", False)),
-            "M365_GRAPH_DEFAULT_MAILBOX": get_runtime_setting("M365_GRAPH_DEFAULT_MAILBOX", ""),
-            "M365_GRAPH_BILLING_MAILBOX": get_runtime_setting("M365_GRAPH_BILLING_MAILBOX", ""),
-            "M365_GRAPH_SUPPORT_MAILBOX": get_runtime_setting("M365_GRAPH_SUPPORT_MAILBOX", ""),
-            "M365_GRAPH_DOMAINS_MAILBOX": get_runtime_setting("M365_GRAPH_DOMAINS_MAILBOX", ""),
-            "EMAIL_HOST": settings.EMAIL_HOST or "(not set)",
-            "EMAIL_PORT": settings.EMAIL_PORT,
-            "EMAIL_USE_TLS": settings.EMAIL_USE_TLS,
-            "EMAIL_HOST_USER": settings.EMAIL_HOST_USER or "(not set)",
-            "DEFAULT_FROM_EMAIL": settings.DEFAULT_FROM_EMAIL,
+            "EMAIL_BACKEND": {"value": settings.EMAIL_BACKEND, "source": "environment", "configured": True},
+            "M365_GRAPH_ENABLED": _runtime_display("M365_GRAPH_ENABLED", getattr(settings, "M365_GRAPH_ENABLED", False)),
+            "M365_GRAPH_DEFAULT_MAILBOX": _runtime_display("M365_GRAPH_DEFAULT_MAILBOX", ""),
+            "M365_GRAPH_BILLING_MAILBOX": _runtime_display("M365_GRAPH_BILLING_MAILBOX", ""),
+            "M365_GRAPH_SUPPORT_MAILBOX": _runtime_display("M365_GRAPH_SUPPORT_MAILBOX", ""),
+            "EMAIL_HOST": _runtime_display("EMAIL_HOST", settings.EMAIL_HOST or "(not set)"),
+            "EMAIL_PORT": _runtime_display("EMAIL_PORT", settings.EMAIL_PORT),
+            "EMAIL_USE_TLS": _runtime_display("EMAIL_USE_TLS", settings.EMAIL_USE_TLS),
+            "EMAIL_HOST_USER": _runtime_display("EMAIL_HOST_USER", settings.EMAIL_HOST_USER or "(not set)"),
+            "DEFAULT_FROM_EMAIL": _runtime_display("DEFAULT_FROM_EMAIL", settings.DEFAULT_FROM_EMAIL),
         },
         "Integrations": {
-            "RESELLERCLUB_API_URL": getattr(settings, "RESELLERCLUB_API_URL", "—"),
-            "RESELLERCLUB_RESELLER_ID": getattr(settings, "RESELLERCLUB_RESELLER_ID", "—") or "(not set)",
-            "WHM_HOST": getattr(settings, "WHM_HOST", "—") or "(not set)",
-            "WHM_PORT": getattr(settings, "WHM_PORT", "—"),
-            "WHM_USERNAME": getattr(settings, "WHM_USERNAME", "—"),
-            "CLOUDFLARE_EMAIL": getattr(settings, "CLOUDFLARE_EMAIL", "—") or "(not set)",
-            "COMPANIES_HOUSE_API_KEY": "•••• (redacted)" if getattr(settings, "COMPANIES_HOUSE_API_KEY", "") else "(not set)",
-            "STRIPE_PUBLISHABLE_KEY": _redact("STRIPE_PUBLISHABLE_KEY", getattr(settings, "STRIPE_PUBLISHABLE_KEY", "")),
+            "RESELLERCLUB_API_URL": _runtime_display("RESELLERCLUB_API_URL", getattr(settings, "RESELLERCLUB_API_URL", "—")),
+            "RESELLERCLUB_RESELLER_ID": _runtime_display("RESELLERCLUB_RESELLER_ID", ""),
+            "RESELLERCLUB_API_KEY": _runtime_display("RESELLERCLUB_API_KEY", "", secret=True),
+            "WHM_HOST": _runtime_display("WHM_HOST", ""),
+            "WHM_PORT": _runtime_display("WHM_PORT", getattr(settings, "WHM_PORT", "2087")),
+            "WHM_USERNAME": _runtime_display("WHM_USERNAME", "root"),
+            "WHM_API_TOKEN": _runtime_display("WHM_API_TOKEN", "", secret=True),
+            "CLOUDFLARE_EMAIL": _runtime_display("CLOUDFLARE_EMAIL", ""),
+            "CLOUDFLARE_API_TOKEN": _runtime_display("CLOUDFLARE_API_TOKEN", "", secret=True),
+            "COMPANIES_HOUSE_API_KEY": _runtime_display("COMPANIES_HOUSE_API_KEY", "", secret=True),
+            "STRIPE_PUBLISHABLE_KEY": _runtime_display("STRIPE_PUBLISHABLE_KEY", "", secret=True),
+            "STRIPE_SECRET_KEY": _runtime_display("STRIPE_SECRET_KEY", "", secret=True),
         },
         "Celery": {
-            "CELERY_BROKER_URL": settings.CELERY_BROKER_URL,
-            "CELERY_RESULT_BACKEND": settings.CELERY_RESULT_BACKEND,
-            "CELERY_TIMEZONE": settings.CELERY_TIMEZONE,
-            "CELERY_TASK_TIME_LIMIT (s)": settings.CELERY_TASK_TIME_LIMIT,
-            "CELERY_RESULT_EXPIRES (s)": settings.CELERY_RESULT_EXPIRES,
+            "CELERY_BROKER_URL": {"value": settings.CELERY_BROKER_URL, "source": "environment", "configured": True},
+            "CELERY_RESULT_BACKEND": {"value": settings.CELERY_RESULT_BACKEND, "source": "environment", "configured": True},
+            "CELERY_TIMEZONE": {"value": settings.CELERY_TIMEZONE, "source": "environment", "configured": True},
         },
         "Storage & Media": {
-            "STATIC_URL": settings.STATIC_URL,
-            "STATIC_ROOT": str(settings.STATIC_ROOT),
-            "MEDIA_URL": settings.MEDIA_URL,
-            "MEDIA_ROOT": str(settings.MEDIA_ROOT),
-            "WEBSITE_TEMPLATES_ZIP_ROOT": getattr(settings, "WEBSITE_TEMPLATES_ZIP_ROOT", "—"),
-            "WEBSITE_TEMPLATES_EXTRACTED_ROOT": getattr(settings, "WEBSITE_TEMPLATES_EXTRACTED_ROOT", "—"),
+            "STATIC_URL": {"value": settings.STATIC_URL, "source": "environment", "configured": True},
+            "MEDIA_URL": {"value": settings.MEDIA_URL, "source": "environment", "configured": True},
+            "WEBSITE_TEMPLATES_ZIP_ROOT": {
+                "value": getattr(settings, "WEBSITE_TEMPLATES_ZIP_ROOT", "—"),
+                "source": "environment",
+                "configured": True,
+            },
         },
     }
 
@@ -1970,12 +2036,54 @@ def settings_setup_step(request, step_key: str):
 
 
 @staff_member_required
+def settings_export(request):
+    if request.method != "POST":
+        return redirect("admin_tools:settings_overview")
+    password = (request.POST.get("backup_password") or "").strip()
+    if len(password) < 8:
+        messages.error(request, "Backup password must be at least 8 characters.")
+        return redirect("admin_tools:settings_overview")
+    from .config_backup import ConfigBackupError, build_backup_zip
+
+    try:
+        payload = build_backup_zip(password)
+    except ConfigBackupError as exc:
+        messages.error(request, str(exc))
+        return redirect("admin_tools:settings_overview")
+    stamp = timezone.now().strftime("%Y%m%d-%H%M")
+    response = HttpResponse(payload, content_type="application/zip")
+    response["Content-Disposition"] = f'attachment; filename="cyberask-config-{stamp}.zip"'
+    return response
+
+
+@staff_member_required
+def settings_import(request):
+    if request.method != "POST":
+        return redirect("admin_tools:settings_overview")
+    password = (request.POST.get("backup_password") or "").strip()
+    upload = request.FILES.get("backup_file")
+    if not upload:
+        messages.error(request, "Choose a backup zip to import.")
+        return redirect("admin_tools:settings_overview")
+    from .config_backup import ConfigBackupError, import_backup_zip
+
+    try:
+        count = import_backup_zip(upload.read(), password)
+    except ConfigBackupError as exc:
+        messages.error(request, str(exc))
+        return redirect("admin_tools:settings_overview")
+    messages.success(request, f"Imported {count} configuration values from backup.")
+    return redirect("admin_tools:settings_overview")
+
+
+@staff_member_required
 def companies_house_config(request):
     from apps.admin_tools.models import IntegrationSetting
     from apps.companies.services import CompaniesHouseService
 
     test_number = ""
     lookup_result = None
+    lookup_error = ""
     key_value = get_runtime_setting("COMPANIES_HOUSE_API_KEY", "")
 
     if request.method == "POST":
@@ -1999,14 +2107,13 @@ def companies_house_config(request):
             if not test_number:
                 messages.warning(request, "Enter a company number to test lookup.")
             else:
-                lookup_result = CompaniesHouseService().get_company(test_number)
+                service = CompaniesHouseService()
+                lookup_result = service.get_company(test_number)
                 if lookup_result:
                     messages.success(request, f"Lookup succeeded for company {test_number}.")
                 else:
-                    messages.error(
-                        request,
-                        "Lookup failed. Check the API key and company number, then try again.",
-                    )
+                    lookup_error = service.last_error or "Lookup failed. Check the API key and company number."
+                    messages.error(request, lookup_error)
 
     return render(
         request,
@@ -2016,6 +2123,7 @@ def companies_house_config(request):
             "api_key_hint": "Configured" if key_value else "Not configured",
             "test_number": test_number,
             "lookup_result": lookup_result,
+            "lookup_error": lookup_error,
         },
     )
 

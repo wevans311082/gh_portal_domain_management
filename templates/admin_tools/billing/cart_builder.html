@@ -1,6 +1,6 @@
 {% extends "base_admin.html" %}
 
-{% block title %}Cart Builder Â· billing Â· {{ SITE_NAME }}{% endblock %}
+{% block title %}Cart Builder · billing · {{ SITE_NAME }}{% endblock %}
 {% block page_title %}Cart Builder{% endblock %}
 
 {% block content %}
@@ -10,9 +10,9 @@
       <label class="block min-w-[24rem]">
         <span class="text-xs uppercase font-semibold text-slate-500">Customer</span>
         <select name="user_id" class="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm">
-          <option value="">Choose customerâ¦</option>
+          <option value="">Choose customer…</option>
           {% for u in users %}
-          <option value="{{ u.pk }}" {% if selected_user and selected_user.pk == u.pk %}selected{% endif %}>{{ u.email }} â {{ u.full_name }}</option>
+          <option value="{{ u.pk }}" {% if selected_user and selected_user.pk == u.pk %}selected{% endif %}>{{ u.email }} — {{ u.full_name }}</option>
           {% endfor %}
         </select>
       </label>
@@ -32,7 +32,7 @@
           {% for package in packages %}
           <article class="rounded-xl border border-slate-200 p-4 bg-slate-50">
             <h3 class="font-semibold text-slate-900">{{ package.name }}</h3>
-            <p class="text-sm text-slate-500 mt-1">Â£{{ package.price_monthly }} monthly Â· Â£{{ package.price_annually }} annual</p>
+            <p class="text-sm text-slate-500 mt-1">£{{ package.price_monthly }} monthly · £{{ package.price_annually }} annual</p>
             <form method="post" action="{% url 'admin_tools:cart_builder_add_hosting' %}" class="mt-4 space-y-3">
               {% csrf_token %}
               <input type="hidden" name="user_id" value="{{ selected_user.pk }}">
@@ -88,7 +88,7 @@
             {% csrf_token %}
             <input type="hidden" name="user_id" value="{{ selected_user.pk }}">
             <select name="domain_id" class="w-full rounded border border-slate-300 px-3 py-2 text-sm" required>
-              <option value="">Choose domainâ¦</option>
+              <option value="">Choose domain…</option>
               {% for domain in domains %}
               <option value="{{ domain.id }}">{{ domain.name }}</option>
               {% endfor %}
@@ -135,7 +135,7 @@
       <div class="bg-slate-900 text-white rounded-2xl p-6 shadow-sm">
         <p class="text-xs uppercase tracking-[0.2em] text-sky-300 mb-2">Staff cart</p>
         <h3 class="text-2xl font-semibold">{{ cart.items.count }} item{{ cart.items.count|pluralize }}</h3>
-        <p class="text-slate-300 mt-2">Subtotal Â£{{ cart.subtotal }}</p>
+        <p class="text-slate-300 mt-2">Subtotal £{{ cart.subtotal }}</p>
         <div class="mt-5 space-y-3">
           <form method="post" action="{% url 'admin_tools:cart_builder_checkout_invoice' %}">
             {% csrf_token %}
@@ -158,7 +158,7 @@
           <div class="rounded-lg border border-slate-200 p-3">
             <p class="text-xs uppercase text-slate-400">{{ item.get_item_type_display }}</p>
             <p class="font-medium text-slate-900 mt-1">{{ item.description }}</p>
-            <p class="text-sm text-slate-500 mt-1">Â£{{ item.line_total }}</p>
+            <p class="text-sm text-slate-500 mt-1">£{{ item.line_total }}</p>
             <form method="post" action="{% url 'admin_tools:cart_builder_remove_item' pk=item.pk %}" class="mt-2">
               {% csrf_token %}
               <input type="hidden" name="user_id" value="{{ selected_user.pk }}">

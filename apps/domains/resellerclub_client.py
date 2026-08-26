@@ -946,6 +946,83 @@ class ResellerClubClient:
         """Get the EPP/auth code for domain transfer out."""
         return self._get("domains/auth-code", {"order-id": order_id})
 
+    def list_customers(self, page_no: int = 1, no_of_records: int = 50) -> list[dict]:
+        """Search ResellerClub customer accounts."""
+        payload = self._get(
+            "customers/search",
+            {"page-no": page_no, "no-of-records": no_of_records},
+        )
+        if isinstance(payload, list):
+            return [row for row in payload if isinstance(row, dict)]
+        if isinstance(payload, dict):
+            extracted = payload.get("customers") or payload.get("data") or payload.get("results")
+            if isinstance(extracted, list):
+                return [row for row in extracted if isinstance(row, dict)]
+            rows = []
+            for key, value in payload.items():
+                if isinstance(value, dict) and any(
+                    marker in value for marker in ("username", "emailaddr", "email", "customerid", "name")
+                ):
+                    row = dict(value)
+                    row.setdefault("customerid", str(key))
+                    rows.append(row)
+            return rows
+        return []
+
+    def list_dns_records(self, order_id: str, record_types: list[str] | None = None) -> list[dict]:
+        """Return DNS records from ResellerClub DNS for an order."""
+        types = record_types or ["A", "AAAA", "CNAME", "MX", "TXT", "NS", "SRV", "CAA"]
+        records: list[dict] = []
+        for record_type in types:
+            try:
+                payload = self._get(
+                    "dns/manage/search-records",
+                    {
+                        "order-id": order_id,
+                        "type": record_type,
+                        "no-of-records": 50,
+                        "page-no": 1,
+                    },
+                )
+            except Exception as exc:
+                logger.warning("ResellerClub DNS search failed type=%s order=%s: %s", record_type, order_id, exc)
+                continue
+            rows = []
+            if isinstance(payload, list):
+                rows = payload
+            elif isinstance(payload, dict):
+                extracted = payload.get("records") or payload.get("data") or payload.get("recds")
+                if isinstance(extracted, list):
+                    rows = extracted
+                else:
+                    rows = [v for v in payload.values() if isinstance(v, dict)]
+            for row in rows:
+                if not isinstance(row, dict):
+                    continue
+                item = dict(row)
+                item.setdefault("type", record_type)
+                records.append(item)
+        return records
+
+    def update_dns_record(
+        self,
+        order_id: str,
+        host: str,
+        current_value: str,
+        new_value: str,
+        record_type: str,
+        ttl: int = 3600,
+    ) -> dict:
+        data = {
+            "order-id": order_id,
+            "host": host,
+            "current-value": current_value,
+            "new-value": new_value,
+            "type": record_type,
+            "ttl": ttl,
+        }
+        return self._post("dns/manage/update-record", data)
+
     def add_dns_record(self, order_id: str, host: str, value: str, record_type: str, ttl: int = 3600) -> dict:
         """Add a DNS record via ResellerClub DNS."""
         data = {

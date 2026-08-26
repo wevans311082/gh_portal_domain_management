@@ -25,7 +25,12 @@
         <tbody>
             {% for service in services %}
             <tr>
-                <td class="font-medium">{{ service.package.name }}</td>
+                <td class="font-medium">
+                    {{ service.package.get_display_name }}
+                    {% if service.package.whm_package_name and service.package.whm_package_name != service.package.get_display_name %}
+                    <span class="block text-xs font-mono text-fluent-muted">{{ service.package.whm_package_name }}</span>
+                    {% endif %}
+                </td>
                 <td class="text-fluent-muted">{{ service.domain_name|default:"—" }}</td>
                 <td>
                     <span class="chip {% if service.status == 'active' %}chip-success{% elif service.status == 'suspended' %}chip-warning{% elif service.status == 'cancelled' or service.status == 'terminated' or service.status == 'failed' %}chip-danger{% else %}chip-neutral{% endif %}">
@@ -36,15 +41,16 @@
                 <td class="text-fluent-muted">{{ service.next_due_date|default:"—" }}</td>
                 <td class="font-mono text-xs text-fluent-muted">{{ service.cpanel_username|default:"—" }}</td>
                 <td class="text-right whitespace-nowrap">
+                    <a href="{% url 'portal:hosting_manage' service.pk %}" class="btn-secondary text-xs inline-flex items-center">Manage</a>
+                    {% if service.cpanel_username %}
+                    <a href="{% url 'portal:hosting_usage' service.pk %}" class="btn-secondary text-xs inline-flex items-center ml-1">Usage</a>
+                    {% endif %}
                     {% if service.cpanel_username and service.status == 'active' %}
                     <a href="{% url 'portal:hosting_sso' service.pk %}"
-                       class="btn-primary text-xs inline-flex items-center gap-1"
+                       class="btn-primary text-xs inline-flex items-center gap-1 ml-1"
                        target="_blank" rel="noopener">
                         Open cPanel
                     </a>
-                    {% endif %}
-                    {% if service.cpanel_username %}
-                    <a href="{% url 'portal:hosting_usage' service.pk %}" class="ml-2 text-sm text-brand-600 hover:underline">Usage</a>
                     {% endif %}
                 </td>
             </tr>

@@ -44,6 +44,9 @@
             <button type="submit" class="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 text-sm font-semibold hover:bg-slate-50">Run Lookup</button>
         </form>
 
+        {% if lookup_error %}
+        <div class="mt-5 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{{ lookup_error }}</div>
+        {% endif %}
         {% if lookup_result %}
         <div class="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
             <p class="text-sm font-semibold text-emerald-800">Lookup successful</p>

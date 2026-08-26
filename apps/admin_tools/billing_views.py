@@ -169,6 +169,56 @@ def branding_edit(request):
     )
 
 
+@staff_member_required
+def invoice_preview(request):
+    """Render a live HTML preview of the current invoice branding."""
+    from types import SimpleNamespace
+    from django.template.loader import render_to_string
+    from django.http import HttpResponse
+    from apps.billing.services import _branding_context, _document_party_context
+
+    branding = BillingDocumentBranding.get_solo()
+    invoice = (
+        Invoice.objects.select_related("user").prefetch_related("line_items").order_by("-created_at").first()
+    )
+    if invoice is None:
+        line = SimpleNamespace(
+            description="Professional hosting — Business plan (preview)",
+            quantity=1,
+            unit_price=Decimal("29.00"),
+            line_total=Decimal("29.00"),
+        )
+        invoice = SimpleNamespace(
+            number="PREVIEW-0001",
+            status=Invoice.STATUS_UNPAID,
+            source_kind=Invoice.SOURCE_MANUAL_ADMIN,
+            billing_name=request.user.full_name or request.user.email,
+            billing_address="Cyber Ask Ltd\nPreview Address\nLondon",
+            user=request.user,
+            created_at=timezone.now(),
+            due_date=timezone.now().date(),
+            paid_at=None,
+            subtotal=Decimal("29.00"),
+            vat_rate=branding.default_vat_rate,
+            vat_amount=Decimal("5.80"),
+            total=Decimal("34.80"),
+            amount_paid=Decimal("0.00"),
+            amount_outstanding=Decimal("34.80"),
+            currency=branding.default_currency or "GBP",
+            notes="This is a branding preview. No invoice was saved.",
+            id=None,
+            line_items=SimpleNamespace(all=lambda: [line]),
+            get_status_display=lambda: "Unpaid",
+            get_source_kind_display=lambda: "Preview",
+        )
+    base_url = request.build_absolute_uri("/")
+    ctx = {"invoice": invoice, "document": invoice, "doc_kind": "invoice"}
+    ctx.update(_branding_context(branding, base_url=base_url))
+    ctx.update(_document_party_context(invoice, "invoice"))
+    html = render_to_string("billing/document_pdf.html", ctx, request=request)
+    return HttpResponse(html)
+
+
 # ---------------------------------------------------------------------------
 # Invoices: list / create / edit / actions
 # ---------------------------------------------------------------------------

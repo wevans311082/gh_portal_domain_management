@@ -21,6 +21,7 @@ from apps.audit.models import AuditLog
 from .forms import (
     MFALoginVerifyForm,
     MFARegenerateBackupCodesForm,
+    PasswordChangePortalForm,
     ProfileUpdateForm,
     RegistrationForm,
     TOTPVerifyForm,
@@ -318,17 +319,44 @@ def mfa_verify(request):
 @login_required
 def profile(request):
     profile_obj, _ = ClientProfile.objects.get_or_create(user=request.user)
+    password_form = PasswordChangePortalForm(request.user)
     if request.method == "POST":
-        form = ProfileUpdateForm(request.POST, instance=profile_obj)
-        if form.is_valid():
-            form.save()
-            messages.success(request, "Profile updated.")
+        action = (request.POST.get("action") or "profile").strip()
+        if action == "password":
+            password_form = PasswordChangePortalForm(request.user, request.POST)
+            form = ProfileUpdateForm(instance=profile_obj)
+            if password_form.is_valid():
+                new_password = password_form.cleaned_data["new_password1"]
+                request.user.set_password(new_password)
+                request.user.save(update_fields=["password"])
+                from django.contrib.auth import update_session_auth_hash
+
+                update_session_auth_hash(request, request.user)
+                if password_form.cleaned_data.get("sync_cpanel"):
+                    from apps.provisioning.whm_client import sync_user_cpanel_passwords
+
+                    updated, errors = sync_user_cpanel_passwords(request.user, new_password)
+                    if updated:
+                        messages.success(request, f"Password updated and synced to {updated} cPanel account(s).")
+                    else:
+                        messages.success(request, "Password updated.")
+                    for err in errors:
+                        messages.warning(request, err)
+                else:
+                    messages.success(request, "Password updated.")
+                return redirect("accounts_custom:profile")
+        else:
+            form = ProfileUpdateForm(request.POST, instance=profile_obj)
+            if form.is_valid():
+                form.save()
+                messages.success(request, "Profile updated.")
     else:
         form = ProfileUpdateForm(instance=profile_obj)
 
     recent_activity = AuditLog.objects.filter(user=request.user).order_by("-created_at")[:20]
     return render(request, "accounts/profile.html", {
         "form": form,
+        "password_form": password_form,
         "recent_activity": recent_activity,
     })
 

@@ -6,6 +6,7 @@ from . import content_views
 from . import operations_views
 from . import manual_order_views
 from . import domain_order_views
+from . import resellerclub_views
 
 app_name = "admin_tools"
 
@@ -96,10 +97,14 @@ urlpatterns = [
     path("integrations/<str:service>/", views.integration_detail, name="integration_detail"),
     path("integrations/companies-house/config/", views.companies_house_config, name="companies_house_config"),
     path("integrations/resellerclub/debug/", views.resellerclub_debug, name="resellerclub_debug"),
+    path("resellerclub/", resellerclub_views.resellerclub_hub, name="resellerclub_hub"),
     path("security/", views.security, name="security"),
     path("database/", views.database, name="database"),
     path("settings/", views.settings_overview, name="settings_overview"),
+    path("settings/export/", views.settings_export, name="settings_export"),
+    path("settings/import/", views.settings_import, name="settings_import"),
     path("settings/setup/<str:step_key>/", views.settings_setup_step, name="settings_setup_step"),
+    path("billing/branding/preview/", billing_views.invoice_preview, name="invoice_preview"),
     path("setup/", views.setup, name="setup"),
     # Setup wizard
     path("setup/wizard/", wizard_views.wizard_index, name="wizard_index"),

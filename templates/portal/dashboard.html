@@ -238,7 +238,7 @@
         {% for service in active_services|slice:":5" %}
         <li class="py-3 flex items-center justify-between gap-3">
             <div>
-                <p class="font-medium text-slate-800">{{ service.package.name }}</p>
+                <p class="font-medium text-slate-800">{{ service.package.get_display_name }}</p>
                 <p class="text-sm text-slate-500">{{ service.domain_name|default:"No domain linked" }}</p>
             </div>
             <div class="text-right text-xs text-slate-500">

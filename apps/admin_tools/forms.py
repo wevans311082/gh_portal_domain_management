@@ -122,11 +122,13 @@ class AdminUserCreateForm(forms.ModelForm):
         self._companies_house_payload = None
 
         if company_number and should_validate:
-            payload = CompaniesHouseService().get_company(company_number)
+            service = CompaniesHouseService()
+            payload = service.get_company(company_number)
             if not payload:
                 self.add_error(
                     "company_number",
-                    "Company number could not be verified with Companies House. Check the number or API key.",
+                    service.last_error
+                    or "Company number could not be verified with Companies House. Check the number or API key.",
                 )
             else:
                 self._companies_house_payload = payload
@@ -185,6 +187,22 @@ class AdminUserUpdateForm(forms.ModelForm):
     company_name = forms.CharField(max_length=255, required=False)
     company_number = forms.CharField(max_length=20, required=False)
     validate_company_with_companies_house = forms.BooleanField(required=False, initial=True)
+    new_password1 = forms.CharField(
+        required=False,
+        widget=forms.PasswordInput,
+        label="New password",
+        help_text="Leave blank to keep the current password.",
+    )
+    new_password2 = forms.CharField(
+        required=False,
+        widget=forms.PasswordInput,
+        label="Confirm new password",
+    )
+    sync_cpanel_password = forms.BooleanField(
+        required=False,
+        initial=True,
+        label="Also update cPanel password for this user's active hosting accounts",
+    )
 
     class Meta:
         model = User
@@ -215,18 +233,31 @@ class AdminUserUpdateForm(forms.ModelForm):
         raw = (self.cleaned_data.get("company_number") or "").strip()
         return raw.replace(" ", "").upper()
 
+    def clean_new_password1(self):
+        pwd = self.cleaned_data.get("new_password1")
+        if pwd:
+            validate_password(pwd, user=self.instance)
+        return pwd
+
     def clean(self):
         cleaned = super().clean()
+        p1 = cleaned.get("new_password1")
+        p2 = cleaned.get("new_password2")
+        if p1 or p2:
+            if p1 != p2:
+                self.add_error("new_password2", "Passwords do not match.")
         company_number = cleaned.get("company_number")
         should_validate = cleaned.get("validate_company_with_companies_house")
         self._companies_house_payload = None
 
         if company_number and should_validate:
-            payload = CompaniesHouseService().get_company(company_number)
+            service = CompaniesHouseService()
+            payload = service.get_company(company_number)
             if not payload:
                 self.add_error(
                     "company_number",
-                    "Company number could not be verified with Companies House. Check the number or API key.",
+                    service.last_error
+                    or "Company number could not be verified with Companies House. Check the number or API key.",
                 )
             else:
                 self._companies_house_payload = payload
@@ -273,9 +304,17 @@ class AdminUserUpdateForm(forms.ModelForm):
         profile.save()
 
     def save(self, commit=True):
-        user = super().save(commit=commit)
+        user = super().save(commit=False)
+        new_password = self.cleaned_data.get("new_password1")
+        if new_password:
+            user.set_password(new_password)
         if commit:
+            user.save()
             self._save_business_profile(user)
+            if new_password and self.cleaned_data.get("sync_cpanel_password"):
+                from apps.provisioning.whm_client import sync_user_cpanel_passwords
+
+                sync_user_cpanel_passwords(user, new_password)
         return user
 
 
@@ -306,6 +345,8 @@ class PackageCardForm(forms.ModelForm):
         model = Package
         fields = [
             "name",
+            "display_name",
+            "whm_package_name",
             "price_monthly",
             "price_annually",
             "setup_fee",

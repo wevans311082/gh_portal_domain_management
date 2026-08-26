@@ -1,5 +1,5 @@
 {% extends "base_admin.html" %}
-{% block title %}Package Card Â· {{ SITE_NAME }}{% endblock %}
+{% block title %}Package Card · {{ SITE_NAME }}{% endblock %}
 {% block page_title %}Edit Package Card{% endblock %}
 {% block content %}
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -13,10 +13,10 @@
   <p class="text-xs uppercase text-slate-500 mb-2">Live preview</p>
   <div class="rounded-xl border p-6 border-slate-200" id="preview_card_wrap">
     <span id="preview_badge" class="inline-block mb-2 bg-sky-600 text-white text-xs px-2 py-1 rounded-full" style="display:none"></span>
-    <h3 id="preview_name" class="text-xl font-bold mb-1">{{ form.name.value }}</h3>
-    <p class="text-3xl font-bold text-sky-600 mb-1">Â£<span id="preview_price">{{ form.price_monthly.value }}</span><span class="text-sm text-slate-500">/mo</span></p>
+    <h3 id="preview_name" class="text-xl font-bold mb-1">{{ form.display_name.value|default:form.name.value }}</h3>
+    <p class="text-3xl font-bold text-sky-600 mb-1">£<span id="preview_price">{{ form.price_monthly.value }}</span><span class="text-sm text-slate-500">/mo</span></p>
     <p id="preview_blurb" class="text-sm text-slate-500 mb-3">{{ form.card_blurb.value }}</p>
-    <ul class="text-sm space-y-1 mb-4">{% for f in preview_features %}<li>{% if f.is_positive %}â{% else %}â{% endif %} {{ f.text }}</li>{% endfor %}</ul>
+    <ul class="text-sm space-y-1 mb-4">{% for f in preview_features %}<li>{% if f.is_positive %}✓{% else %}✗{% endif %} {{ f.text }}</li>{% endfor %}</ul>
     <button type="button" id="preview_cta" class="w-full py-2 rounded bg-sky-600 text-white text-sm">{{ form.card_cta_label.value|default:'Get Started' }}</button>
   </div>
 </div>

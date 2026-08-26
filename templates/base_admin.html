@@ -73,7 +73,7 @@
                @click="if (window.innerWidth < 1024 && $event.target.closest('a')) sidebarOpen = false">
             <!-- Overview -->
             <details class="admin-nav-section mb-3" {% if request.resolver_match.url_name == 'dashboard' or request.resolver_match.url_name == 'stats' %}open{% endif %}>
-                <summary class="list-none cursor-pointer px-2 text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1 flex items-center justify-between">
+                <summary class="list-none cursor-pointer px-2 text-xs text-slate-300 uppercase tracking-wider font-semibold mb-1 flex items-center justify-between">
                     <span>Overview</span>
                     <span class="text-slate-600"><span class="admin-nav-plus">+</span><span class="admin-nav-minus">-</span></span>
                 </summary>
@@ -93,7 +93,7 @@
 
             <!-- People -->
             <details class="admin-nav-section mb-3" {% if request.resolver_match.url_name == 'users' or request.resolver_match.url_name == 'user_create' or request.resolver_match.url_name == 'user_update' or request.resolver_match.url_name == 'user_mfa_manage' %}open{% endif %}>
-                <summary class="list-none cursor-pointer px-2 text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1 flex items-center justify-between">
+                <summary class="list-none cursor-pointer px-2 text-xs text-slate-300 uppercase tracking-wider font-semibold mb-1 flex items-center justify-between">
                     <span>People</span>
                     <span class="text-slate-600"><span class="admin-nav-plus">+</span><span class="admin-nav-minus">-</span></span>
                 </summary>
@@ -108,7 +108,7 @@
 
             <!-- Commerce -->
             <details class="admin-nav-section mb-3" {% if 'invoice' in request.resolver_match.url_name or 'quote' in request.resolver_match.url_name or request.resolver_match.url_name == 'billing_branding' or 'payments_' in request.resolver_match.url_name or request.resolver_match.url_name == 'payments_list' %}open{% endif %}>
-                <summary class="list-none cursor-pointer px-2 text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1 flex items-center justify-between">
+                <summary class="list-none cursor-pointer px-2 text-xs text-slate-300 uppercase tracking-wider font-semibold mb-1 flex items-center justify-between">
                     <span>Commerce</span>
                     <span class="text-slate-600"><span class="admin-nav-plus">+</span><span class="admin-nav-minus">-</span></span>
                 </summary>
@@ -138,7 +138,7 @@
 
             <!-- Website -->
             <details class="admin-nav-section mb-3" {% if request.resolver_match.url_name == 'content_dashboard' or request.resolver_match.url_name == 'content_settings' or 'package_card' in request.resolver_match.url_name or 'service_card' in request.resolver_match.url_name or 'faq_' in request.resolver_match.url_name or 'error_page' in request.resolver_match.url_name or 'contact_submission' in request.resolver_match.url_name or request.resolver_match.url_name == 'contact_form_config' %}open{% endif %}">
-                <summary class="list-none cursor-pointer px-2 text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1 flex items-center justify-between">
+                <summary class="list-none cursor-pointer px-2 text-xs text-slate-300 uppercase tracking-wider font-semibold mb-1 flex items-center justify-between">
                     <span>Website</span>
                     <span class="text-slate-600"><span class="admin-nav-plus">+</span><span class="admin-nav-minus">-</span></span>
                 </summary>
@@ -183,7 +183,7 @@
 
             <!-- Services -->
             <details class="admin-nav-section mb-3" {% if 'domains_' in request.resolver_match.url_name or request.resolver_match.url_name == 'domains_list' or request.resolver_match.url_name == 'tld_pricing' or 'services_' in request.resolver_match.url_name or request.resolver_match.url_name == 'services_list' or 'tickets_' in request.resolver_match.url_name or request.resolver_match.url_name == 'tickets_list' or 'templates_' in request.resolver_match.url_name or request.resolver_match.url_name == 'templates_list' %}open{% endif %}>
-                <summary class="list-none cursor-pointer px-2 text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1 flex items-center justify-between">
+                <summary class="list-none cursor-pointer px-2 text-xs text-slate-300 uppercase tracking-wider font-semibold mb-1 flex items-center justify-between">
                     <span>Services</span>
                     <span class="text-slate-600"><span class="admin-nav-plus">+</span><span class="admin-nav-minus">-</span></span>
                 </summary>
@@ -227,8 +227,8 @@
             </details>
 
             <!-- System -->
-            <details class="admin-nav-section mb-3" {% if request.resolver_match.url_name == 'task_management' or request.resolver_match.url_name == 'integrations_overview' or request.resolver_match.url_name == 'companies_house_config' or request.resolver_match.url_name == 'resellerclub_debug' or request.resolver_match.url_name == 'template_scan' or request.resolver_match.url_name == 'security' or request.resolver_match.url_name == 'database' or request.resolver_match.url_name == 'settings_overview' or request.resolver_match.url_name == 'settings_setup_step' or 'wizard' in request.resolver_match.url_name %}open{% endif %}>
-                <summary class="list-none cursor-pointer px-2 text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1 flex items-center justify-between">
+            <details class="admin-nav-section mb-3" {% if request.resolver_match.url_name == 'task_management' or request.resolver_match.url_name == 'integrations_overview' or request.resolver_match.url_name == 'companies_house_config' or request.resolver_match.url_name == 'resellerclub_debug' or request.resolver_match.url_name == 'resellerclub_hub' or request.resolver_match.url_name == 'template_scan' or request.resolver_match.url_name == 'security' or request.resolver_match.url_name == 'database' or request.resolver_match.url_name == 'settings_overview' or request.resolver_match.url_name == 'settings_setup_step' or 'wizard' in request.resolver_match.url_name %}open{% endif %}>
+                <summary class="list-none cursor-pointer px-2 text-xs text-slate-300 uppercase tracking-wider font-semibold mb-1 flex items-center justify-between">
                     <span>System</span>
                     <span class="text-slate-600"><span class="admin-nav-plus">+</span><span class="admin-nav-minus">-</span></span>
                 </summary>
@@ -248,6 +248,11 @@
                           <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h8M8 11h5m-7 8h12a2 2 0 002-2V7a2 2 0 00-2-2h-3.586a1 1 0 01-.707-.293l-1.414-1.414a1 1 0 00-.707-.293H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                           Companies House Config
                      </a>
+                <a href="{% url 'admin_tools:resellerclub_hub' %}"
+                   class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition-colors {% if request.resolver_match.url_name == 'resellerclub_hub' %}bg-slate-800 text-white{% endif %}">
+                    <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"/></svg>
+                    ResellerClub inventory
+                </a>
                 <a href="{% url 'admin_tools:resellerclub_debug' %}"
                    class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition-colors {% if request.resolver_match.url_name == 'resellerclub_debug' %}bg-slate-800 text-white{% endif %}">
                     <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 3h4.5M6 7.5h12M7.5 21h9a2.25 2.25 0 002.25-2.25V9.75a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 005.25 9.75v9A2.25 2.25 0 007.5 21zm2.25-7.5h4.5"/></svg>
@@ -283,7 +288,7 @@
 
             <!-- External -->
             <details class="admin-nav-section mb-3">
-                <summary class="list-none cursor-pointer px-2 text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1 flex items-center justify-between">
+                <summary class="list-none cursor-pointer px-2 text-xs text-slate-300 uppercase tracking-wider font-semibold mb-1 flex items-center justify-between">
                     <span>External</span>
                     <span class="text-slate-600"><span class="admin-nav-plus">+</span><span class="admin-nav-minus">-</span></span>
                 </summary>

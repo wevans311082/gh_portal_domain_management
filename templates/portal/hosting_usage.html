@@ -1,40 +1,101 @@
 {% extends "base_portal.html" %}
-{% block title %}Hosting Usage · {{ service.package.name }} · {{ SITE_NAME }}{% endblock %}
-{% block page_title %}Hosting Usage — {{ service.domain_name|default:service.package.name }}{% endblock %}
+{% block title %}Hosting Usage · {{ service.package.get_display_name }} · {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Hosting usage — {{ service.domain_name|default:service.package.get_display_name }}{% endblock %}
+{% block header_actions %}
+<a href="{% url 'portal:hosting_manage' service.pk %}" class="btn-secondary text-xs">Manage package</a>
+{% endblock %}
 {% block content %}
-<div class="max-w-2xl space-y-6">
-  <div class="grid grid-cols-2 gap-4">
+<div class="max-w-5xl space-y-6">
+  {% if stats_errors %}
+  <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+    Some WHM stats could not be loaded: {{ stats_errors|join:" · " }}
+  </div>
+  {% endif %}
+
+  <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
     <div class="bg-white rounded-xl border border-slate-200 p-5">
-      <p class="text-xs text-slate-500 uppercase tracking-wide mb-1">Disk Used</p>
-      {% if quota.bytesused %}
-      <p class="text-2xl font-bold text-slate-900">{{ quota.bytesused|filesizeformat }}</p>
-      {% if quota.bytelimit and quota.bytelimit != "unlimited" %}
-      <p class="text-xs text-slate-400 mt-1">of {{ quota.bytelimit|filesizeformat }}</p>
-      {% else %}
-      <p class="text-xs text-slate-400 mt-1">Unlimited quota</p>
-      {% endif %}
-      {% else %}
-      <p class="text-slate-400 text-sm">Unavailable</p>
-      {% endif %}
+      <p class="text-xs text-slate-500 uppercase tracking-wide mb-1">Disk</p>
+      <p class="text-2xl font-bold text-slate-900">{{ disk_used_mb|floatformat:1 }} MB</p>
+      <p class="text-xs text-slate-400 mt-1">{% if disk_limit_mb %}of {{ disk_limit_mb|floatformat:0 }} MB{% else %}Unlimited{% endif %}</p>
+      <div class="mt-3 h-2 rounded-full bg-slate-100 overflow-hidden">
+        <div class="h-full {% if disk_percent > 90 %}bg-red-500{% elif disk_percent > 70 %}bg-amber-500{% else %}bg-sky-500{% endif %}" style="width: {{ disk_percent }}%"></div>
+      </div>
+      <p class="text-xs text-slate-500 mt-1">{{ disk_percent }}% used</p>
     </div>
     <div class="bg-white rounded-xl border border-slate-200 p-5">
-      <p class="text-xs text-slate-500 uppercase tracking-wide mb-1">cPanel User</p>
-      <p class="text-lg font-semibold text-slate-800 font-mono">{{ service.cpanel_username|default:"—" }}</p>
+      <p class="text-xs text-slate-500 uppercase tracking-wide mb-1">Bandwidth</p>
+      <p class="text-2xl font-bold text-slate-900">{{ bw_used_mb|floatformat:1 }} MB</p>
+      <p class="text-xs text-slate-400 mt-1">{% if bw_limit_mb %}of {{ bw_limit_mb|floatformat:0 }} MB{% else %}Unlimited{% endif %}</p>
+      <div class="mt-3 h-2 rounded-full bg-slate-100 overflow-hidden">
+        <div class="h-full {% if bw_percent > 90 %}bg-red-500{% elif bw_percent > 70 %}bg-amber-500{% else %}bg-emerald-500{% endif %}" style="width: {{ bw_percent }}%"></div>
+      </div>
+      <p class="text-xs text-slate-500 mt-1">{{ bw_percent }}% used</p>
+    </div>
+    <div class="bg-white rounded-xl border border-slate-200 p-5">
+      <p class="text-xs text-slate-500 uppercase tracking-wide mb-1">Email accounts</p>
+      <p class="text-2xl font-bold text-slate-900">{{ email_count }}</p>
+      <p class="text-xs text-slate-400 mt-1">{% if email_limit %}of {{ email_limit }}{% else %}package default{% endif %}</p>
+    </div>
+    <div class="bg-white rounded-xl border border-slate-200 p-5">
+      <p class="text-xs text-slate-500 uppercase tracking-wide mb-1">Databases</p>
+      <p class="text-2xl font-bold text-slate-900">{{ database_count }}</p>
+      <p class="text-xs text-slate-400 mt-1">{% if database_limit %}of {{ database_limit }}{% else %}package default{% endif %}</p>
     </div>
   </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div class="bg-white rounded-xl border border-slate-200 p-5">
+      <h2 class="text-sm font-semibold text-slate-700 mb-3">Account</h2>
+      <dl class="text-sm space-y-2">
+        <div class="flex justify-between"><dt class="text-slate-500">Package</dt><dd class="font-medium">{{ service.package.get_display_name }}</dd></div>
+        <div class="flex justify-between"><dt class="text-slate-500">WHM plan</dt><dd class="font-mono text-xs">{{ service.package.whm_package_name|default:service.package.name }}</dd></div>
+        <div class="flex justify-between"><dt class="text-slate-500">cPanel user</dt><dd class="font-mono">{{ service.cpanel_username|default:"—" }}</dd></div>
+        <div class="flex justify-between"><dt class="text-slate-500">Domain</dt><dd>{{ service.domain_name|default:"—" }}</dd></div>
+        <div class="flex justify-between"><dt class="text-slate-500">Status</dt><dd class="capitalize">{{ service.get_status_display }}</dd></div>
+        <div class="flex justify-between"><dt class="text-slate-500">Next due</dt><dd>{{ service.next_due_date|default:"—" }}</dd></div>
+      </dl>
+    </div>
+    <div class="bg-white rounded-xl border border-slate-200 p-5">
+      <h2 class="text-sm font-semibold text-slate-700 mb-3">Usage snapshot</h2>
+      <div class="space-y-4">
+        <div>
+          <div class="flex justify-between text-xs text-slate-500 mb-1"><span>Disk</span><span>{{ disk_percent }}%</span></div>
+          <div class="h-8 flex items-end rounded bg-slate-50 overflow-hidden">
+            <div class="bg-sky-500 h-full" style="width: {{ disk_percent }}%"></div>
+          </div>
+        </div>
+        <div>
+          <div class="flex justify-between text-xs text-slate-500 mb-1"><span>Bandwidth</span><span>{{ bw_percent }}%</span></div>
+          <div class="h-8 flex items-end rounded bg-slate-50 overflow-hidden">
+            <div class="bg-emerald-500 h-full" style="width: {{ bw_percent }}%"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if emails %}
+  <div class="bg-white rounded-xl border border-slate-200 p-5">
+    <h2 class="text-sm font-semibold text-slate-700 mb-3">Email accounts</h2>
+    <ul class="divide-y divide-slate-100 text-sm">
+      {% for box in emails|slice:":12" %}
+      <li class="py-2 flex justify-between">
+        <span class="font-mono">{{ box.user|default:box.email }}{% if box.domain %}@{{ box.domain }}{% endif %}</span>
+        <span class="text-slate-500">{{ box.diskusedmb|default:box.humandiskused|default:"" }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
 
   <div class="bg-white rounded-xl border border-slate-200 p-5">
     <h2 class="text-sm font-semibold text-slate-700 mb-3">Actions</h2>
     <div class="flex flex-wrap gap-3">
       {% if service.cpanel_username %}
-      <a href="{% url 'portal:hosting_sso' service_pk=service.pk %}"
-         class="px-4 py-2 rounded-lg bg-sky-600 text-white text-sm font-medium hover:bg-sky-700">
-        Open cPanel →
-      </a>
+      <a href="{% url 'portal:hosting_sso' service_pk=service.pk %}" class="px-4 py-2 rounded-lg bg-sky-600 text-white text-sm font-medium hover:bg-sky-700">Open cPanel</a>
       {% endif %}
-      <a href="{% url 'portal:my_services' %}" class="px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">
-        ← My Services
-      </a>
+      <a href="{% url 'portal:hosting_manage' service.pk %}" class="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700">Upgrade / manage</a>
+      <a href="{% url 'portal:my_services' %}" class="px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">My hosting</a>
     </div>
   </div>
 </div>

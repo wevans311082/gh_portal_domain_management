@@ -15,12 +15,14 @@ urlpatterns = [
     path("cart/checkout/invoice/", views.cart_checkout_invoice, name="cart_checkout_invoice"),
     path("cart/checkout/quote/", views.cart_checkout_quote, name="cart_checkout_quote"),
     path("services/", views.my_services, name="my_services"),
+    path("subscriptions/", views.subscriptions, name="subscriptions"),
     path("quotes/", views.my_quotes, name="my_quotes"),
     path("statement/", views.account_statement, name="account_statement"),
     path("notifications/", views.notification_preferences, name="notification_preferences"),
     # Phase 6: Hosting self-service
     path("services/<int:service_pk>/sso/", views.hosting_sso, name="hosting_sso"),
     path("services/<int:service_pk>/usage/", views.hosting_usage, name="hosting_usage"),
+    path("services/<int:service_pk>/manage/", views.hosting_manage, name="hosting_manage"),
     # Phase 7: Promo codes
     path("cart/promo/", views.apply_promo_code, name="apply_promo_code"),
     # Phase 8: Security / privacy

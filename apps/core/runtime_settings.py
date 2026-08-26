@@ -18,18 +18,30 @@ def _from_db(key: str):
         return _SENTINEL
 
 
+def get_runtime_setting_with_source(key: str, default=""):
+    """Return ``(value, source)`` where source is database, environment, or default."""
+    db_value = _from_db(key)
+    if db_value is not _SENTINEL:
+        return db_value, "database"
+
+    if hasattr(settings, key):
+        value = getattr(settings, key)
+        if value not in (None, ""):
+            return value, "environment"
+        if default not in (None, ""):
+            return default, "default"
+        return value, "environment"
+
+    return default, "default"
+
+
 def get_runtime_setting(key: str, default=""):
     cache_key = f"runtime_setting:{key}"
     cached = cache.get(cache_key, _SENTINEL)
     if cached is not _SENTINEL:
         return cached
 
-    db_value = _from_db(key)
-    if db_value is not _SENTINEL:
-        cache.set(cache_key, db_value, timeout=_CACHE_TTL)
-        return db_value
-
-    value = getattr(settings, key, default)
+    value, _source = get_runtime_setting_with_source(key, default)
     cache.set(cache_key, value, timeout=_CACHE_TTL)
     return value
 

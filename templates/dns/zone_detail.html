@@ -35,14 +35,15 @@
 
   {% if not zone %}
   <div class="rounded-lg border-2 border-dashed border-gray-300 bg-white p-12 text-center">
-    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-            d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"/>
-    </svg>
     <h3 class="mt-4 text-sm font-semibold text-gray-900">No DNS zone configured</h3>
     <p class="mt-1 text-sm text-gray-500">
-      DNS management is not yet available for this domain. The zone will be created automatically after your domain is provisioned.
+      Create a zone and import records from WHM, ResellerClub, or Cloudflare.
     </p>
+    <form method="post" class="mt-4">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="ensure_zone">
+      <button class="inline-flex items-center gap-2 rounded-md bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-500">Create zone and import records</button>
+    </form>
   </div>
   {% else %}
 
@@ -74,6 +75,11 @@
       <p class="mt-0.5 text-sm text-gray-700">{{ zone.last_synced|date:"d M Y H:i" }}</p>
     </div>
     {% endif %}
+    <form method="post" class="ml-auto">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="refresh">
+      <button class="text-sm text-sky-700 hover:underline font-medium">Refresh from provider</button>
+    </form>
   </div>
 
   <!-- Records table -->

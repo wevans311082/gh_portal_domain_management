@@ -1,4 +1,4 @@
-﻿"""Domain management views."""
+"""Domain management views."""
 from decimal import Decimal
 import logging
 import re
@@ -228,7 +228,8 @@ def domain_search(request):
         }
         for tld in active_tlds
     ]
-    return render(request, "domains/search.html", {"popular_tlds": active_tlds, "featured_tlds": featured_tlds})
+    template = "portal/domain_search.html" if request.user.is_authenticated else "domains/search.html"
+    return render(request, template, {"popular_tlds": active_tlds, "featured_tlds": featured_tlds})
 
 
 @require_GET
@@ -535,7 +536,7 @@ def domain_register(request):
 
 @login_required
 def my_domains(request):
-    """Client portal: list user's domains â€" paginated."""
+    """Client portal: list user's domains, paginated."""
     from django.core.paginator import Paginator
     qs = Domain.objects.filter(user=request.user).select_related("order__registration_contact").order_by("name")
     paginator = Paginator(qs, 20)
@@ -551,7 +552,34 @@ def domain_detail(request, pk):
         pk=pk,
         user=request.user,
     )
-    return render(request, "domains/domain_detail.html", {"domain": domain})
+    from apps.products.models import Package
+    from apps.services.models import Service
+    from apps.domains.models import TLDPricing
+
+    hosting = (
+        Service.objects.filter(user=request.user, domain_name__iexact=domain.name)
+        .select_related("package")
+        .first()
+    )
+    pricing = TLDPricing.objects.filter(tld=domain.tld, is_active=True).first()
+    whm_nameservers = []
+    try:
+        from apps.provisioning.whm_client import WHMClient
+
+        whm_nameservers = WHMClient().get_nameservers()
+    except Exception:
+        whm_nameservers = []
+    return render(
+        request,
+        "domains/domain_detail.html",
+        {
+            "domain": domain,
+            "hosting": hosting,
+            "pricing": pricing,
+            "whm_nameservers": whm_nameservers,
+            "upgrade_packages": Package.objects.filter(is_active=True).order_by("price_monthly"),
+        },
+    )
 
 
 @login_required
@@ -570,8 +598,8 @@ def domain_renew(request, pk):
     """
     Customer-facing renewal checkout.
 
-    GET  â€" show a confirmation page with the renewal price.
-    POST â€" create a DomainRenewal + Invoice, redirect to Stripe checkout.
+    GET  - show a confirmation page with the renewal price.
+    POST - create a DomainRenewal + Invoice, redirect to Stripe checkout.
     """
     domain = get_object_or_404(Domain, pk=pk, user=request.user)
 
@@ -819,10 +847,19 @@ def domain_update_nameservers(request, pk):
         return redirect("domains:detail", pk=pk)
 
     ns_list = []
-    for field in ("nameserver1", "nameserver2", "nameserver3", "nameserver4"):
-        val = (request.POST.get(field) or "").strip().lower()
-        if val:
-            ns_list.append(val)
+    if request.POST.get("action") == "use_whm":
+        from apps.provisioning.whm_client import WHMClient, WHMClientError
+
+        try:
+            ns_list = [host.strip().lower() for host in WHMClient().get_nameservers() if host]
+        except WHMClientError as exc:
+            messages.error(request, f"Could not load WHM nameservers: {exc}")
+            return redirect("domains:detail", pk=pk)
+    else:
+        for field in ("nameserver1", "nameserver2", "nameserver3", "nameserver4"):
+            val = (request.POST.get(field) or "").strip().lower()
+            if val:
+                ns_list.append(val)
 
     if len(ns_list) < 2:
         messages.error(request, "At least two nameservers are required.")
@@ -831,15 +868,30 @@ def domain_update_nameservers(request, pk):
     client = ResellerClubClient()
     try:
         client.modify_nameservers(domain.registrar_id, ns_list)
-        # Persist locally
         domain.nameserver1 = ns_list[0] if len(ns_list) > 0 else ""
         domain.nameserver2 = ns_list[1] if len(ns_list) > 1 else ""
         domain.nameserver3 = ns_list[2] if len(ns_list) > 2 else ""
         domain.nameserver4 = ns_list[3] if len(ns_list) > 3 else ""
         domain.save(update_fields=["nameserver1", "nameserver2", "nameserver3", "nameserver4", "updated_at"])
-        messages.success(request, f"Nameservers updated for {domain.name}.")
+        messages.success(request, f"Nameservers updated at the registrar for {domain.name}.")
     except ResellerClubError as exc:
-        messages.error(request, f"Could not update nameservers: {exc}")
+        messages.error(request, f"Could not update registrar nameservers: {exc}")
+        return redirect("domains:detail", pk=pk)
+
+    from apps.services.models import Service
+    from apps.provisioning.whm_client import WHMClient, WHMClientError
+
+    hosted = Service.objects.filter(
+        user=request.user,
+        domain_name__iexact=domain.name,
+        status=Service.STATUS_ACTIVE,
+    ).exclude(cpanel_username="").first()
+    if hosted:
+        try:
+            WHMClient().modify_account_nameservers(hosted.cpanel_username, ns_list)
+            messages.success(request, f"WHM nameservers updated for {hosted.cpanel_username}.")
+        except WHMClientError as exc:
+            messages.warning(request, f"Registrar updated, but WHM nameserver update failed: {exc}")
 
     return redirect("domains:detail", pk=pk)
 

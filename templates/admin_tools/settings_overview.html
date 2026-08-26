@@ -5,10 +5,39 @@
 
 {% block content %}
 <p class="text-sm text-slate-500 mb-5">
-    Read-only view of application configuration. Secrets are redacted.
-    Use the configuration editor below for all setup-related values, or use <a href="{% url 'admin_tools:wizard_index' %}" class="text-sky-700 hover:underline">Setup Wizard</a>
-    for guided first-time onboarding.
+    Running configuration is shown first from the database (Admin Tools), then environment defaults.
+    Secrets are redacted. Use the configuration editor below, or the
+    <a href="{% url 'admin_tools:wizard_index' %}" class="text-sky-700 hover:underline">Setup Wizard</a>
+    for first-time onboarding.
 </p>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+        <h2 class="text-sm font-semibold text-slate-800 mb-1">Export backup</h2>
+        <p class="text-xs text-slate-500 mb-3">Download a password-protected zip of runtime integration settings (API keys included, encrypted with AES-256-GCM).</p>
+        <form method="post" action="{% url 'admin_tools:settings_export' %}" class="space-y-3">
+            {% csrf_token %}
+            <label class="block text-sm font-semibold text-slate-700">Password (min 8 characters)
+                <input type="password" name="backup_password" minlength="8" required class="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm">
+            </label>
+            <button class="px-4 py-2 rounded-lg bg-slate-800 text-white text-sm font-semibold hover:bg-slate-900">Download encrypted zip</button>
+        </form>
+    </div>
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+        <h2 class="text-sm font-semibold text-slate-800 mb-1">Import backup</h2>
+        <p class="text-xs text-slate-500 mb-3">Restore settings from a zip exported here. This overwrites matching keys.</p>
+        <form method="post" action="{% url 'admin_tools:settings_import' %}" enctype="multipart/form-data" class="space-y-3">
+            {% csrf_token %}
+            <label class="block text-sm font-semibold text-slate-700">Backup zip
+                <input type="file" name="backup_file" accept=".zip" required class="mt-1 w-full text-sm">
+            </label>
+            <label class="block text-sm font-semibold text-slate-700">Password
+                <input type="password" name="backup_password" minlength="8" required class="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm">
+            </label>
+            <button class="px-4 py-2 rounded-lg bg-sky-600 text-white text-sm font-semibold hover:bg-sky-700">Import settings</button>
+        </form>
+    </div>
+</div>
 
 <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 mb-5">
     <div class="flex items-center justify-between gap-3 mb-4">
@@ -31,9 +60,7 @@
 <div class="mb-5 rounded-xl border border-cyan-200 bg-cyan-50 p-4 flex items-center justify-between gap-4">
     <div>
         <p class="text-sm font-semibold text-cyan-950">Microsoft 365 Graph Mail</p>
-        <p class="text-xs text-cyan-800">
-            Configure outbound email through CyberAsk's Microsoft 365 shared mailboxes.
-        </p>
+        <p class="text-xs text-cyan-800">Configure outbound email through CyberAsk's Microsoft 365 shared mailboxes.</p>
     </div>
     <a href="{% url 'admin_tools:m365_graph_config' %}" class="px-4 py-2 rounded-lg bg-cyan-600 text-white text-sm font-semibold hover:bg-cyan-700">Open M365 Mail Config</a>
 </div>
@@ -43,7 +70,7 @@
         <p class="text-sm font-semibold {% if has_companies_house_key %}text-emerald-800{% else %}text-amber-800{% endif %}">UK Companies House API</p>
         <p class="text-xs {% if has_companies_house_key %}text-emerald-700{% else %}text-amber-700{% endif %}">
             {% if has_companies_house_key %}
-            API key detected. You can run test lookups and manage this integration.
+            API key detected in running config. Use the config page to test lookups.
             {% else %}
             API key missing. User company validation and company lookup will fail until configured.
             {% endif %}
@@ -61,25 +88,25 @@
         <div class="overflow-x-auto">
         <table class="w-full text-sm">
             <tbody class="divide-y divide-slate-100">
-                {% for key, value in values.items %}
+                {% for key, item in values.items %}
                 <tr class="hover:bg-slate-50 transition-colors">
                     <td class="px-5 py-3 font-mono text-xs font-semibold text-slate-700 w-64 align-top">{{ key }}</td>
                     <td class="px-5 py-3 text-xs text-slate-600 break-all">
-                        {% if "redacted" in value|stringformat:"s" %}
-                        <span class="text-slate-400 italic">{{ value }}</span>
-                        {% elif value == True %}
-                        <span class="inline-flex items-center gap-1 text-emerald-700 font-medium">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                            True
-                        </span>
-                        {% elif value == False %}
-                        <span class="inline-flex items-center gap-1 text-red-600 font-medium">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                            False
-                        </span>
+                        {% if item.value == True %}
+                        <span class="inline-flex items-center gap-1 text-emerald-700 font-medium">True</span>
+                        {% elif item.value == False %}
+                        <span class="inline-flex items-center gap-1 text-red-600 font-medium">False</span>
                         {% else %}
-                        <span class="font-mono">{{ value }}</span>
+                        <span class="font-mono">{{ item.value }}</span>
                         {% endif %}
+                    </td>
+                    <td class="px-5 py-3 text-right w-36">
+                        <span class="inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold
+                            {% if item.source == 'database' %}bg-emerald-100 text-emerald-800
+                            {% elif item.source == 'environment' %}bg-sky-100 text-sky-800
+                            {% else %}bg-slate-100 text-slate-600{% endif %}">
+                            {{ item.source }}
+                        </span>
                     </td>
                 </tr>
                 {% endfor %}
@@ -92,7 +119,7 @@
 
 <div class="mt-5 bg-amber-50 border border-amber-200 rounded-xl p-4">
     <p class="text-xs text-amber-700 font-medium">
-        ⚠️ This page is for authorised admin use only. Do not share screenshots containing configuration details.
+        This page is for authorised admin use only. Do not share screenshots containing configuration details.
         Secrets are redacted above but ensure your browser history and sessions are secure.
     </p>
 </div>

@@ -37,7 +37,7 @@
                 <div class="flex items-center gap-4 md:text-right">
                     <div>
                         <p class="text-xs uppercase tracking-wide text-slate-400">Line total</p>
-                        <p class="text-lg font-semibold text-slate-900">Â£{{ item.line_total }}</p>
+                        <p class="text-lg font-semibold text-slate-900">£{{ item.line_total }}</p>
                     </div>
                     <form method="post" action="{% url 'portal:cart_remove_item' pk=item.pk %}">
                         {% csrf_token %}
@@ -62,7 +62,7 @@
             <div class="flex items-end justify-between gap-4">
                 <div>
                     <p class="text-sm text-slate-300">Subtotal</p>
-                    <p class="text-3xl font-semibold">Â£{{ cart.subtotal }}</p>
+                    <p class="text-3xl font-semibold">£{{ cart.subtotal }}</p>
                 </div>
                 <p class="text-xs text-slate-400">Taxes are applied by the invoice or quote rules.</p>
             </div>

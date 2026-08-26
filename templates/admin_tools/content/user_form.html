@@ -63,6 +63,27 @@
       </div>
     </div>
   </section>
+  {% else %}
+  <section class="space-y-4">
+    <h3 class="text-sm font-semibold text-slate-800 uppercase tracking-wide">Password</h3>
+    <p class="text-sm text-slate-500">Set a new password, or send the user a reset email.</p>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-semibold text-slate-700 mb-1" for="{{ form.new_password1.id_for_label }}">New password</label>
+        {{ form.new_password1 }}
+        {% if form.new_password1.help_text %}<p class="text-xs text-slate-500 mt-1">{{ form.new_password1.help_text }}</p>{% endif %}
+        {{ form.new_password1.errors }}
+      </div>
+      <div>
+        <label class="block text-sm font-semibold text-slate-700 mb-1" for="{{ form.new_password2.id_for_label }}">Confirm new password</label>
+        {{ form.new_password2 }}
+        {{ form.new_password2.errors }}
+      </div>
+    </div>
+    <label class="inline-flex items-center gap-2 text-sm text-slate-700">
+      {{ form.sync_cpanel_password }} {{ form.sync_cpanel_password.label }}
+    </label>
+  </section>
   {% endif %}
 
   <section class="space-y-4">
@@ -109,11 +130,18 @@
     </div>
   </section>
 
-  <div class="pt-3 border-t border-slate-200">
+  <div class="pt-3 border-t border-slate-200 flex flex-wrap items-center gap-3">
     <button class="px-4 py-2 rounded bg-sky-600 text-white font-semibold hover:bg-sky-700">{% if mode == 'create' %}Create user{% else %}Save user{% endif %}</button>
-    <a href="{% url 'admin_tools:users' %}" class="ml-3 text-sm text-slate-500 hover:text-slate-700">Back</a>
+    <a href="{% url 'admin_tools:users' %}" class="text-sm text-slate-500 hover:text-slate-700">Back</a>
   </div>
 </form>
+{% if mode == 'edit' and obj %}
+<form method="post" class="mt-4">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="send_password_reset">
+  <button class="px-4 py-2 rounded border border-slate-300 text-sm font-semibold text-slate-700 hover:bg-slate-50">Send password reset email</button>
+</form>
+{% endif %}
 
 <script>
   (function () {

@@ -58,6 +58,41 @@ class ProfileUpdateForm(forms.ModelForm):
         model = ClientProfile
         fields = ["address_line1", "address_line2", "city", "county", "postcode", "country", "vat_number"]
 
+
+class PasswordChangePortalForm(forms.Form):
+    current_password = forms.CharField(widget=forms.PasswordInput, label="Current password")
+    new_password1 = forms.CharField(widget=forms.PasswordInput, label="New password")
+    new_password2 = forms.CharField(widget=forms.PasswordInput, label="Confirm new password")
+    sync_cpanel = forms.BooleanField(
+        required=False,
+        initial=True,
+        label="Also update my cPanel hosting password",
+    )
+
+    def __init__(self, user, *args, **kwargs):
+        self.user = user
+        super().__init__(*args, **kwargs)
+
+    def clean_current_password(self):
+        current = self.cleaned_data.get("current_password")
+        if not self.user.check_password(current):
+            raise forms.ValidationError("Current password is incorrect.")
+        return current
+
+    def clean_new_password1(self):
+        password = self.cleaned_data.get("new_password1")
+        if password:
+            validate_password(password, user=self.user)
+        return password
+
+    def clean(self):
+        cleaned = super().clean()
+        p1 = cleaned.get("new_password1")
+        p2 = cleaned.get("new_password2")
+        if p1 and p2 and p1 != p2:
+            self.add_error("new_password2", "Passwords don't match.")
+        return cleaned
+
     def clean_postcode(self):
         postcode = self.cleaned_data.get("postcode", "").strip().upper()
         return postcode

@@ -66,8 +66,8 @@
             <tr>
                 <td>{{ item.description }}</td>
                 <td style="text-align: right;">{{ item.quantity }}</td>
-                <td style="text-align: right;">Â£{{ item.unit_price }}</td>
-                <td style="text-align: right;">Â£{{ item.line_total }}</td>
+                <td style="text-align: right;">£{{ item.unit_price }}</td>
+                <td style="text-align: right;">£{{ item.line_total }}</td>
             </tr>
             {% endfor %}
         </tbody>
@@ -76,17 +76,17 @@
     <table class="totals" style="margin-top: 10px;">
         <tr>
             <td>Subtotal</td>
-            <td style="text-align: right;">Â£{{ invoice.subtotal }}</td>
+            <td style="text-align: right;">£{{ invoice.subtotal }}</td>
         </tr>
         {% if invoice.vat_amount %}
         <tr>
             <td>VAT ({{ invoice.vat_rate }}%)</td>
-            <td style="text-align: right;">Â£{{ invoice.vat_amount }}</td>
+            <td style="text-align: right;">£{{ invoice.vat_amount }}</td>
         </tr>
         {% endif %}
         <tr class="total-row">
             <td>Total</td>
-            <td style="text-align: right;">Â£{{ invoice.total }}</td>
+            <td style="text-align: right;">£{{ invoice.total }}</td>
         </tr>
     </table>
 

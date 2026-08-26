@@ -114,7 +114,14 @@ body {
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: #94a3b8; /* slate-400 — readable on dark */
+    color: #cbd5e1; /* slate-300 — readable on dark */
+}
+.admin-nav-section > summary {
+    color: #cbd5e1 !important;
+}
+.admin-nav-section > summary .admin-nav-plus,
+.admin-nav-section > summary .admin-nav-minus {
+    color: #94a3b8 !important;
 }
 .portal-nav-link {
     display: flex;

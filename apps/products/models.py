@@ -5,6 +5,11 @@ from apps.provisioning.providers import PROVIDER_CHOICES, PROVIDER_WHM
 
 class Package(TimeStampedModel):
     name = models.CharField(max_length=100)
+    display_name = models.CharField(
+        max_length=120,
+        blank=True,
+        help_text="Customer-facing name. Falls back to name when blank.",
+    )
     slug = models.SlugField(unique=True)
     description = models.TextField(blank=True)
     price_monthly = models.DecimalField(max_digits=10, decimal_places=2)
@@ -67,7 +72,10 @@ class Package(TimeStampedModel):
         ordering = ["card_sort_order", "sort_order", "price_monthly"]
 
     def __str__(self):
-        return self.name
+        return self.get_display_name()
+
+    def get_display_name(self):
+        return (self.display_name or "").strip() or self.name
 
     def get_features(self):
         return self.features.filter(is_active=True)

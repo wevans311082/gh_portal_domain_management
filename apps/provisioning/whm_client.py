@@ -120,6 +120,38 @@ class WHMClient:
         """Get disk usage for a cPanel account."""
         return self._call("showbw", {"searchtype": "user", "search": username})
 
+    def dump_zone(self, domain: str) -> list[dict]:
+        """Return WHM zone records for *domain* (best-effort parse)."""
+        data = self._call("dumpzone", {"domain": domain})
+        payload = data.get("data") if isinstance(data.get("data"), dict) else data
+        records: list[dict] = []
+        zone_blocks = []
+        if isinstance(payload, dict):
+            zone_blocks = payload.get("zone") or payload.get("zones") or []
+        if isinstance(payload, list):
+            zone_blocks = payload
+        if not isinstance(zone_blocks, list):
+            zone_blocks = [zone_blocks] if zone_blocks else []
+        for block in zone_blocks:
+            items = block
+            if isinstance(block, dict):
+                items = block.get("record") or block.get("records") or []
+            if not isinstance(items, list):
+                continue
+            for item in items:
+                if isinstance(item, dict):
+                    records.append(item)
+        return records
+
+    def modify_account_nameservers(self, username: str, nameservers: list[str]) -> dict:
+        """Best-effort update of account nameserver fields via modifyacct."""
+        params = {"user": username}
+        for idx, host in enumerate(nameservers[:4], start=1):
+            host = str(host or "").strip()
+            if host:
+                params[f"ns{idx}"] = host
+        return self._call("modifyacct", params)
+
     def list_accounts(self, columns: list[str] | None = None) -> list:
         """List cPanel accounts, optionally requesting only specific columns."""
         params = None
@@ -436,6 +468,73 @@ class WHMClient:
         if not url:
             raise WHMClientError("WHM did not return a session URL.")
         return url
+
+    def collect_account_stats(self, cpanel_username: str) -> dict:
+        """Gather disk, bandwidth, email, and database stats for a cPanel user."""
+        stats = {
+            "quota": {},
+            "summary": {},
+            "bandwidth": {},
+            "emails": [],
+            "databases": [],
+            "errors": [],
+        }
+        try:
+            stats["quota"] = self.get_quota(cpanel_username) or {}
+        except WHMClientError as exc:
+            stats["errors"].append(f"Quota: {exc}")
+        try:
+            summary = self.get_account_summary(cpanel_username)
+            payload = summary.get("data") if isinstance(summary.get("data"), dict) else summary
+            acct = payload.get("acct") if isinstance(payload, dict) else None
+            if isinstance(acct, list) and acct:
+                stats["summary"] = acct[0] if isinstance(acct[0], dict) else {}
+            elif isinstance(acct, dict):
+                stats["summary"] = acct
+            elif isinstance(payload, dict):
+                stats["summary"] = payload
+        except WHMClientError as exc:
+            stats["errors"].append(f"Account summary: {exc}")
+        try:
+            bw = self.get_disk_usage(cpanel_username)
+            payload = bw.get("data") if isinstance(bw.get("data"), dict) else bw
+            acct = payload.get("acct") if isinstance(payload, dict) else None
+            if isinstance(acct, list) and acct:
+                stats["bandwidth"] = acct[0] if isinstance(acct[0], dict) else {}
+            elif isinstance(acct, dict):
+                stats["bandwidth"] = acct
+            elif isinstance(payload, dict):
+                stats["bandwidth"] = payload
+        except WHMClientError as exc:
+            stats["errors"].append(f"Bandwidth: {exc}")
+        try:
+            stats["emails"] = self.list_email_accounts(cpanel_username) or []
+        except WHMClientError as exc:
+            stats["errors"].append(f"Email: {exc}")
+        try:
+            stats["databases"] = self.list_databases(cpanel_username) or []
+        except WHMClientError as exc:
+            stats["errors"].append(f"Databases: {exc}")
+        return stats
+
+
+def sync_user_cpanel_passwords(user, password: str) -> tuple[int, list[str]]:
+    """Update cPanel passwords for all active hosting services owned by *user*."""
+    from apps.services.models import Service
+
+    updated = 0
+    errors: list[str] = []
+    services = Service.objects.filter(user=user, status=Service.STATUS_ACTIVE).exclude(cpanel_username="")
+    if not services.exists():
+        return 0, []
+    client = WHMClient()
+    for service in services:
+        try:
+            client.change_password(service.cpanel_username, password)
+            updated += 1
+        except WHMClientError as exc:
+            errors.append(f"{service.cpanel_username}: {exc}")
+    return updated, errors
 
 
 def generate_cpanel_username(domain: str, unique_suffix: str = "") -> str:
