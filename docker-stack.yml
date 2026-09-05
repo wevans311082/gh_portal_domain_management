@@ -46,7 +46,10 @@ services:
       - static_files:/app/staticfiles
       - media_files:/app/media
     networks:
-      - default
+      default:
+        aliases:
+          - web
+          - cyberask-domains
     deploy:
       placement:
         constraints:
