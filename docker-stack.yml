@@ -41,6 +41,10 @@ services:
       RUN_STARTUP_MIGRATIONS: "1"
       MIGRATION_LEADER: "1"
       RUN_COLLECTSTATIC: "1"
+      EMAIL_PORT: "587"
+      EMAIL_USE_TLS: "True"
+      WHM_PORT: "2087"
+      DJANGO_DEBUG: "False"
     command: ["python", "manage.py", "runserver", "0.0.0.0:7000"]
     volumes:
       - static_files:/app/staticfiles
@@ -50,6 +54,7 @@ services:
         aliases:
           - web
           - cyberask-domains
+      ca_public:
     deploy:
       placement:
         constraints:
@@ -61,6 +66,10 @@ services:
     image: cyberask-domains:local
     env_file:
       - .env
+    environment:
+      EMAIL_PORT: "587"
+      EMAIL_USE_TLS: "True"
+      WHM_PORT: "2087"
     command: ["celery", "-A", "cyberask_domains", "worker", "-l", "info"]
     volumes:
       - media_files:/app/media
@@ -75,6 +84,10 @@ services:
     image: cyberask-domains:local
     env_file:
       - .env
+    environment:
+      EMAIL_PORT: "587"
+      EMAIL_USE_TLS: "True"
+      WHM_PORT: "2087"
     command: ["celery", "-A", "cyberask_domains", "beat", "-l", "info"]
     networks:
       - default
