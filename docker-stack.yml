@@ -1,0 +1,123 @@
+# Swarm stack for Cyber Ask Domains portal.
+#   cd /opt/gh_portal_domain_management
+#   docker stack deploy -c docker-stack.yml domains
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: grumpy_portal
+      POSTGRES_USER: grumpy
+      POSTGRES_PASSWORD: grumpy_pass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - default
+    deploy:
+      placement:
+        constraints:
+          - node.hostname == caprod04
+      restart_policy:
+        condition: on-failure
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    networks:
+      - default
+    deploy:
+      placement:
+        constraints:
+          - node.hostname == caprod04
+
+  web:
+    image: cyberask-domains:local
+    env_file:
+      - .env
+    environment:
+      DJANGO_SETTINGS_MODULE: cyberask_domains.settings.development
+      RUN_STARTUP_MIGRATIONS: "1"
+      MIGRATION_LEADER: "1"
+      RUN_COLLECTSTATIC: "1"
+    command: ["python", "manage.py", "runserver", "0.0.0.0:7000"]
+    volumes:
+      - static_files:/app/staticfiles
+      - media_files:/app/media
+    networks:
+      - default
+    deploy:
+      placement:
+        constraints:
+          - node.hostname == caprod04
+      restart_policy:
+        condition: on-failure
+
+  celery:
+    image: cyberask-domains:local
+    env_file:
+      - .env
+    command: ["celery", "-A", "cyberask_domains", "worker", "-l", "info"]
+    volumes:
+      - media_files:/app/media
+    networks:
+      - default
+    deploy:
+      placement:
+        constraints:
+          - node.hostname == caprod04
+
+  celery-beat:
+    image: cyberask-domains:local
+    env_file:
+      - .env
+    command: ["celery", "-A", "cyberask_domains", "beat", "-l", "info"]
+    networks:
+      - default
+    deploy:
+      placement:
+        constraints:
+          - node.hostname == caprod04
+
+  nginx:
+    image: nginx:1.25-alpine
+    volumes:
+      - /opt/gh_portal_domain_management/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - /opt/gh_portal_domain_management/nginx/conf.d/sites:/etc/nginx/conf.d/sites:ro
+      - static_files:/app/staticfiles:ro
+      - media_files:/app/media:ro
+    networks:
+      - default
+      - ca_public
+    deploy:
+      placement:
+        constraints:
+          - node.hostname == caprod04
+      labels:
+        - "traefik.enable=true"
+        - "traefik.docker.network=ca_public"
+        - "traefik.http.routers.domains.rule=Host(`domains.cyberask.co.uk`) || Host(`portal.cyberask.co.uk`) || Host(`billing.cyberask.co.uk`)"
+        - "traefik.http.routers.domains.entrypoints=websecure"
+        - "traefik.http.routers.domains.tls=true"
+        - "traefik.http.routers.domains.tls.certresolver=letsencrypt"
+        - "traefik.http.services.domains.loadbalancer.server.port=780"
+
+networks:
+  default:
+  ca_public:
+    external: true
+
+volumes:
+  postgres_data:
+    external: true
+    name: gh_portal_domain_management_postgres_data
+  redis_data:
+    external: true
+    name: gh_portal_domain_management_redis_data
+  static_files:
+    external: true
+    name: gh_portal_domain_management_static_files
+  media_files:
+    external: true
+    name: gh_portal_domain_management_media_files
