@@ -67,6 +67,10 @@ NOTIFICATION_TEMPLATES = {
         "subject": "New reply on ticket #{ticket_id}",
         "template": "emails/support_ticket_reply.html",
     },
+    "registrar_low_balance": {
+        "subject": "Registrar balance low ({balance})",
+        "template": "emails/registrar_low_balance.html",
+    },
 }
 
 
@@ -103,7 +107,7 @@ def send_notification(
             pref = NotificationPreference.objects.filter(user=user, template_name=template_name).first()
             if pref is not None and not pref.enabled:
                 logger.info("Notification %s suppressed by preference for user %s", template_name, user.pk)
-                return
+                return True
         except Exception:  # pragma: no cover - DB may not be ready in tests
             pass
 
@@ -114,7 +118,7 @@ def send_notification(
     template_config = NOTIFICATION_TEMPLATES.get(template_name)
     if not template_config:
         logger.warning("Unknown notification template: %s", template_name)
-        return
+        return False
 
     subject_template = template_config["subject"]
     template_path = template_config["template"]
@@ -136,7 +140,7 @@ def send_notification(
 
     if not recipient:
         logger.warning("send_notification: no recipient for %s", template_name)
-        return
+        return False
 
     try:
         if db_template:
@@ -176,6 +180,7 @@ def send_notification(
             pass
 
         logger.info("Sent %s email to %s", template_name, recipient)
+        return True
     except Exception as exc:
         logger.error("Failed to send %s email to %s: %s", template_name, recipient, exc)
         try:
@@ -190,3 +195,4 @@ def send_notification(
             )
         except Exception:  # pragma: no cover
             pass
+        return False

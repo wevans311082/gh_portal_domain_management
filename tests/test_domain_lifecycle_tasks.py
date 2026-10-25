@@ -26,8 +26,9 @@ def test_send_domain_expiry_reminders_only_targets_matching_domains(django_user_
     )
     sent = []
 
-    def fake_send_notification(template_name, user, context=None):
+    def fake_send_notification(template_name, user, context=None, **kwargs):
         sent.append((template_name, user.email, context["domain"]))
+        return True
 
     monkeypatch.setattr("apps.notifications.services.send_notification", fake_send_notification)
 

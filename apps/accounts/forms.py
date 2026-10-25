@@ -1,12 +1,28 @@
 import re
 
+from allauth.account import app_settings
+from allauth.account.adapter import get_adapter
+from allauth.account.forms import ResetPasswordForm
 from django import forms
+from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 
 from .models import User, ClientProfile
 
 # E.164-compatible phone pattern (international or UK local)
 _PHONE_RE = re.compile(r"^\+?[\d\s\-\(\)]{7,20}$")
+
+
+class PortalResetPasswordForm(ResetPasswordForm):
+    """Find the account by email without requiring the stored case to match."""
+
+    def clean_email(self):
+        email = (self.cleaned_data.get("email") or "").strip().lower()
+        email = get_adapter().clean_email(email)
+        self.users = list(get_user_model().objects.filter(email__iexact=email, is_active=True))
+        if not self.users and not app_settings.PREVENT_ENUMERATION:
+            raise get_adapter().validation_error("unknown_email")
+        return email
 
 
 class RegistrationForm(forms.ModelForm):

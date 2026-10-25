@@ -383,12 +383,12 @@ def send_domain_expiry_reminders(days_before=30):
     from apps.notifications.services import send_notification
 
     for domain in domains:
-        send_notification(
+        if send_notification(
             template_name="domain_expiry_reminder",
             user=domain.user,
             context={"domain": domain.name, "expires_at": domain.expires_at, "days_before": days_before},
-        )
-        sent += 1
+        ):
+            sent += 1
     logger.info("Sent %s expiry reminder(s) for domains expiring in %s days", sent, days_before)
     return sent
 
@@ -727,11 +727,14 @@ def monitor_registrar_balance():
         staff_emails = list(User.objects.filter(is_staff=True, is_active=True).values_list("email", flat=True))
         for email in staff_emails:
             try:
-                send_notification(
-                    template_name="registrar_low_balance",
+                delivered = send_notification(
+                    "registrar_low_balance",
+                    None,
+                    {"balance": balance, "threshold": threshold},
                     recipient_email=email,
-                    context={"balance": balance, "threshold": threshold},
                 )
+                if not delivered:
+                    logger.warning("monitor_registrar_balance: notification was not delivered to %s", email)
             except Exception as exc:
                 logger.warning("monitor_registrar_balance: notification failed for %s: %s", email, exc)
         logger.warning(

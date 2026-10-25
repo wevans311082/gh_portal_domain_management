@@ -632,7 +632,7 @@ def email_document(
 
     user = document.user if document.user else _RecipientShim(recipient)
 
-    send_notification(
+    delivered = send_notification(
         kind,
         user,
         context=context,
@@ -640,6 +640,8 @@ def email_document(
         recipient_email=recipient,
         cc=list(cc) if cc else None,
     )
+    if not delivered:
+        raise RuntimeError(f"Email was not delivered to {recipient}. Check the email log.")
 
 
 class _RecipientShim:

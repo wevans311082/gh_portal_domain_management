@@ -17,10 +17,10 @@ CACHES = {
     }
 }
 
-# Lab convenience: if SMTP host is empty/placeholder, never blow up password reset
-# with socket.gaierror — log mail to the web container console instead.
-_email_host = (os.environ.get("EMAIL_HOST") or EMAIL_HOST or "").strip()  # noqa: F405
-_bad_hosts = {"", "smtp.example.com", "localhost.invalid"}
-if _email_host in _bad_hosts and not os.environ.get("M365_GRAPH_ENABLED", "").lower() in ("1", "true", "yes"):
-    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
-    M365_GRAPH_FALLBACK_EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+# Local runs may print mail to the console. Production swarm sets
+# EMAIL_ALLOW_CONSOLE_FALLBACK=false so a missing SMTP host cannot pretend
+# that password resets and customer mail were delivered. Database M365
+# settings are read by MicrosoftGraphEmailBackend; do not replace that backend
+# here or those settings are ignored.
+if "EMAIL_ALLOW_CONSOLE_FALLBACK" not in os.environ:
+    EMAIL_ALLOW_CONSOLE_FALLBACK = True  # noqa: F811

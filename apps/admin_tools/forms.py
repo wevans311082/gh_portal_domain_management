@@ -22,6 +22,7 @@ from apps.support.models import SupportTicket
 from apps.payments.models import Payment
 from apps.website_templates.models import WebsiteTemplate
 from apps.admin_tools.models import IntegrationSetting
+from apps.core.runtime_settings import get_runtime_bool, get_runtime_int, get_runtime_setting
 
 
 class Microsoft365GraphSettingsForm(forms.Form):
@@ -59,16 +60,21 @@ class Microsoft365GraphSettingsForm(forms.Form):
 
     @classmethod
     def initial_from_settings(cls):
+        """Show the value the running site uses: database, then environment."""
+        from django.conf import settings as django_settings
+
         data = {}
         for field_name, (setting_key, _is_secret) in cls.SETTING_MAP.items():
             if field_name == "client_secret":
                 data[field_name] = ""
                 continue
-            value = IntegrationSetting.get_value(setting_key, "")
+            env_default = getattr(django_settings, setting_key, "")
             if field_name in {"enabled", "save_to_sent_items"}:
-                data[field_name] = str(value).strip().lower() in {"1", "true", "yes", "on"}
+                data[field_name] = get_runtime_bool(setting_key, bool(env_default))
+            elif field_name == "timeout_seconds":
+                data[field_name] = get_runtime_int(setting_key, int(env_default or 15))
             else:
-                data[field_name] = value
+                data[field_name] = get_runtime_setting(setting_key, env_default or "")
         return data
 
     def save_settings(self):

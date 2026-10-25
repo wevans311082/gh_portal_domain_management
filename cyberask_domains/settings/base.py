@@ -212,10 +212,12 @@ WEBSITE_TEMPLATES_EXTRACTED_ROOT = env(
 )
 
 EMAIL_BACKEND = env("EMAIL_BACKEND", default="apps.notifications.email_backend.MicrosoftGraphEmailBackend")
-# Prefer console when SMTP is not configured (avoids socket.gaierror on password reset).
+# Console fallback must be explicit. The domains swarm sets this false so
+# unconfigured SMTP cannot report password resets and customer mail as sent.
+EMAIL_ALLOW_CONSOLE_FALLBACK = env.bool("EMAIL_ALLOW_CONSOLE_FALLBACK", default=False)
 M365_GRAPH_FALLBACK_EMAIL_BACKEND = env(
     "M365_GRAPH_FALLBACK_EMAIL_BACKEND",
-    default="django.core.mail.backends.console.EmailBackend",
+    default="django.core.mail.backends.smtp.EmailBackend",
 )
 M365_GRAPH_ENABLED = env.bool("M365_GRAPH_ENABLED", default=False)
 M365_GRAPH_TENANT_ID = env("M365_GRAPH_TENANT_ID", default="")
@@ -242,6 +244,10 @@ ACCOUNT_USERNAME_REQUIRED = False
 ACCOUNT_AUTHENTICATION_METHOD = "email"
 ACCOUNT_EMAIL_VERIFICATION = "mandatory"
 ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
+ACCOUNT_ADAPTER = "apps.accounts.adapter.PortalAccountAdapter"
+ACCOUNT_FORMS = {
+    "reset_password": "apps.accounts.forms.PortalResetPasswordForm",
+}
 LOGIN_URL = "/accounts/login/"
 LOGIN_REDIRECT_URL = "/portal/"
 LOGOUT_REDIRECT_URL = "/"

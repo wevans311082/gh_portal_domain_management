@@ -476,12 +476,15 @@ def m365_graph_config(request):
     else:
         form = Microsoft365GraphSettingsForm(initial=Microsoft365GraphSettingsForm.initial_from_settings())
 
+    from apps.notifications.email_backend import outbound_mail_mode
+
     return render(
         request,
         "admin_tools/m365_graph_config.html",
         {
             "form": form,
             "test_result": test_result,
+            "mail_mode": outbound_mail_mode(),
             "graph_docs_url": "https://learn.microsoft.com/en-us/graph/api/user-sendmail?view=graph-rest-1.0",
             "mailbox_scope_docs_url": "https://learn.microsoft.com/graph/auth-limit-mailbox-access",
         },

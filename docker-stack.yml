@@ -43,6 +43,7 @@ services:
       RUN_COLLECTSTATIC: "1"
       EMAIL_PORT: "587"
       EMAIL_USE_TLS: "True"
+      EMAIL_ALLOW_CONSOLE_FALLBACK: "False"
       WHM_PORT: "2087"
       DJANGO_DEBUG: "False"
     command: ["python", "manage.py", "runserver", "0.0.0.0:7000"]
@@ -69,6 +70,7 @@ services:
     environment:
       EMAIL_PORT: "587"
       EMAIL_USE_TLS: "True"
+      EMAIL_ALLOW_CONSOLE_FALLBACK: "False"
       WHM_PORT: "2087"
     command: ["celery", "-A", "cyberask_domains", "worker", "-l", "info"]
     volumes:
@@ -87,6 +89,7 @@ services:
     environment:
       EMAIL_PORT: "587"
       EMAIL_USE_TLS: "True"
+      EMAIL_ALLOW_CONSOLE_FALLBACK: "False"
       WHM_PORT: "2087"
     command: ["celery", "-A", "cyberask_domains", "beat", "-l", "info"]
     networks:

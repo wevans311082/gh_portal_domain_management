@@ -103,7 +103,7 @@ def send_dunning_reminders() -> int:
             continue
 
         try:
-            send_notification(
+            delivered = send_notification(
                 "invoice_overdue",
                 invoice.user,
                 {
@@ -113,6 +113,9 @@ def send_dunning_reminders() -> int:
                     "amount_outstanding": invoice.amount_outstanding,
                 },
             )
+            if not delivered:
+                logger.error("Dunning email was not delivered for invoice %s", invoice.number)
+                continue
             Invoice.objects.filter(pk=invoice.pk).update(last_dunning_sent_at=now)
             sent += 1
             logger.info(
