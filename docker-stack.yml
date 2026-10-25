@@ -41,6 +41,7 @@ services:
       RUN_STARTUP_MIGRATIONS: "1"
       MIGRATION_LEADER: "1"
       RUN_COLLECTSTATIC: "1"
+      EMAIL_BACKEND: apps.notifications.email_backend.MicrosoftGraphEmailBackend
       EMAIL_PORT: "587"
       EMAIL_USE_TLS: "True"
       EMAIL_ALLOW_CONSOLE_FALLBACK: "False"
@@ -68,6 +69,7 @@ services:
     env_file:
       - .env
     environment:
+      EMAIL_BACKEND: apps.notifications.email_backend.MicrosoftGraphEmailBackend
       EMAIL_PORT: "587"
       EMAIL_USE_TLS: "True"
       EMAIL_ALLOW_CONSOLE_FALLBACK: "False"
@@ -87,6 +89,7 @@ services:
     env_file:
       - .env
     environment:
+      EMAIL_BACKEND: apps.notifications.email_backend.MicrosoftGraphEmailBackend
       EMAIL_PORT: "587"
       EMAIL_USE_TLS: "True"
       EMAIL_ALLOW_CONSOLE_FALLBACK: "False"
