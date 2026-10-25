@@ -136,11 +136,29 @@
   </div>
 </form>
 {% if mode == 'edit' and obj %}
-<form method="post" class="mt-4">
-  {% csrf_token %}
-  <input type="hidden" name="action" value="send_password_reset">
-  <button class="px-4 py-2 rounded border border-slate-300 text-sm font-semibold text-slate-700 hover:bg-slate-50">Send password reset email</button>
-</form>
+<div class="mt-4 bg-white rounded-xl border border-slate-200 p-6 max-w-4xl space-y-4">
+  <h3 class="text-sm font-semibold text-slate-800 uppercase tracking-wide">Sign-in status</h3>
+  <p class="text-sm text-slate-600">
+    Email: {% if email_verified %}<span class="font-semibold text-emerald-700">Validated</span>{% else %}<span class="font-semibold text-amber-700">Not validated</span>{% endif %}
+    <span class="mx-2 text-slate-300">|</span>
+    Login: {% if can_login %}<span class="font-semibold text-emerald-700">Allowed</span>{% else %}<span class="font-semibold text-amber-700">Blocked</span>{% endif %}
+  </p>
+  <div class="flex flex-wrap gap-3">
+    <form method="post">{% csrf_token %}
+      <input type="hidden" name="action" value="send_password_reset">
+      <button class="px-4 py-2 rounded border border-slate-300 text-sm font-semibold text-slate-700 hover:bg-slate-50">Send password reset email</button>
+    </form>
+    <form method="post">{% csrf_token %}
+      <input type="hidden" name="action" value="mark_validated">
+      <button class="px-4 py-2 rounded border border-emerald-300 text-sm font-semibold text-emerald-800 hover:bg-emerald-50">Mark account validated</button>
+    </form>
+    <form method="post">{% csrf_token %}
+      <input type="hidden" name="action" value="allow_login">
+      <button class="px-4 py-2 rounded border border-sky-300 text-sm font-semibold text-sky-800 hover:bg-sky-50">OK to login</button>
+    </form>
+  </div>
+  <p class="text-xs text-slate-500">A password reset also sends a validation email when the account is not confirmed. OK to login marks the email validated and activates the account.</p>
+</div>
 {% endif %}
 
 <script>

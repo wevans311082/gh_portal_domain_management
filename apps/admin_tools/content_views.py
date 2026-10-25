@@ -54,27 +54,59 @@ def user_edit(request, pk):
             try:
                 from allauth.account.forms import ResetPasswordForm
 
+                from apps.accounts.verification import validation_email_notice
+
                 reset_form = ResetPasswordForm(data={"email": user.email})
                 if reset_form.is_valid():
                     reset_form.save(request)
-                    messages.success(request, f"Password reset email sent to {user.email}.")
+                    notice = validation_email_notice(request, user)
+                    messages.success(request, f"Password reset email sent to {user.email}.{notice}")
                 else:
                     messages.error(request, "Could not send a password reset email for this account.")
             except Exception as exc:
                 messages.error(request, f"Password reset email failed: {exc}")
             return redirect("admin_tools:user_edit", pk=user.pk)
 
+        if action == "mark_validated":
+            from apps.accounts.verification import mark_account_validated
+
+            mark_account_validated(user)
+            messages.success(request, f"{user.email} is validated and can sign in once the account is active.")
+            return redirect("admin_tools:user_edit", pk=user.pk)
+
+        if action == "allow_login":
+            from apps.accounts.verification import allow_account_login
+
+            allow_account_login(user)
+            messages.success(request, f"{user.email} is validated and allowed to log in.")
+            return redirect("admin_tools:user_edit", pk=user.pk)
+
         form = AdminUserUpdateForm(request.POST, instance=user)
         if form.is_valid():
             form.save()
             if form.cleaned_data.get("new_password1"):
-                messages.success(request, f"User {user.email} saved and password updated.")
+                from apps.accounts.verification import validation_email_notice
+
+                notice = validation_email_notice(request, user)
+                messages.success(request, f"User {user.email} saved and password updated.{notice}")
             else:
                 messages.success(request, f"User {user.email} saved.")
             return redirect("admin_tools:user_edit", pk=user.pk)
     else:
         form = AdminUserUpdateForm(instance=user)
-    return render(request, "admin_tools/content/user_form.html", {"form": form, "mode": "edit", "obj": user})
+    from apps.accounts.verification import can_login, email_is_verified
+
+    return render(
+        request,
+        "admin_tools/content/user_form.html",
+        {
+            "form": form,
+            "mode": "edit",
+            "obj": user,
+            "email_verified": email_is_verified(user),
+            "can_login": can_login(user),
+        },
+    )
 
 
 @staff_member_required

@@ -78,17 +78,31 @@ def _issue_support_login_code(request) -> str:
 # ──────────────────────────────────────────────────────────────────────────────
 
 def _email_is_verified(user) -> bool:
-    """Superusers and legacy users without an EmailAddress row may sign in."""
-    if getattr(user, "is_superuser", False):
-        return True
+    from apps.accounts.verification import email_is_verified
+
+    return email_is_verified(user)
+
+
+def _reject_unverified(request, user, next_url, support_email, support_code):
+    from apps.accounts.verification import validation_email_notice
+
     try:
-        from allauth.account.models import EmailAddress
+        validation_email_notice(request, user)
     except Exception:
-        return True
-    record = EmailAddress.objects.filter(user=user, email__iexact=user.email).first()
-    if record is None:
-        return True
-    return bool(record.verified)
+        logger.exception("Could not send a validation email to %s", user.email)
+    messages.error(
+        request,
+        "Confirm your email address before signing in. Check your inbox for the link.",
+    )
+    return render(
+        request,
+        "accounts/login.html",
+        {
+            "next": next_url,
+            "support_email": support_email,
+            "support_login_code": support_code,
+        },
+    )
 
 
 def register(request):
@@ -173,18 +187,12 @@ def custom_login(request):
                 db_user = User.objects.get(email__iexact=email)
                 if db_user.mfa_enabled and db_user.check_password(password):
                     if not _email_is_verified(db_user):
-                        messages.error(
+                        return _reject_unverified(
                             request,
-                            "Confirm your email address before signing in. Check your inbox for the link.",
-                        )
-                        return render(
-                            request,
-                            "accounts/login.html",
-                            {
-                                "next": next_url,
-                                "support_email": support_email,
-                                "support_login_code": support_code,
-                            },
+                            db_user,
+                            next_url,
+                            support_email,
+                            support_code,
                         )
                     # Password correct, MFA required → redirect to TOTP step.
                     # Increment the counter so attackers cannot silently enumerate
@@ -211,18 +219,12 @@ def custom_login(request):
             )
 
         if not _email_is_verified(user):
-            messages.error(
+            return _reject_unverified(
                 request,
-                "Confirm your email address before signing in. Check your inbox for the link.",
-            )
-            return render(
-                request,
-                "accounts/login.html",
-                {
-                    "next": next_url,
-                    "support_email": support_email,
-                    "support_login_code": support_code,
-                },
+                user,
+                next_url,
+                support_email,
+                support_code,
             )
 
         # No MFA — complete login immediately; reset failure counter
