@@ -8,6 +8,7 @@ from django.urls import reverse
 
 from apps.admin_tools.models import IntegrationSetting
 from apps.notifications.email_backend import MicrosoftGraphEmailBackend
+from apps.notifications.m365_graph import MicrosoftGraphMailClient, MicrosoftGraphMailConfig, MicrosoftGraphMailError
 
 
 @pytest.mark.django_db
@@ -89,3 +90,46 @@ def test_m365_admin_config_saves_settings(client, django_user_model):
     assert IntegrationSetting.get_value("M365_GRAPH_TENANT_ID") == "tenant-id"
     assert IntegrationSetting.get_value("M365_GRAPH_CLIENT_SECRET") == "client-secret"
     assert IntegrationSetting.get_value("M365_GRAPH_BILLING_MAILBOX") == "billing@cyberask.co.uk"
+
+
+def _graph_config():
+    return MicrosoftGraphMailConfig(
+        enabled=True,
+        tenant_id="tenant",
+        client_id="client",
+        client_secret="secret",
+        default_mailbox="notifications@cyberask.co.uk",
+        billing_mailbox="",
+        support_mailbox="",
+        domains_mailbox="",
+        notifications_mailbox="notifications@cyberask.co.uk",
+        save_to_sent_items=True,
+        timeout_seconds=15,
+    )
+
+
+def test_mailbox_directory_read_denied_is_send_only_success():
+    client = MicrosoftGraphMailClient(_graph_config())
+    response = Mock(status_code=403)
+    response.json.return_value = {
+        "error": {"code": "Authorization_RequestDenied", "message": "Insufficient privileges to complete the operation."}
+    }
+    response.text = '{"error":{"code":"Authorization_RequestDenied"}}'
+
+    with patch.object(client, "get_access_token", return_value="token"):
+        with patch("apps.notifications.m365_graph.requests.get", return_value=response):
+            result = client.test_mailbox("notifications@cyberask.co.uk")
+
+    assert result["directory_read"] is False
+    assert "Mail.Send" in result["detail"]
+
+
+def test_mailbox_missing_user_is_an_error():
+    client = MicrosoftGraphMailClient(_graph_config())
+    response = Mock(status_code=404)
+    response.text = "not found"
+
+    with patch.object(client, "get_access_token", return_value="token"):
+        with patch("apps.notifications.m365_graph.requests.get", return_value=response):
+            with pytest.raises(MicrosoftGraphMailError, match="was not found"):
+                client.test_mailbox("missing@cyberask.co.uk")

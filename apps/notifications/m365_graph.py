@@ -105,6 +105,13 @@ class MicrosoftGraphMailClient:
         return {"Authorization": f"Bearer {self.get_access_token()}", "Content-Type": "application/json"}
 
     def test_mailbox(self, mailbox: str) -> dict:
+        """Check the mailbox address.
+
+        Reading ``/users/{mailbox}`` needs directory permission such as
+        ``User.Read.All``. A send-only app with ``Mail.Send`` is rejected
+        with 403. That rejection means the credentials were accepted and
+        does not block sendMail.
+        """
         if not mailbox:
             raise MicrosoftGraphMailError("Mailbox is required for connectivity test")
         response = requests.get(
@@ -113,9 +120,24 @@ class MicrosoftGraphMailClient:
             params={"$select": "id,displayName,mail,userPrincipalName"},
             timeout=self.config.timeout_seconds,
         )
+        if response.status_code == 403 and _graph_error_code(response) == "Authorization_RequestDenied":
+            return {
+                "mailbox": mailbox,
+                "directory_read": False,
+                "detail": (
+                    f"Microsoft Graph accepted the app credentials for {mailbox}. "
+                    "The app is not allowed to read directory users, so the mailbox "
+                    "profile cannot be listed. Mail.Send does not need that permission. "
+                    "Use Save and send test email to confirm delivery."
+                ),
+            }
+        if response.status_code == 404:
+            raise MicrosoftGraphMailError(f"Mailbox {mailbox} was not found in this tenant.")
         if response.status_code >= 400:
             raise MicrosoftGraphMailError(f"Mailbox test failed ({response.status_code}): {response.text[:500]}")
-        return response.json()
+        profile = response.json()
+        profile["directory_read"] = True
+        return profile
 
     def send_mail(self, *, mailbox: str, message: dict, save_to_sent_items: Optional[bool] = None):
         if not mailbox:
@@ -133,6 +155,17 @@ class MicrosoftGraphMailClient:
         if response.status_code >= 400:
             raise MicrosoftGraphMailError(f"sendMail failed ({response.status_code}): {response.text[:500]}")
         return {"ok": True, "status_code": response.status_code}
+
+
+def _graph_error_code(response) -> str:
+    try:
+        payload = response.json()
+    except ValueError:
+        return ""
+    error = payload.get("error") if isinstance(payload, dict) else None
+    if not isinstance(error, dict):
+        return ""
+    return str(error.get("code") or "")
 
 
 def address_list(addresses: Optional[Iterable[str]]) -> list[dict]:

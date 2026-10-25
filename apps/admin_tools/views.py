@@ -444,7 +444,10 @@ def m365_graph_config(request):
                         or config.notifications_mailbox
                     )
                     test_result = {"ok": True, "data": client.test_mailbox(mailbox)}
-                    messages.success(request, f"Connected to Microsoft Graph mailbox: {mailbox}")
+                    if test_result["data"].get("directory_read") is False:
+                        messages.warning(request, test_result["data"]["detail"])
+                    else:
+                        messages.success(request, f"Connected to Microsoft Graph mailbox: {mailbox}")
                 except Exception as exc:
                     test_result = {"ok": False, "error": str(exc)}
                     messages.error(request, f"Microsoft Graph connectivity failed: {exc}")
