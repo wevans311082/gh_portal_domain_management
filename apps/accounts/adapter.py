@@ -1,7 +1,12 @@
 """Allauth adapter that records account mail and routes it to the right mailbox."""
 import logging
 
+from allauth.account import app_settings
 from allauth.account.adapter import DefaultAccountAdapter
+from allauth.core import context as allauth_context
+from django.utils.encoding import force_str
+
+from apps.accounts.mail_site import customer_domain_names, ensure_portal_site_record, portal_mail_site
 
 logger = logging.getLogger(__name__)
 
@@ -9,12 +14,28 @@ logger = logging.getLogger(__name__)
 class PortalAccountAdapter(DefaultAccountAdapter):
     """Send account mail through the portal backend and write an email log."""
 
+    def format_email_subject(self, subject) -> str:
+        subject = " ".join(force_str(subject).splitlines()).strip()
+        prefix = app_settings.EMAIL_SUBJECT_PREFIX
+        if prefix is None:
+            prefix = f"[{portal_mail_site().name}] "
+        if prefix and subject.lower().startswith(prefix.strip().lower()):
+            return subject
+        return f"{prefix}{subject}"
+
     def send_mail(self, template_prefix, email, context):
-        ctx = {
-            "email": email,
-            "current_site": self._current_site(context),
-        }
-        ctx.update(context)
+        ensure_portal_site_record()
+        ctx = dict(context or {})
+        site = portal_mail_site(ctx.get("request") or getattr(allauth_context, "request", None))
+        domains = customer_domain_names(ctx.get("user"))
+        ctx.update(
+            {
+                "email": email,
+                "current_site": site,
+                "portal_url": f"https://{site.domain}",
+                "customer_domains": domains,
+            }
+        )
         msg = self.render_mail(template_prefix, email, ctx)
         extra = dict(getattr(msg, "extra_headers", None) or {})
         extra["X-CyberAsk-Mailbox-Purpose"] = "notifications"
@@ -26,16 +47,6 @@ class PortalAccountAdapter(DefaultAccountAdapter):
             logger.exception("Account email %s to %s failed", template_prefix, email)
             raise
         self._log_email(email, msg.subject, template_prefix, "sent", "")
-
-    def _current_site(self, context):
-        request = context.get("request") if isinstance(context, dict) else None
-        if request is not None:
-            from django.contrib.sites.shortcuts import get_current_site
-
-            return get_current_site(request)
-        from django.contrib.sites.models import Site
-
-        return Site.objects.get_current()
 
     def _log_email(self, recipient, subject, template, status, error):
         try:

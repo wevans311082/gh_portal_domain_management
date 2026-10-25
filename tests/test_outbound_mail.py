@@ -13,6 +13,52 @@ from apps.notifications.m365_graph import MicrosoftGraphMailError
 
 
 @pytest.mark.django_db
+def test_account_mail_uses_the_portal_name_and_customer_domains(client, django_user_model):
+    from allauth.account.models import EmailAddress
+    from django.contrib.sites.models import Site
+
+    from apps.accounts.mail_site import canonical_portal_site
+    from apps.domains.models import Domain
+
+    user = django_user_model.objects.create_user(email="owner@acme.test", password="password123")
+    Domain.objects.create(user=user, name="acme.co.uk", tld="co.uk", status="active")
+    Domain.objects.create(user=user, name="example.com", tld="com", status="active")
+    EmailAddress.objects.create(user=user, email=user.email, primary=True, verified=False)
+
+    response = client.post(
+        reverse("account_reset_password"),
+        {"email": user.email},
+        HTTP_HOST="portal.cyberask.co.uk",
+    )
+
+    assert response.status_code == 302
+    message = mail.outbox[0]
+    identity = canonical_portal_site()
+    combined = f"{message.subject}\n{message.body}".lower()
+    assert "example.com" not in combined
+    assert identity.name.lower() in combined
+    assert "acme.co.uk" in message.body
+    assert "portal.cyberask.co.uk" in message.body
+    site = Site.objects.get(pk=1)
+    assert site.domain == identity.domain
+    assert site.name == identity.name
+    assert site.domain != "example.com"
+
+    mail.outbox.clear()
+    client.post(
+        reverse("accounts_custom:login"),
+        {"email": user.email, "password": "password123"},
+        HTTP_HOST="domains.cyberask.co.uk",
+    )
+    confirmation = mail.outbox[0]
+    text = f"{confirmation.subject}\n{confirmation.body}".lower()
+    assert "example.com" not in text
+    assert identity.name.lower() in text
+    assert "acme.co.uk" in confirmation.body
+    assert "https://domains.cyberask.co.uk" in confirmation.body
+
+
+@pytest.mark.django_db
 def test_password_reset_matches_mixed_case_and_is_logged(client, django_user_model):
     django_user_model.objects.create_user(email="Paul.Lee@Example.com", password="password123")
 

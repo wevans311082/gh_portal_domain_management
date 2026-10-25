@@ -1,0 +1,11 @@
+{% load i18n %}{% autoescape off %}{% blocktrans with site_name=current_site.name %}Hello from {{ site_name }}!{% endblocktrans %}
+
+{% block content %}{% endblock content %}
+{% if customer_domains %}
+{% blocktrans %}Domains on this account:{% endblocktrans %}
+{% for domain in customer_domains %}{{ domain }}
+{% endfor %}
+{% endif %}
+{% blocktrans with site_name=current_site.name portal_url=portal_url %}Thank you for using {{ site_name }}!
+{{ portal_url }}{% endblocktrans %}
+{% endautoescape %}
