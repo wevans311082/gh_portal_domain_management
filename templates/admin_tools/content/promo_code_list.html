@@ -2,7 +2,7 @@
 {% block title %}Promo Codes · {{ SITE_NAME }}{% endblock %}
 {% block page_title %}Promo Codes{% endblock %}
 {% block page_actions %}
-<a href="{% url 'admin_tools:promo_code_create' %}" class="px-4 py-2 rounded-lg bg-sky-600 text-white text-sm font-medium hover:bg-sky-700">New Code</a>
+<a href="{% url 'admin_tools:promo_code_create' %}" class="admin-button-primary px-4 py-2 rounded-lg text-white text-sm font-medium">New Code</a>
 {% endblock %}
 {% block content %}
 <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
@@ -35,7 +35,7 @@
           {% endif %}
         </td>
         <td class="px-5 py-3 text-right space-x-3">
-          <a href="{% url 'admin_tools:promo_code_edit' pk=code.pk %}" class="text-sky-600 hover:underline text-xs">Edit</a>
+          <a href="{% url 'admin_tools:promo_code_edit' pk=code.pk %}" class="text-sky-700 hover:underline text-xs">Edit</a>
           <form method="post" action="{% url 'admin_tools:promo_code_delete' pk=code.pk %}" class="inline" onsubmit="return confirm('Delete promo code {{ code.code }}?')">
             {% csrf_token %}
             <button type="submit" class="text-red-500 hover:underline text-xs">Delete</button>
@@ -43,7 +43,7 @@
         </td>
       </tr>
       {% empty %}
-      <tr><td colspan="7" class="px-5 py-8 text-center text-slate-400">No promo codes yet.</td></tr>
+      <tr><td colspan="7" class="px-5 py-8 text-center text-slate-600">No promo codes yet.</td></tr>
       {% endfor %}
     </tbody>
   </table>

@@ -27,6 +27,11 @@ console.log('CyberAsk Domains portal loaded');
         return;
     }
 
+    // Admin forms define their own layout and help text in the templates.
+    if (scopedRoot.matches('.admin-shell')) {
+        return;
+    }
+
     scopedRoot.querySelectorAll('form').forEach(function (formEl) {
         if (formEl.closest('nav') || formEl.closest('header') || formEl.hasAttribute('data-no-form-card')) {
             return;

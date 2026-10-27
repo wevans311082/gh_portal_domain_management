@@ -26,7 +26,7 @@
         <form method="get" class="flex flex-wrap gap-2 flex-1 min-w-[260px]">
             <input type="text" name="q" value="{{ search_q }}" placeholder="Search by email or name…"
                    class="border border-slate-200 rounded-lg px-3 py-2 text-sm flex-1 min-w-[200px] focus:outline-none focus:ring-2 focus:ring-indigo-400">
-            <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700">Search</button>
+            <button type="submit" class="admin-button-primary text-white px-4 py-2 rounded-lg text-sm font-medium">Search</button>
             {% if search_q %}<a href="{% url 'admin_tools:users' %}" class="border border-slate-200 text-slate-600 px-4 py-2 rounded-lg text-sm hover:bg-slate-50">Clear</a>{% endif %}
         </form>
         <form method="post" class="flex flex-wrap items-center gap-2">
@@ -41,9 +41,9 @@
                 <option value="import">Import from WHM</option>
                 <option value="export">Export to WHM</option>
             </select>
-            <button type="submit" class="inline-flex items-center justify-center h-10 bg-sky-600 text-white px-4 rounded-lg text-sm font-medium hover:bg-sky-700">Sync WHM</button>
+            <button type="submit" class="admin-button-primary inline-flex items-center justify-center h-10 text-white px-4 rounded-lg text-sm font-medium">Sync WHM</button>
         </form>
-        <a href="{% url 'admin_tools:user_create' %}" class="inline-flex items-center justify-center h-10 bg-emerald-600 text-white px-4 rounded-lg text-sm font-medium hover:bg-emerald-700">+ New User</a>
+        <a href="{% url 'admin_tools:user_create' %}" class="inline-flex items-center justify-center h-10 bg-emerald-700 text-white px-4 rounded-lg text-sm font-medium hover:bg-emerald-800">+ New User</a>
     </div>
 </div>
 
@@ -76,10 +76,10 @@
                     <span class="inline-flex items-center mt-1 text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-medium">Unverified</span>
                     {% endif %}
                     {% else %}
-                    <span class="text-slate-400">—</span>
+                    <span class="text-slate-600">—</span>
                     {% endif %}
                 </td>
-                <td class="px-4 py-3 text-slate-400 text-xs">{{ u.created_at|date:"d M Y" }}</td>
+                <td class="px-4 py-3 text-slate-600 text-xs">{{ u.created_at|date:"d M Y" }}</td>
                 <td class="px-4 py-3">
                     <div class="flex gap-1 flex-wrap">
                         {% if u.is_superuser %}<span class="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-medium">Super</span>{% endif %}
@@ -104,7 +104,7 @@
                 </td>
             </tr>
             {% empty %}
-            <tr><td colspan="6" class="px-4 py-8 text-center text-slate-400 text-sm">No users found.</td></tr>
+            <tr><td colspan="6" class="px-4 py-8 text-center text-slate-600 text-sm">No users found.</td></tr>
             {% endfor %}
         </tbody>
     </table>

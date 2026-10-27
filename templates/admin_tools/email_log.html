@@ -12,7 +12,7 @@
         <option value="sent" {% if status == 'sent' %}selected{% endif %}>Sent</option>
         <option value="failed" {% if status == 'failed' %}selected{% endif %}>Failed</option>
     </select>
-    <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700">Filter</button>
+    <button type="submit" class="admin-button-primary text-white px-4 py-2 rounded-lg text-sm font-medium">Filter</button>
     {% if query or status %}<a href="{% url 'admin_tools:email_log' %}" class="border border-slate-200 text-slate-600 px-4 py-2 rounded-lg text-sm hover:bg-slate-50">Clear</a>{% endif %}
 </form>
 
@@ -46,7 +46,7 @@
                 <td class="px-4 py-3 text-xs text-red-600 max-w-xs truncate">{{ log.error|default:"" }}</td>
             </tr>
             {% empty %}
-            <tr><td colspan="6" class="px-4 py-8 text-center text-slate-400">No email log entries found.</td></tr>
+            <tr><td colspan="6" class="px-4 py-8 text-center text-slate-600">No email log entries found.</td></tr>
             {% endfor %}
         </tbody>
     </table>

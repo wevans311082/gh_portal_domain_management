@@ -45,7 +45,7 @@
       <tr>
         <td class="font-medium">
           {{ row.domain_name|default:"—" }}
-          <span class="block text-xs text-slate-400">{{ row.status }}{% if row.expiry %} · exp {{ row.expiry }}{% endif %}</span>
+          <span class="block text-xs text-slate-600">{{ row.status }}{% if row.expiry %} · exp {{ row.expiry }}{% endif %}</span>
         </td>
         <td class="font-mono text-xs">{{ row.order_id|default:"—" }}</td>
         <td class="font-mono text-xs text-slate-600">
@@ -70,7 +70,7 @@
           <span class="block text-xs">{{ svc.package.get_display_name }} ({{ svc.cpanel_username|default:"pending" }})</span>
           {% endfor %}
           {% else %}
-          <span class="text-xs text-slate-400">No WHM match</span>
+          <span class="text-xs text-slate-600">No WHM match</span>
           {% endif %}
         </td>
         <td class="text-xs">
@@ -96,7 +96,7 @@
               <option value="{{ u.pk }}">{{ u.email }}</option>
               {% endfor %}
             </select>
-            <button class="text-xs bg-sky-600 text-white px-2 py-1 rounded">Import</button>
+            <button class="admin-button-primary text-xs text-white px-2 py-1 rounded">Import</button>
           </form>
           {% endif %}
         </td>

@@ -2,7 +2,7 @@
 {% block title %}Service Cards · {{ SITE_NAME }}{% endblock %}
 {% block page_title %}Homepage Service Cards{% endblock %}
 {% block content %}
-<div class="mb-4"><a href="{% url 'admin_tools:service_card_create' %}" class="px-4 py-2 rounded bg-sky-600 text-white text-sm">New Service Card</a></div>
+<div class="mb-4"><a href="{% url 'admin_tools:service_card_create' %}" class="admin-button-primary px-4 py-2 rounded text-white text-sm">New Service Card</a></div>
 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 {% for c in cards %}
   <div class="bg-white rounded-xl border border-slate-200 p-5">

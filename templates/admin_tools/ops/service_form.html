@@ -20,7 +20,7 @@
 		{% if obj.whm_last_sync_at %}
 		<div class="mt-2 text-sm text-slate-700">
 			<span class="font-medium">Action:</span> {{ obj.whm_last_sync_action|default:"sync" }}
-			<span class="mx-1 text-slate-400">•</span>
+			<span class="mx-1 text-slate-600">•</span>
 			<span class="font-medium">At:</span> {{ obj.whm_last_sync_at|date:"Y-m-d H:i" }}
 		</div>
 		{% if obj.whm_last_sync_message %}
@@ -32,6 +32,6 @@
 	</section>
 	{% endif %}
 
-	<form method="post" class="bg-white border rounded-xl p-6">{% csrf_token %}{{ form.as_p }}<button class="px-4 py-2 bg-sky-600 text-white rounded text-sm">Save</button></form>
+	<form method="post" class="bg-white border rounded-xl p-6">{% csrf_token %}{{ form.as_p }}<button class="admin-button-primary px-4 py-2 text-white rounded text-sm">Save</button></form>
 </div>
 {% endblock %}

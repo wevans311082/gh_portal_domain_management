@@ -9,12 +9,12 @@
     <div class="flex items-start justify-between px-5 py-4 gap-4">
       <div>
         <p class="text-sm font-medium text-slate-800">{{ flag.label }}</p>
-        <p class="text-xs text-slate-400 mt-0.5">{{ flag.description }}</p>
-        <p class="text-xs text-slate-300 font-mono mt-1">{{ flag.key }}</p>
+        <p class="text-xs text-slate-600 mt-0.5">{{ flag.description }}</p>
+        <p class="text-xs text-slate-600 font-mono mt-1">{{ flag.key }}</p>
       </div>
       <label class="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
         <input type="hidden" name="{{ flag.key }}" value="0">
-        <input type="checkbox" name="{{ flag.key }}" value="1"
+        <input type="checkbox" aria-label="{{ flag.label }}" name="{{ flag.key }}" value="1"
                {% if flag.enabled %}checked{% endif %}
                class="sr-only peer"
                onchange="this.previousElementSibling.value = this.checked ? '1' : '0'">
@@ -23,11 +23,11 @@
       </label>
     </div>
     {% empty %}
-    <div class="px-5 py-8 text-center text-slate-400 text-sm">No feature flags defined.</div>
+    <div class="px-5 py-8 text-center text-slate-600 text-sm">No feature flags defined.</div>
     {% endfor %}
   </div>
   <div>
-    <button type="submit" class="px-5 py-2 rounded-lg bg-sky-600 text-white text-sm font-medium hover:bg-sky-700">Save Flags</button>
+    <button type="submit" class="admin-button-primary px-5 py-2 rounded-lg text-white text-sm font-medium">Save Flags</button>
   </div>
 </form>
 {% endblock %}

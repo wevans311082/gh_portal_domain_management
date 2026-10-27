@@ -4,11 +4,11 @@
 {% block page_title %}ResellerClub HTTP Debug{% endblock %}
 
 {% block header_actions %}
-<a href="{% url 'admin_tools:integration_detail' 'resellerclub' %}" class="text-sm text-sky-600 hover:underline font-medium">← ResellerClub Diagnostics</a>
+<a href="{% url 'admin_tools:integration_detail' 'resellerclub' %}" class="text-sm text-sky-700 hover:underline font-medium">← ResellerClub Diagnostics</a>
 {% endblock %}
 
 {% block content %}
-<p class="text-sm text-sky-500 mb-6">
+<p class="text-sm text-sky-700 mb-6">
     This sends a live request directly to ResellerClub and prints the full prepared request and full response.
 </p>
 
@@ -20,7 +20,7 @@
             <input type="checkbox" name="enable_debug_mode" {% if debug_mode %}checked{% endif %}>
             Enable global ResellerClub debug tray
         </label>
-        <button type="submit" class="bg-amber-600 text-white px-3 py-1.5 rounded hover:bg-amber-700 text-xs font-semibold">Save</button>
+        <button type="submit" class="bg-amber-700 text-white px-3 py-1.5 rounded hover:bg-amber-800 text-xs font-semibold">Save</button>
     </form>
 
     <form method="post" class="grid grid-cols-1 lg:grid-cols-4 gap-3 items-end">
@@ -42,7 +42,7 @@
             <textarea name="raw_params" rows="4" class="w-full border border-slate-300 rounded px-3 py-2 text-sm font-mono" placeholder='{"domain-name":"example","tlds":"com"}'>{{ raw_params }}</textarea>
         </div>
         <div class="lg:col-span-4 flex gap-2 items-center">
-            <button type="submit" class="bg-sky-600 text-white px-4 py-2 rounded hover:bg-sky-700 text-sm font-semibold">Run Request</button>
+            <button type="submit" class="admin-button-primary text-white px-4 py-2 rounded text-sm font-semibold">Run Request</button>
             <span class="text-xs text-slate-500">Base URL: {{ base_url }}</span>
         </div>
     </form>

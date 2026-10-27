@@ -4,7 +4,7 @@
 {% block page_title %}Settings Editor — {{ meta.title }}{% endblock %}
 
 {% block header_actions %}
-<a href="{% url 'admin_tools:settings_overview' %}" class="text-sm font-medium text-sky-600 hover:text-sky-800">&larr; Back to Settings &amp; Config</a>
+<a href="{% url 'admin_tools:settings_overview' %}" class="text-sm font-medium text-sky-700 hover:text-sky-800">&larr; Back to Settings &amp; Config</a>
 {% endblock %}
 
 {% block content %}
@@ -80,7 +80,7 @@
                         <button type="submit" name="action" value="test" class="border border-slate-300 text-slate-700 px-4 py-2.5 rounded hover:bg-slate-50 font-semibold">
                             Test Connection
                         </button>
-                        <button type="submit" name="action" value="save" class="bg-sky-600 text-white px-6 py-2.5 rounded hover:bg-sky-700 font-semibold">
+                        <button type="submit" name="action" value="save" class="admin-button-primary text-white px-6 py-2.5 rounded font-semibold">
                             Save Changes
                         </button>
                     </div>

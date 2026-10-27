@@ -10,7 +10,7 @@
             <p class="text-xs uppercase tracking-wide text-cyan-800 font-semibold">Frontpage Customization</p>
             <p class="text-sm text-cyan-900">Edit homepage cards, FAQs, footer/legal links, cookie banner, and error pages from Website Content.</p>
         </div>
-        <a href="{% url 'admin_tools:content_dashboard' %}" class="px-4 py-2 bg-cyan-600 text-white rounded text-sm font-medium hover:bg-cyan-700">Open Website Content</a>
+        <a href="{% url 'admin_tools:content_dashboard' %}" class="admin-button-primary px-4 py-2 text-white rounded text-sm font-medium">Open Website Content</a>
     </div>
 </div>
 
@@ -19,7 +19,7 @@
     <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
         <p class="text-xs text-slate-500 font-medium uppercase tracking-wide mb-1">Total Users</p>
         <p class="text-3xl font-bold text-slate-800">{{ total_users }}</p>
-        <p class="text-xs text-emerald-600 mt-1">+{{ new_users_30d }} last 30 days</p>
+        <p class="text-xs text-emerald-700 mt-1">+{{ new_users_30d }} last 30 days</p>
     </div>
     <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
         <p class="text-xs text-slate-500 font-medium uppercase tracking-wide mb-1">Active Services</p>
@@ -39,7 +39,7 @@
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
     <a href="{% url 'admin_tools:security' %}" class="bg-white rounded-xl border {% if failed_tasks_7d %}border-amber-300{% else %}border-slate-200{% endif %} shadow-sm p-5 hover:shadow-md transition-shadow">
         <p class="text-xs text-slate-500 font-medium uppercase tracking-wide mb-1">Failed Tasks (7d)</p>
-        <p class="text-3xl font-bold {% if failed_tasks_7d %}text-amber-600{% else %}text-slate-800{% endif %}">{{ failed_tasks_7d }}</p>
+        <p class="text-3xl font-bold {% if failed_tasks_7d %}text-amber-700{% else %}text-slate-800{% endif %}">{{ failed_tasks_7d }}</p>
     </a>
     <a href="{% url 'admin_tools:invoice_list' %}" class="bg-white rounded-xl border {% if unpaid_invoices %}border-red-300{% else %}border-slate-200{% endif %} shadow-sm p-5 hover:shadow-md transition-shadow">
         <p class="text-xs text-slate-500 font-medium uppercase tracking-wide mb-1">Unpaid Invoices</p>
@@ -47,7 +47,7 @@
     </a>
     <a href="{% url 'admin_tools:quote_list' %}" class="bg-white rounded-xl border {% if quotes_open %}border-sky-300{% else %}border-slate-200{% endif %} shadow-sm p-5 hover:shadow-md transition-shadow">
         <p class="text-xs text-slate-500 font-medium uppercase tracking-wide mb-1">Open Quotes</p>
-        <p class="text-3xl font-bold {% if quotes_open %}text-sky-600{% else %}text-slate-800{% endif %}">{{ quotes_open }}</p>
+        <p class="text-3xl font-bold {% if quotes_open %}text-sky-700{% else %}text-slate-800{% endif %}">{{ quotes_open }}</p>
         <p class="text-xs text-slate-500 mt-1">£{{ quotes_pipeline_value|floatformat:0 }} pipeline · {{ quotes_conversion_30d }}% conv (30d)</p>
     </a>
     <a href="{% url 'admin_tools:tickets_list' %}" class="bg-white rounded-xl border {% if open_tickets %}border-indigo-300{% else %}border-slate-200{% endif %} shadow-sm p-5 hover:shadow-md transition-shadow">
@@ -60,7 +60,7 @@
     </a>
     <a href="{% url 'admin_tools:users' %}" class="bg-white rounded-xl border {% if staff_without_mfa %}border-amber-300{% else %}border-slate-200{% endif %} shadow-sm p-5 hover:shadow-md transition-shadow">
         <p class="text-xs text-slate-500 font-medium uppercase tracking-wide mb-1">Staff Without MFA</p>
-        <p class="text-3xl font-bold {% if staff_without_mfa %}text-amber-600{% else %}text-slate-800{% endif %}">{{ staff_without_mfa }}</p>
+        <p class="text-3xl font-bold {% if staff_without_mfa %}text-amber-700{% else %}text-slate-800{% endif %}">{{ staff_without_mfa }}</p>
     </a>
 </div>
 
@@ -78,12 +78,12 @@
                 <div class="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center text-xs font-bold text-indigo-700 flex-shrink-0">{{ u.email|first|upper }}</div>
                 <div class="min-w-0">
                     <p class="text-xs font-medium text-slate-800 truncate">{{ u.email }}</p>
-                    <p class="text-xs text-slate-400">{{ u.created_at|date:"d M Y" }}</p>
+                    <p class="text-xs text-slate-600">{{ u.created_at|date:"d M Y" }}</p>
                 </div>
                 {% if u.is_staff %}<span class="ml-auto text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-medium flex-shrink-0">Staff</span>{% endif %}
             </li>
             {% empty %}
-            <li class="text-xs text-slate-400">No users yet.</li>
+            <li class="text-xs text-slate-600">No users yet.</li>
             {% endfor %}
         </ul>
     </div>
@@ -106,11 +106,11 @@
                 </span>
                 <div class="min-w-0">
                     <p class="text-xs font-medium text-slate-800 truncate">{{ ticket.subject }}</p>
-                    <p class="text-xs text-slate-400">{{ ticket.user.email|default:"—" }}</p>
+                    <p class="text-xs text-slate-600">{{ ticket.user.email|default:"—" }}</p>
                 </div>
             </li>
             {% empty %}
-            <li class="text-xs text-slate-400">No tickets yet.</li>
+            <li class="text-xs text-slate-600">No tickets yet.</li>
             {% endfor %}
         </ul>
     </div>
@@ -125,10 +125,10 @@
             {% for log in recent_audit %}
             <li class="text-xs">
                 <p class="font-medium text-slate-700 truncate">{{ log.action }}</p>
-                <p class="text-slate-400">{{ log.user.email|default:"anon" }} · {{ log.created_at|timesince }} ago</p>
+                <p class="text-slate-600">{{ log.user.email|default:"anon" }} · {{ log.created_at|timesince }} ago</p>
             </li>
             {% empty %}
-            <li class="text-xs text-slate-400">No audit records yet.</li>
+            <li class="text-xs text-slate-600">No audit records yet.</li>
             {% endfor %}
         </ul>
     </div>
@@ -146,7 +146,7 @@
             <div class="flex-1 flex flex-col items-center gap-1.5">
                 <span class="text-xl font-bold text-slate-800">{{ bar.count }}</span>
                 <div class="w-full rounded-t {{ bar.color }}" style="height: {{ bar.height }}%; min-height: 4px;"></div>
-                <span class="text-xs text-slate-400">{{ bar.label }}</span>
+                <span class="text-xs text-slate-600">{{ bar.label }}</span>
             </div>
             {% endfor %}
         </div>

@@ -11,7 +11,7 @@
     </p>
   </div>
   <div class="flex flex-wrap gap-2">
-    <a href="{% url 'admin_tools:manual_domain_register' %}" class="px-3 py-1.5 rounded bg-emerald-600 text-white text-xs font-semibold">Manual register</a>
+    <a href="{% url 'admin_tools:manual_domain_register' %}" class="px-3 py-1.5 rounded bg-emerald-700 text-white text-xs font-semibold">Manual register</a>
     <a href="{% url 'admin_tools:domains_list' %}" class="px-3 py-1.5 rounded border border-slate-300 text-slate-700 text-xs">Domains</a>
   </div>
 </div>
@@ -36,8 +36,8 @@
 </form>
 
 <div class="flex flex-wrap gap-2 mb-4 text-xs">
-  <a href="?status=open" class="px-2 py-1 rounded {% if status_filter == 'open' %}bg-sky-600 text-white{% else %}bg-slate-100 text-slate-700{% endif %}">Open {{ open_count }}</a>
-  <a href="?status=pending_payment" class="px-2 py-1 rounded {% if status_filter == 'pending_payment' %}bg-amber-600 text-white{% else %}bg-slate-100{% endif %}">Pending payment {{ counts.pending_payment|default:0 }}</a>
+  <a href="?status=open" class="px-2 py-1 rounded {% if status_filter == 'open' %}bg-sky-700 text-white{% else %}bg-slate-100 text-slate-700{% endif %}">Open {{ open_count }}</a>
+  <a href="?status=pending_payment" class="px-2 py-1 rounded {% if status_filter == 'pending_payment' %}bg-amber-700 text-white{% else %}bg-slate-100{% endif %}">Pending payment {{ counts.pending_payment|default:0 }}</a>
   <a href="?status=paid" class="px-2 py-1 rounded {% if status_filter == 'paid' %}bg-emerald-700 text-white{% else %}bg-slate-100{% endif %}">Paid {{ counts.paid|default:0 }}</a>
   <a href="?status=failed" class="px-2 py-1 rounded {% if status_filter == 'failed' %}bg-rose-600 text-white{% else %}bg-slate-100{% endif %}">Failed {{ counts.failed|default:0 }}</a>
   <a href="?status=paused" class="px-2 py-1 rounded {% if status_filter == 'paused' %}bg-violet-600 text-white{% else %}bg-slate-100{% endif %}">Paused {{ counts.paused|default:0 }}</a>
@@ -87,7 +87,7 @@
               <a href="{% url 'admin_tools:invoice_edit' o.invoice_id %}" class="text-sky-700 hover:underline">{{ o.invoice.number }}</a>
               <div class="text-slate-500">{{ o.invoice.get_status_display }}</div>
             {% else %}
-              <span class="text-slate-400">—</span>
+              <span class="text-slate-600">—</span>
             {% endif %}
           </td>
           <td class="px-3 py-2">{{ o.registration_years }}</td>

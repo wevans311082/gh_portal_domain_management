@@ -7,17 +7,17 @@
   {{ form.as_p }}
   <label class="block text-sm font-medium text-slate-700">Features (+ good / - limitation)</label>
   <textarea name="feature_lines" rows="8" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">{{ feature_lines }}</textarea>
-  <button class="px-4 py-2 rounded bg-sky-600 text-white">Save</button>
+  <button class="admin-button-primary px-4 py-2 rounded text-white">Save</button>
 </form>
 <div class="bg-white rounded-xl border border-slate-200 p-6">
   <p class="text-xs uppercase text-slate-500 mb-2">Live preview</p>
   <div class="rounded-xl border p-6 border-slate-200" id="preview_card_wrap">
     <span id="preview_badge" class="inline-block mb-2 bg-sky-600 text-white text-xs px-2 py-1 rounded-full" style="display:none"></span>
     <h3 id="preview_name" class="text-xl font-bold mb-1">{{ form.display_name.value|default:form.name.value }}</h3>
-    <p class="text-3xl font-bold text-sky-600 mb-1">£<span id="preview_price">{{ form.price_monthly.value }}</span><span class="text-sm text-slate-500">/mo</span></p>
+    <p class="text-3xl font-bold text-sky-700 mb-1">£<span id="preview_price">{{ form.price_monthly.value }}</span><span class="text-sm text-slate-500">/mo</span></p>
     <p id="preview_blurb" class="text-sm text-slate-500 mb-3">{{ form.card_blurb.value }}</p>
     <ul class="text-sm space-y-1 mb-4">{% for f in preview_features %}<li>{% if f.is_positive %}✓{% else %}✗{% endif %} {{ f.text }}</li>{% endfor %}</ul>
-    <button type="button" id="preview_cta" class="w-full py-2 rounded bg-sky-600 text-white text-sm">{{ form.card_cta_label.value|default:'Get Started' }}</button>
+    <button type="button" id="preview_cta" class="admin-button-primary w-full py-2 rounded text-white text-sm">{{ form.card_cta_label.value|default:'Get Started' }}</button>
   </div>
 </div>
 </div>

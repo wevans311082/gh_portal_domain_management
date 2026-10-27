@@ -20,7 +20,7 @@
         <option value="{{ val }}" {% if status_filter == val %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
     </select>
-    <button type="submit" class="px-4 py-2 rounded-lg bg-sky-600 text-white text-sm hover:bg-sky-700">Filter</button>
+    <button type="submit" class="admin-button-primary px-4 py-2 rounded-lg text-white text-sm">Filter</button>
     {% if search_q or status_filter %}<a href="{% url 'admin_tools:contact_submissions_list' %}" class="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 text-sm hover:bg-slate-50">Clear</a>{% endif %}
 </form>
 

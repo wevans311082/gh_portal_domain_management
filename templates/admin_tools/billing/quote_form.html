@@ -18,11 +18,11 @@
   <a href="{% url 'admin_tools:quote_pdf' quote.pk %}?inline=1" target="_blank" class="px-3 py-1.5 rounded bg-slate-700 text-white text-xs">View PDF</a>
   <a href="{% url 'admin_tools:quote_pdf' quote.pk %}" class="px-3 py-1.5 rounded bg-slate-700 text-white text-xs">Download PDF</a>
   <form method="post" action="{% url 'admin_tools:quote_action' quote.pk 'send' %}" class="inline-flex">{% csrf_token %}
-    <button class="px-3 py-1.5 rounded bg-sky-600 text-white text-xs">Email to recipient</button>
+    <button class="admin-button-primary px-3 py-1.5 rounded text-white text-xs">Email to recipient</button>
   </form>
   {% if quote.user and quote.status != 'converted' %}
     <form method="post" action="{% url 'admin_tools:quote_action' quote.pk 'convert' %}" class="inline-flex">{% csrf_token %}
-      <button class="px-3 py-1.5 rounded bg-emerald-600 text-white text-xs">Convert to invoice</button>
+      <button class="px-3 py-1.5 rounded bg-emerald-700 text-white text-xs">Convert to invoice</button>
     </form>
   {% endif %}
   <form method="post" action="{% url 'admin_tools:quote_action' quote.pk 'clone' %}" class="inline-flex">{% csrf_token %}
@@ -30,7 +30,7 @@
   </form>
   {% if quote.status != 'void' %}
     <form method="post" action="{% url 'admin_tools:quote_action' quote.pk 'void' %}" class="inline-flex" onsubmit="return confirm('Void this quote?');">{% csrf_token %}
-      <button class="px-3 py-1.5 rounded bg-amber-600 text-white text-xs">Void</button>
+      <button class="px-3 py-1.5 rounded bg-amber-700 text-white text-xs">Void</button>
     </form>
   {% endif %}
   {% if quote.status == 'draft' %}
@@ -63,12 +63,12 @@
         <tbody x-ref="lines" class="divide-y divide-slate-100">
           <template x-for="(line, idx) in lines" :key="line.uid">
             <tr class="line-row">
-              <td class="text-center text-slate-300 cursor-move handle">⋮⋮</td>
-              <td class="py-1.5"><input type="text" name="line_description[]" x-model="line.description" required class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"></td>
-              <td class="py-1.5"><input type="number" step="0.01" min="0" name="line_quantity[]" x-model.number="line.quantity" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm text-right"></td>
-              <td class="py-1.5"><input type="number" step="0.01" min="0" name="line_unit_price[]" x-model.number="line.unit_price" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm text-right"></td>
+              <td class="text-center text-slate-600 cursor-move handle">⋮⋮</td>
+              <td class="py-1.5"><input type="text" name="line_description[]" :aria-label="'Line ' + (idx + 1) + ' description'" x-model="line.description" required class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"></td>
+              <td class="py-1.5"><input type="number" step="0.01" min="0" name="line_quantity[]" :aria-label="'Line ' + (idx + 1) + ' quantity'" x-model.number="line.quantity" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm text-right"></td>
+              <td class="py-1.5"><input type="number" step="0.01" min="0" name="line_unit_price[]" :aria-label="'Line ' + (idx + 1) + ' unit price'" x-model.number="line.unit_price" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm text-right"></td>
               <td class="py-1.5 text-right font-semibold" x-text="formatMoney(line.quantity * line.unit_price)"></td>
-              <td class="text-right"><button type="button" @click="removeLine(idx)" class="text-rose-600 text-xs">×</button></td>
+              <td class="text-right"><button type="button" @click="removeLine(idx)" :aria-label="'Remove line ' + (idx + 1)" class="text-rose-600 text-xs">×</button></td>
               <input type="hidden" name="line_position[]" :value="idx">
             </tr>
           </template>
@@ -158,7 +158,7 @@
       </dl>
     </div>
 
-    <button type="submit" class="w-full px-4 py-2 rounded bg-sky-600 hover:bg-sky-700 text-white font-semibold">{% if quote %}Save changes{% else %}Create quote{% endif %}</button>
+    <button type="submit" class="admin-button-primary w-full px-4 py-2 rounded text-white font-semibold">{% if quote %}Save changes{% else %}Create quote{% endif %}</button>
   </aside>
 </form>
 

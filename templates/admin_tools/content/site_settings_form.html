@@ -5,7 +5,7 @@
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 <form method="post" class="bg-white rounded-xl border border-slate-200 p-6 space-y-4">{% csrf_token %}
   {{ form.as_p }}
-  <button class="px-4 py-2 rounded bg-sky-600 text-white">Save settings</button>
+  <button class="admin-button-primary px-4 py-2 rounded text-white">Save settings</button>
 </form>
 <div class="bg-white rounded-xl border border-slate-200 p-6">
   <p class="text-xs uppercase text-slate-500 mb-2">Footer preview</p>
@@ -13,7 +13,7 @@
     <p class="font-semibold text-white">{{ SITE_NAME }}</p>
     <p id="preview_footer_about" class="mt-1">{{ form.footer_about.value }}</p>
     <div class="mt-4 flex flex-wrap gap-3">
-      {% for p in legal_links %}<span class="underline">{{ p.title }}</span>{% empty %}<span class="text-slate-400">No legal links yet.</span>{% endfor %}
+      {% for p in legal_links %}<span class="underline">{{ p.title }}</span>{% empty %}<span class="text-slate-200">No legal links yet.</span>{% endfor %}
     </div>
   </div>
   <p class="text-xs uppercase text-slate-500 mt-6 mb-2">Cookie banner preview</p>

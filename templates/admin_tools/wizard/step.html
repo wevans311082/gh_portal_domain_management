@@ -4,7 +4,7 @@
 {% block page_title %}Setup Wizard — {{ meta.title }}{% endblock %}
 
 {% block header_actions %}
-<a href="{% url 'admin_tools:wizard_index' %}" class="text-sm font-medium text-sky-600 hover:text-sky-800">&larr; Wizard overview</a>
+<a href="{% url 'admin_tools:wizard_index' %}" class="text-sm font-medium text-sky-700 hover:text-sky-800">&larr; Wizard overview</a>
 {% endblock %}
 
 {% block content %}
@@ -12,7 +12,7 @@
     <!-- Sidebar steps navigator -->
     <aside class="w-52 flex-shrink-0">
         <div class="bg-white rounded-lg shadow p-4 space-y-1">
-            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Setup Steps</p>
+            <p class="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-3">Setup Steps</p>
             {% for step in steps %}
             <a href="{% url 'admin_tools:wizard_step' step.key %}"
                class="flex items-center gap-2 rounded px-3 py-2 text-sm
@@ -21,7 +21,7 @@
                       {% else %}text-gray-500 hover:bg-gray-50{% endif %}">
                 <span>{{ step.icon }}</span>
                 <span>{{ step.title }}</span>
-                {% if step.done and not step.current %}<span class="ml-auto text-emerald-500 text-xs">✓</span>{% endif %}
+                {% if step.done and not step.current %}<span class="ml-auto text-emerald-700 text-xs">✓</span>{% endif %}
             </a>
             {% endfor %}
         </div>
@@ -32,7 +32,7 @@
                 {% widthratio done_count total 100 as pct %}
                 <div class="bg-sky-600 h-2 rounded-full" style="width: {{ pct }}%"></div>
             </div>
-            <p class="text-xs text-gray-400 mt-1">{{ done_count }}/{{ total }} done</p>
+            <p class="text-xs text-gray-600 mt-1">{{ done_count }}/{{ total }} done</p>
         </div>
     </aside>
 
@@ -72,7 +72,7 @@
                         {{ field }}
                     </div>
                     {% if field.help_text %}
-                    <p class="text-xs text-gray-400 mt-1">{{ field.help_text }}</p>
+                    <p class="text-xs text-gray-600 mt-1">{{ field.help_text }}</p>
                     {% endif %}
                     {% for error in field.errors %}
                     <p class="text-xs text-red-500 mt-1">{{ error }}</p>
@@ -86,7 +86,7 @@
                         <button type="submit" name="action" value="test" class="border border-slate-300 text-slate-700 px-4 py-2.5 rounded hover:bg-slate-50 font-semibold">
                             Test Connection
                         </button>
-                        <button type="submit" name="action" value="save" class="bg-sky-600 text-white px-6 py-2.5 rounded hover:bg-sky-700 font-semibold">
+                        <button type="submit" name="action" value="save" class="admin-button-primary text-white px-6 py-2.5 rounded font-semibold">
                             Save &amp; Continue &rarr;
                         </button>
                     </div>

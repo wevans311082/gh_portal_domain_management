@@ -2,12 +2,12 @@
 {% block title %}Services · {{ SITE_NAME }}{% endblock %}
 {% block page_title %}Hosting Services{% endblock %}
 {% block content %}
-<div class="flex items-center justify-between mb-4">
+<div class="admin-command-bar flex flex-wrap gap-3 items-center justify-between mb-4">
 	<form method="get" class="flex gap-2">
 		<input name="q" value="{{ search_q }}" placeholder="Search service/user/package" class="border rounded px-3 py-2 text-sm w-72">
 		<button class="px-4 py-2 bg-slate-800 text-white rounded text-sm">Search</button>
 	</form>
-	<a href="{% url 'admin_tools:services_create' %}" class="px-4 py-2 bg-sky-600 text-white rounded text-sm">New service</a>
+	<a href="{% url 'admin_tools:services_create' %}" class="admin-button-primary px-4 py-2 text-white rounded text-sm">New service</a>
 </div>
 <div class="bg-white border rounded-xl overflow-hidden">
 	<div class="overflow-x-auto">
@@ -45,7 +45,7 @@
 							<div class="text-[11px] text-slate-500 truncate max-w-[240px]" title="{{ s.whm_last_sync_message }}">{{ s.whm_last_sync_message }}</div>
 							{% endif %}
 						{% else %}
-							<span class="text-xs text-slate-400">No push yet</span>
+							<span class="text-xs text-slate-600">No push yet</span>
 						{% endif %}
 					</td>
 					<td class="px-4 py-2 text-right">

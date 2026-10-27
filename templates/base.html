@@ -8,14 +8,15 @@
     {% load static %}
     <link rel="icon" type="image/svg+xml" href="{% static 'images/logo.svg' %}">
     <!-- Tailwind CSS -->
-    <script src="{% static 'js/tailwind-config.js' %}"></script>
     <script src="{% static 'vendor/tailwindcss-cdn.js' %}"></script>
+    <script src="{% static 'js/tailwind-config.js' %}"></script>
     <!-- Alpine.js (standard build — templates use inline expressions) -->
     {% block alpine_script %}
     <script defer src="{% static 'vendor/alpine-3.14.1.min.js' %}"></script>
     {% endblock %}
     <link rel="stylesheet" href="{% static 'css/app.css' %}">
     <style>[x-cloak]{display:none!important}</style>
+    {% block shell_styles %}{% endblock %}
     {% block extra_head %}{% endblock %}
 </head>
 <body class="h-full bg-fluent-canvas text-fluent-ink font-sans" data-noise-texture="{% static 'images/noise.png' %}">

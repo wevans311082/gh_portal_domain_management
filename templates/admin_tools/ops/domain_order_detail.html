@@ -12,7 +12,7 @@
 <div class="flex flex-wrap gap-2 mb-6">
   {% if order.status != 'completed' and order.status != 'cancelled' and order.status != 'paused' %}
   <form method="post" action="{% url 'admin_tools:domain_order_action' order.pk 'process' %}">{% csrf_token %}
-    <button class="px-3 py-1.5 rounded bg-emerald-600 text-white text-xs font-semibold" type="submit">Process / register</button>
+    <button class="px-3 py-1.5 rounded bg-emerald-700 text-white text-xs font-semibold" type="submit">Process / register</button>
   </form>
   {% endif %}
   {% if order.status == 'failed' %}
@@ -22,7 +22,7 @@
   {% endif %}
   {% if order.status == 'pending_payment' or order.status == 'draft' or order.status == 'paused' %}
   <form method="post" action="{% url 'admin_tools:domain_order_action' order.pk 'mark_paid' %}">{% csrf_token %}
-    <button class="px-3 py-1.5 rounded bg-sky-600 text-white text-xs font-semibold" type="submit">Mark paid</button>
+    <button class="admin-button-primary px-3 py-1.5 rounded text-white text-xs font-semibold" type="submit">Mark paid</button>
   </form>
   {% endif %}
   {% if order.status != 'paused' and order.status != 'completed' and order.status != 'cancelled' %}
@@ -39,7 +39,7 @@
   {% if order.status != 'completed' and order.status != 'cancelled' %}
   <form method="post" action="{% url 'admin_tools:domain_order_action' order.pk 'cancel' %}" class="inline-flex gap-1" onsubmit="return confirm('Cancel this order?');">{% csrf_token %}
     <input type="text" name="reason" placeholder="Cancel reason" class="border rounded px-2 py-1 text-xs w-40">
-    <button class="px-3 py-1.5 rounded bg-amber-600 text-white text-xs font-semibold" type="submit">Cancel</button>
+    <button class="px-3 py-1.5 rounded bg-amber-700 text-white text-xs font-semibold" type="submit">Cancel</button>
   </form>
   {% endif %}
   <form method="post" action="{% url 'admin_tools:domain_order_action' order.pk 'clear_error' %}">{% csrf_token %}
@@ -157,7 +157,7 @@
   </div>
 
   <div class="lg:col-span-2">
-    <button type="submit" class="px-5 py-2.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-sm font-semibold">Save changes</button>
+    <button type="submit" class="admin-button-primary px-5 py-2.5 rounded-lg text-white text-sm font-semibold">Save changes</button>
   </div>
 </form>
 {% endblock %}

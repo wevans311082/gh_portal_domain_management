@@ -4,7 +4,7 @@
 {% block content %}
 <div class="mb-4 flex items-center justify-between">
   <p class="text-sm text-slate-500">When entries exist, only listed IPs may access staff areas.</p>
-  <a href="{% url 'admin_tools:ip_allowlist_create' %}" class="px-4 py-2 rounded bg-sky-600 text-white text-sm font-medium hover:bg-sky-700">+ Add IP</a>
+  <a href="{% url 'admin_tools:ip_allowlist_create' %}" class="admin-button-primary px-4 py-2 rounded text-white text-sm font-medium">+ Add IP</a>
 </div>
 <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
   <div class="overflow-x-auto">
@@ -24,9 +24,9 @@
       <tr>
         <td class="px-4 py-3 font-mono">{{ entry.ip_address }}</td>
         <td class="px-4 py-3">{{ entry.label|default:"—" }}</td>
-        <td class="px-4 py-3">{% if entry.is_active %}<span class="text-green-600">Yes</span>{% else %}<span class="text-slate-400">No</span>{% endif %}</td>
+        <td class="px-4 py-3">{% if entry.is_active %}<span class="text-green-700">Yes</span>{% else %}<span class="text-slate-600">No</span>{% endif %}</td>
         <td class="px-4 py-3">{{ entry.added_by.email|default:"—" }}</td>
-        <td class="px-4 py-3 text-slate-400">{{ entry.created_at|date:"d M Y" }}</td>
+        <td class="px-4 py-3 text-slate-600">{{ entry.created_at|date:"d M Y" }}</td>
         <td class="px-4 py-3 text-right">
           <form method="post" action="{% url 'admin_tools:ip_allowlist_delete' entry.pk %}" onsubmit="return confirm('Remove this IP?')">
             {% csrf_token %}
@@ -35,7 +35,7 @@
         </td>
       </tr>
       {% empty %}
-      <tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">No entries — all IPs are allowed.</td></tr>
+      <tr><td colspan="6" class="px-4 py-6 text-center text-slate-600">No entries — all IPs are allowed.</td></tr>
       {% endfor %}
     </tbody>
   </table>

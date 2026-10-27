@@ -4,11 +4,11 @@
 {% block page_title %}Task Management{% endblock %}
 
 {% block header_actions %}
-<a href="{% url 'admin_tools:dashboard' %}" class="text-sm font-medium text-sky-600 hover:text-sky-800">&larr; Dashboard</a>
-<a href="{{ periodic_task_admin_url }}" class="text-sm font-medium text-sky-600 hover:text-sky-800">Periodic Tasks</a>
-<a href="{{ interval_schedule_admin_url }}" class="text-sm font-medium text-sky-600 hover:text-sky-800">Intervals</a>
-<a href="{{ crontab_schedule_admin_url }}" class="text-sm font-medium text-sky-600 hover:text-sky-800">Crontabs</a>
-<a href="{{ task_result_admin_url }}" class="text-sm font-medium text-sky-600 hover:text-sky-800">Task Results</a>
+<a href="{% url 'admin_tools:dashboard' %}" class="text-sm font-medium text-sky-700 hover:text-sky-800">&larr; Dashboard</a>
+<a href="{{ periodic_task_admin_url }}" class="text-sm font-medium text-sky-700 hover:text-sky-800">Periodic Tasks</a>
+<a href="{{ interval_schedule_admin_url }}" class="text-sm font-medium text-sky-700 hover:text-sky-800">Intervals</a>
+<a href="{{ crontab_schedule_admin_url }}" class="text-sm font-medium text-sky-700 hover:text-sky-800">Crontabs</a>
+<a href="{{ task_result_admin_url }}" class="text-sm font-medium text-sky-700 hover:text-sky-800">Task Results</a>
 {% endblock %}
 
 {% block content %}
@@ -37,7 +37,7 @@
     <div class="bg-white rounded-lg shadow p-6">
         <div class="flex items-center justify-between mb-4">
             <h3 class="font-semibold text-gray-900">Active Periodic Tasks</h3>
-            <a href="{{ periodic_task_admin_url }}" class="text-sm text-sky-600 hover:underline">Manage in admin</a>
+            <a href="{{ periodic_task_admin_url }}" class="text-sm text-sky-700 hover:underline">Manage in admin</a>
         </div>
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200 text-sm">
@@ -66,7 +66,7 @@
                         </td>
                     </tr>
                     {% empty %}
-                    <tr><td colspan="3" class="px-3 py-6 text-center text-gray-400">No periodic tasks configured.</td></tr>
+                    <tr><td colspan="3" class="px-3 py-6 text-center text-gray-600">No periodic tasks configured.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
@@ -77,21 +77,21 @@
     <div class="bg-white rounded-lg shadow p-6">
         <div class="flex items-center justify-between mb-4">
             <h3 class="font-semibold text-gray-900">Recent Task Results</h3>
-            <a href="{{ task_result_admin_url }}" class="text-sm text-sky-600 hover:underline">Full history</a>
+            <a href="{{ task_result_admin_url }}" class="text-sm text-sky-700 hover:underline">Full history</a>
         </div>
         <div class="space-y-3">
             {% for result in recent_results %}
             <div class="flex items-start justify-between gap-4 rounded-lg border border-gray-100 p-3">
                 <div>
                     <p class="font-medium text-gray-900 text-sm">{{ result.task_name|default:result.task_id }}</p>
-                    <p class="text-xs text-gray-400 mt-0.5">{{ result.date_done|date:"Y-m-d H:i" }}</p>
+                    <p class="text-xs text-gray-600 mt-0.5">{{ result.date_done|date:"Y-m-d H:i" }}</p>
                 </div>
                 <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold {% if result.status == 'SUCCESS' %}bg-emerald-100 text-emerald-700{% elif result.status == 'FAILURE' %}bg-red-100 text-red-700{% else %}bg-yellow-100 text-yellow-700{% endif %}">
                     {{ result.status }}
                 </span>
             </div>
             {% empty %}
-            <p class="text-sm text-gray-400">No task results recorded yet.</p>
+            <p class="text-sm text-gray-600">No task results recorded yet.</p>
             {% endfor %}
         </div>
     </div>

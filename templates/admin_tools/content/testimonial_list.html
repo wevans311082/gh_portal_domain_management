@@ -2,7 +2,7 @@
 {% block title %}Testimonials · {{ SITE_NAME }}{% endblock %}
 {% block page_title %}Testimonials{% endblock %}
 {% block content %}
-<div class="mb-4"><a href="{% url 'admin_tools:testimonial_create' %}" class="px-4 py-2 rounded bg-sky-600 text-white text-sm">+ New Testimonial</a></div>
+<div class="mb-4"><a href="{% url 'admin_tools:testimonial_create' %}" class="admin-button-primary px-4 py-2 rounded text-white text-sm">+ New Testimonial</a></div>
 <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
 <div class="overflow-x-auto">
 <table class="w-full text-sm">
@@ -23,7 +23,7 @@
       <td class="px-4 py-3 text-slate-500">{{ t.company|default:"—" }}</td>
       <td class="px-4 py-3">{{ t.rating }}/5</td>
       <td class="px-4 py-3 text-slate-500">{{ t.sort_order }}</td>
-      <td class="px-4 py-3">{% if t.is_active %}<span class="text-green-600">Yes</span>{% else %}<span class="text-slate-400">No</span>{% endif %}</td>
+      <td class="px-4 py-3">{% if t.is_active %}<span class="text-green-700">Yes</span>{% else %}<span class="text-slate-600">No</span>{% endif %}</td>
       <td class="px-4 py-3 text-right">
         <a href="{% url 'admin_tools:testimonial_edit' t.pk %}" class="text-sky-700 text-xs mr-3">Edit</a>
         <form method="post" action="{% url 'admin_tools:testimonial_delete' t.pk %}" class="inline">

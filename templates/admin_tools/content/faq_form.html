@@ -4,7 +4,7 @@
 {% block content %}
 <form method="post" class="bg-white rounded-xl border border-slate-200 p-6 max-w-3xl space-y-4">{% csrf_token %}
   {{ form.as_p }}
-  <button class="px-4 py-2 rounded bg-sky-600 text-white">Save</button>
+  <button class="admin-button-primary px-4 py-2 rounded text-white">Save</button>
   <a href="{% url 'admin_tools:faq_list' %}" class="ml-3 text-sm text-slate-500">Back</a>
 </form>
 {% endblock %}

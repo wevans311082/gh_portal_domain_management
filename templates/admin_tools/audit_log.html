@@ -24,7 +24,7 @@
         <input type="text" name="model" value="{{ model }}" placeholder="e.g. Invoice, Domain…"
                class="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
     </div>
-    <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700">Filter</button>
+    <button type="submit" class="admin-button-primary text-white px-4 py-2 rounded-lg text-sm font-medium">Filter</button>
     {% if query or action or model %}<a href="{% url 'admin_tools:audit_log' %}" class="border border-slate-200 text-slate-600 px-4 py-2 rounded-lg text-sm hover:bg-slate-50">Clear</a>{% endif %}
 </form>
 
@@ -53,10 +53,10 @@
                 <td class="px-4 py-3 font-mono text-xs text-slate-700">{{ entry.action }}</td>
                 <td class="px-4 py-3 text-xs text-slate-500">{{ entry.model_name|default:"" }}</td>
                 <td class="px-4 py-3 text-xs text-slate-500 font-mono">{{ entry.object_id|default:"" }}</td>
-                <td class="px-4 py-3 text-xs text-slate-400 font-mono">{{ entry.ip_address|default:"" }}</td>
+                <td class="px-4 py-3 text-xs text-slate-600 font-mono">{{ entry.ip_address|default:"" }}</td>
             </tr>
             {% empty %}
-            <tr><td colspan="6" class="px-4 py-8 text-center text-slate-400">No audit log entries found.</td></tr>
+            <tr><td colspan="6" class="px-4 py-8 text-center text-slate-600">No audit log entries found.</td></tr>
             {% endfor %}
         </tbody>
     </table>

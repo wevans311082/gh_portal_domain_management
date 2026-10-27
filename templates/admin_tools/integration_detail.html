@@ -4,7 +4,7 @@
 {% block page_title %}{{ service_label }} — Integration Tests{% endblock %}
 
 {% block header_actions %}
-<a href="{% url 'admin_tools:integrations_overview' %}" class="text-sm text-sky-600 hover:underline font-medium">← All Integrations</a>
+<a href="{% url 'admin_tools:integrations_overview' %}" class="text-sm text-sky-700 hover:underline font-medium">← All Integrations</a>
 {% if service == 'resellerclub' %}
 <a href="{% url 'admin_tools:resellerclub_debug' %}" class="text-sm text-amber-700 hover:underline font-medium">HTTP Debug</a>
 <form method="post" class="inline">
@@ -28,7 +28,7 @@
 {% endblock %}
 
 {% block content %}
-<p class="text-sm text-sky-500 mb-6">
+<p class="text-sm text-sky-700 mb-6">
     Each card below shows a live test call to the <strong>{{ service_label }}</strong> API: the URL called,
     response time, and the raw response data.
 </p>
@@ -40,7 +40,7 @@
         <div class="flex items-center justify-between px-5 py-3.5 border-b {% if test.ok %}border-sky-100 bg-sky-50/50{% else %}border-red-100 bg-red-50/50{% endif %}">
             <span class="font-semibold text-sm text-sky-900">{{ test.label }}</span>
             <div class="flex items-center gap-3">
-                <span class="text-xs text-sky-400">{{ test.elapsed_ms }} ms</span>
+                <span class="text-xs text-sky-700">{{ test.elapsed_ms }} ms</span>
                 {% if test.ok %}
                 <span class="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 text-xs px-2.5 py-1 rounded-full font-medium">✓ OK</span>
                 {% else %}
@@ -65,7 +65,7 @@
             {% if test.json %}
             <div x-data="{ open: false }">
                 <button @click="open = !open"
-                        class="text-xs text-sky-600 hover:underline font-medium mb-2 flex items-center gap-1">
+                        class="text-xs text-sky-700 hover:underline font-medium mb-2 flex items-center gap-1">
                     <span x-text="open ? 'Hide response' : 'Show response'">Show response</span>
                     <svg class="w-3 h-3 transition-transform" :class="open && 'rotate-180'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
@@ -139,7 +139,7 @@
                     <td class="px-4 py-2 text-slate-600">
                         {% if order.order_details_json %}
                         <details>
-                            <summary class="cursor-pointer text-sky-600">View</summary>
+                            <summary class="cursor-pointer text-sky-700">View</summary>
                             <pre class="mt-2 text-[11px] text-slate-700 bg-slate-50 rounded p-2 max-h-48 overflow-auto whitespace-pre-wrap">{{ order.order_details_json }}</pre>
                         </details>
                         {% elif order.order_details_error %}
@@ -164,19 +164,19 @@
         <h2 class="text-sm font-semibold text-sky-900 mb-3">Synced WHM Inventory</h2>
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
             <div class="bg-sky-50 rounded-lg p-3">
-                <p class="text-sky-500">Packages</p>
+                <p class="text-sky-700">Packages</p>
                 <p class="text-sky-900 font-semibold text-base">{{ whm_context.package_total }}</p>
             </div>
             <div class="bg-sky-50 rounded-lg p-3">
-                <p class="text-sky-500">Accounts</p>
+                <p class="text-sky-700">Accounts</p>
                 <p class="text-sky-900 font-semibold text-base">{{ whm_context.account_total }}</p>
             </div>
             <div class="bg-sky-50 rounded-lg p-3">
-                <p class="text-sky-500">Usage Snapshots</p>
+                <p class="text-sky-700">Usage Snapshots</p>
                 <p class="text-sky-900 font-semibold text-base">{{ whm_context.usage_total }}</p>
             </div>
             <div class="bg-sky-50 rounded-lg p-3">
-                <p class="text-sky-500">Server Version</p>
+                <p class="text-sky-700">Server Version</p>
                 <p class="text-sky-900 font-semibold text-base">{{ whm_context.latest_server.server_version|default:"—" }}</p>
             </div>
         </div>
@@ -201,7 +201,7 @@
             <form method="post">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="reconcile_domains">
-                <button type="submit" class="px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs font-medium">Run Cross-check</button>
+                <button type="submit" class="px-3 py-1.5 rounded-lg bg-amber-700 text-white text-xs font-medium">Run Cross-check</button>
             </form>
         </div>
 
@@ -341,7 +341,7 @@
                     <input name="maxpop" class="w-full border border-slate-200 rounded px-2 py-1.5 text-xs" placeholder="50">
                 </div>
                 <div>
-                    <button type="submit" class="w-full px-3 py-1.5 rounded bg-emerald-600 text-white text-xs font-medium">Create Package</button>
+                    <button type="submit" class="w-full px-3 py-1.5 rounded bg-emerald-700 text-white text-xs font-medium">Create Package</button>
                 </div>
             </form>
         </div>
@@ -397,7 +397,7 @@
                                         <input name="quota" value="{{ pkg.disk_quota_mb }}" placeholder="disk MB" class="border border-slate-200 rounded px-2 py-1">
                                         <input name="bwlimit" value="{{ pkg.bandwidth_quota_mb }}" placeholder="bw MB" class="border border-slate-200 rounded px-2 py-1">
                                         <input name="maxpop" value="{{ pkg.max_email_accounts }}" placeholder="max email" class="border border-slate-200 rounded px-2 py-1">
-                                        <button type="submit" class="col-span-2 px-2 py-1 rounded bg-sky-600 text-white">Update</button>
+                                        <button type="submit" class="admin-button-primary col-span-2 px-2 py-1 rounded text-white">Update</button>
                                     </form>
                                 </details>
                                 <form method="post" class="inline" onsubmit="return confirm('Delete package {{ pkg.name }} in WHM?')">
@@ -428,7 +428,7 @@
                     <option value="yes" {% if whm_context.filters.suspended == 'yes' %}selected{% endif %}>Suspended only</option>
                     <option value="no" {% if whm_context.filters.suspended == 'no' %}selected{% endif %}>Active only</option>
                 </select>
-                <button type="submit" class="px-3 py-1.5 rounded-lg bg-sky-600 text-white text-xs font-medium">Filter</button>
+                <button type="submit" class="admin-button-primary px-3 py-1.5 rounded-lg text-white text-xs font-medium">Filter</button>
             </form>
         </div>
         <div class="overflow-x-auto">

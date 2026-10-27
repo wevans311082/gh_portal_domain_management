@@ -29,7 +29,7 @@
           {% endif %}
         </td>
         <td class="px-5 py-3 text-right space-x-3">
-          <a href="{% url 'admin_tools:email_template_edit' name=tpl.name %}" class="text-sky-600 hover:underline text-xs">
+          <a href="{% url 'admin_tools:email_template_edit' name=tpl.name %}" class="text-sky-700 hover:underline text-xs">
             {% if tpl.db_template %}Edit{% else %}Customise{% endif %}
           </a>
           {% if tpl.db_template %}
@@ -41,7 +41,7 @@
         </td>
       </tr>
       {% empty %}
-      <tr><td colspan="3" class="px-5 py-8 text-center text-slate-400">No templates found.</td></tr>
+      <tr><td colspan="3" class="px-5 py-8 text-center text-slate-600">No templates found.</td></tr>
       {% endfor %}
     </tbody>
   </table>
