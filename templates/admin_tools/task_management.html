@@ -5,13 +5,16 @@
 
 {% block header_actions %}
 <a href="{% url 'admin_tools:dashboard' %}" class="text-sm font-medium text-sky-700 hover:text-sky-800">&larr; Dashboard</a>
-<a href="{{ periodic_task_admin_url }}" class="text-sm font-medium text-sky-700 hover:text-sky-800">Periodic Tasks</a>
-<a href="{{ interval_schedule_admin_url }}" class="text-sm font-medium text-sky-700 hover:text-sky-800">Intervals</a>
-<a href="{{ crontab_schedule_admin_url }}" class="text-sm font-medium text-sky-700 hover:text-sky-800">Crontabs</a>
-<a href="{{ task_result_admin_url }}" class="text-sm font-medium text-sky-700 hover:text-sky-800">Task Results</a>
 {% endblock %}
 
 {% block content %}
+<nav aria-label="Task configuration" class="flex flex-wrap gap-x-5 gap-y-3 mb-5 text-sm font-medium text-sky-800">
+  <a href="{{ periodic_task_admin_url }}" class="underline">Periodic tasks</a>
+  <a href="{{ interval_schedule_admin_url }}" class="underline">Intervals</a>
+  <a href="{{ crontab_schedule_admin_url }}" class="underline">Crontabs</a>
+  <a href="{{ task_result_admin_url }}" class="underline">Task results</a>
+</nav>
+{% include "admin_tools/partials/public_deliveries.html" %}
 <div class="">
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
     <div class="bg-white rounded-lg shadow p-6">

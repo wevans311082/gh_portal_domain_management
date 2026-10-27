@@ -84,7 +84,7 @@ def customer_domain_names(user) -> list:
         found.extend(
             Domain.objects.filter(user=user)
             .exclude(status__in=[Domain.STATUS_CANCELLED, Domain.STATUS_TRANSFERRED])
-            .values_list("name", flat=True)
+            .order_by("pk").values_list("name", flat=True)[:50]
         )
     except Exception:
         pass
@@ -94,8 +94,8 @@ def customer_domain_names(user) -> list:
         services = Service.objects.filter(user=user).exclude(
             status__in=[Service.STATUS_CANCELLED, Service.STATUS_TERMINATED]
         )
-        found.extend(services.values_list("domain_name", flat=True))
-        found.extend(services.values_list("cpanel_domain", flat=True))
+        found.extend(services.order_by("pk").values_list("domain_name", flat=True)[:50])
+        found.extend(services.order_by("pk").values_list("cpanel_domain", flat=True)[:50])
     except Exception:
         pass
 

@@ -1,0 +1,59 @@
+{% extends "admin_tools/components/table.html" %}
+{% block table_head %}
+            <tr>
+                <th scope="col" class="px-4 py-3 text-left font-semibold text-slate-600">Email</th>
+                <th scope="col" class="px-4 py-3 text-left font-semibold text-slate-600">Name</th>
+                <th scope="col" class="px-4 py-3 text-left font-semibold text-slate-600">Company</th>
+                <th scope="col" class="px-4 py-3 text-left font-semibold text-slate-600">Joined</th>
+                <th scope="col" class="px-4 py-3 text-left font-semibold text-slate-600">Flags</th>
+                <th scope="col" class="px-4 py-3 text-left font-semibold text-slate-600">Actions</th>
+            </tr>
+        {% endblock %}
+{% block table_body %}
+            {% for u in page_obj %}
+            <tr class="hover:bg-slate-50 transition-colors">
+                <th scope="row" class="px-4 py-3 font-medium text-slate-800">{{ u.email }}</th>
+                <td class="px-4 py-3 text-slate-600">{{ u.full_name|default:"—" }}</td>
+                <td class="px-4 py-3 text-slate-600">
+                    {% if u.business_profile %}
+                    <p class="font-medium text-slate-700">{{ u.business_profile.company_name|default:"—" }}</p>
+                    <p class="text-xs text-slate-500">{{ u.business_profile.company_number|default:"No number" }}</p>
+                    {% if u.business_profile.is_verified %}
+                    <span class="inline-flex items-center mt-1 text-xs px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-medium">Verified</span>
+                    {% elif u.business_profile.company_number %}
+                    <span class="inline-flex items-center mt-1 text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-medium">Unverified</span>
+                    {% endif %}
+                    {% else %}
+                    <span class="text-slate-600">—</span>
+                    {% endif %}
+                </td>
+                <td class="px-4 py-3 text-slate-600 text-xs">{{ u.created_at|date:"d M Y" }}</td>
+                <td class="px-4 py-3">
+                    <div class="flex gap-1 flex-wrap">
+                        {% if u.is_superuser %}<span class="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-medium">Super</span>{% endif %}
+                        {% if u.is_staff %}<span class="text-xs bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded font-medium">Staff</span>{% endif %}
+                        {% if not u.is_active %}<span class="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-medium">Inactive</span>{% endif %}
+                        {% if u.mfa_enabled %}<span class="text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-medium">2FA</span>{% endif %}
+                    </div>
+                </td>
+                <td class="px-4 py-3">
+                    <div class="flex flex-wrap items-center gap-2">
+                        {% if IS_PLATFORM_OWNER %}<a href="{% url 'admin_tools:user_edit' u.pk %}" class="text-xs text-indigo-600 hover:underline">Edit user</a>
+                        <a href="{% url 'admin_tools:user_mfa_manage' u.pk %}" class="text-xs text-sky-700 hover:underline">Manage MFA</a>{% endif %}
+                        {% if not u.is_staff and ADMIN_ACCESS.cart_builder %}
+                        <a href="{% url 'admin_tools:cart_builder' %}?user_id={{ u.pk }}" class="text-xs text-emerald-700 hover:underline">Cart Builder</a>
+                        {% endif %}
+                        {% if IS_PLATFORM_OWNER and u.pk != request.user.pk and not u.is_staff and not u.is_superuser and u.is_active %}
+                        <form method="post" action="{% url 'admin_tools:user_su_start' u.pk %}" class="inline">{% csrf_token %}
+                            <label class="sr-only" for="impersonation-reason-{{ u.pk }}">Reason for impersonating {{ u.email }}</label>
+                            <input id="impersonation-reason-{{ u.pk }}" name="reason" maxlength="500" required placeholder="Support reason">
+                            <button class="text-xs text-amber-700 hover:underline">Start customer impersonation</button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6">{% include "admin_tools/components/empty_state.html" with empty_heading="No users found" %}</td></tr>
+            {% endfor %}
+        {% endblock %}

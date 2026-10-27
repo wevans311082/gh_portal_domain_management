@@ -4,118 +4,16 @@
 {% block page_title %}Users &amp; Accounts{% endblock %}
 
 {% block content %}
+{% include "admin_tools/components/page_header.html" with heading="Users and accounts" description="Find customer accounts and review account status." %}
 <!-- Summary -->
 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-        <p class="text-xs text-slate-500 font-medium uppercase tracking-wide mb-1">Total Users</p>
-        <p class="text-3xl font-bold text-slate-800">{{ total_users }}</p>
-    </div>
-    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-        <p class="text-xs text-slate-500 font-medium uppercase tracking-wide mb-1">Staff Members</p>
-        <p class="text-3xl font-bold text-indigo-700">{{ staff_count }}</p>
-    </div>
-    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-        <p class="text-xs text-slate-500 font-medium uppercase tracking-wide mb-1">Superadmins</p>
-        <p class="text-3xl font-bold text-indigo-700">{{ superuser_count }}</p>
-    </div>
+    {% include "admin_tools/components/stat_card.html" with label="Total Users" value=total_users %}
+    {% if IS_PLATFORM_OWNER %}{% include "admin_tools/components/stat_card.html" with label="Staff Members" value=staff_count %}
+    {% include "admin_tools/components/stat_card.html" with label="Superadmins" value=superuser_count %}{% endif %}
 </div>
 
-<!-- Search -->
-<div class="bg-white rounded-xl border border-slate-200 shadow-sm p-4 mb-5">
-    <div class="flex flex-wrap gap-2">
-        <form method="get" class="flex flex-wrap gap-2 flex-1 min-w-[260px]">
-            <input type="text" name="q" value="{{ search_q }}" placeholder="Search by email or name…"
-                   class="border border-slate-200 rounded-lg px-3 py-2 text-sm flex-1 min-w-[200px] focus:outline-none focus:ring-2 focus:ring-indigo-400">
-            <button type="submit" class="admin-button-primary text-white px-4 py-2 rounded-lg text-sm font-medium">Search</button>
-            {% if search_q %}<a href="{% url 'admin_tools:users' %}" class="border border-slate-200 text-slate-600 px-4 py-2 rounded-lg text-sm hover:bg-slate-50">Clear</a>{% endif %}
-        </form>
-        <form method="post" class="flex flex-wrap items-center gap-2">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="sync_whm">
-            <label for="whm-sync-direction" class="text-sm text-slate-600 font-medium">Direction</label>
-            <select
-                name="direction"
-                id="whm-sync-direction"
-                class="h-10 border border-slate-200 rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400"
-            >
-                <option value="import">Import from WHM</option>
-                <option value="export">Export to WHM</option>
-            </select>
-            <button type="submit" class="admin-button-primary inline-flex items-center justify-center h-10 text-white px-4 rounded-lg text-sm font-medium">Sync WHM</button>
-        </form>
-        <a href="{% url 'admin_tools:user_create' %}" class="inline-flex items-center justify-center h-10 bg-emerald-700 text-white px-4 rounded-lg text-sm font-medium hover:bg-emerald-800">+ New User</a>
-    </div>
-</div>
+{% include "admin_tools/partials/users_actions.html" with action_bar_label="Customer search and actions" %}
 
-<!-- User table -->
-<div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-    <div class="overflow-x-auto">
-<table class="w-full text-sm">
-        <thead class="bg-slate-50 border-b border-slate-200">
-            <tr>
-                <th class="px-4 py-3 text-left font-semibold text-slate-600">Email</th>
-                <th class="px-4 py-3 text-left font-semibold text-slate-600">Name</th>
-                <th class="px-4 py-3 text-left font-semibold text-slate-600">Company</th>
-                <th class="px-4 py-3 text-left font-semibold text-slate-600">Joined</th>
-                <th class="px-4 py-3 text-left font-semibold text-slate-600">Flags</th>
-                <th class="px-4 py-3 text-left font-semibold text-slate-600">Actions</th>
-            </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100">
-            {% for u in page_obj %}
-            <tr class="hover:bg-slate-50 transition-colors">
-                <td class="px-4 py-3 font-medium text-slate-800">{{ u.email }}</td>
-                <td class="px-4 py-3 text-slate-600">{{ u.full_name|default:"—" }}</td>
-                <td class="px-4 py-3 text-slate-600">
-                    {% if u.business_profile %}
-                    <p class="font-medium text-slate-700">{{ u.business_profile.company_name|default:"—" }}</p>
-                    <p class="text-xs text-slate-500">{{ u.business_profile.company_number|default:"No number" }}</p>
-                    {% if u.business_profile.is_verified %}
-                    <span class="inline-flex items-center mt-1 text-xs px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-medium">Verified</span>
-                    {% elif u.business_profile.company_number %}
-                    <span class="inline-flex items-center mt-1 text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-medium">Unverified</span>
-                    {% endif %}
-                    {% else %}
-                    <span class="text-slate-600">—</span>
-                    {% endif %}
-                </td>
-                <td class="px-4 py-3 text-slate-600 text-xs">{{ u.created_at|date:"d M Y" }}</td>
-                <td class="px-4 py-3">
-                    <div class="flex gap-1 flex-wrap">
-                        {% if u.is_superuser %}<span class="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-medium">Super</span>{% endif %}
-                        {% if u.is_staff %}<span class="text-xs bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded font-medium">Staff</span>{% endif %}
-                        {% if not u.is_active %}<span class="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-medium">Inactive</span>{% endif %}
-                        {% if u.mfa_enabled %}<span class="text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-medium">2FA</span>{% endif %}
-                    </div>
-                </td>
-                <td class="px-4 py-3">
-                    <div class="flex flex-wrap items-center gap-2">
-                        <a href="{% url 'admin_tools:user_edit' u.pk %}" class="text-xs text-indigo-600 hover:underline">Edit user</a>
-                        <a href="{% url 'admin_tools:user_mfa_manage' u.pk %}" class="text-xs text-sky-700 hover:underline">Manage MFA</a>
-                        {% if not u.is_staff %}
-                        <a href="{% url 'admin_tools:cart_builder' %}?user_id={{ u.pk }}" class="text-xs text-emerald-700 hover:underline">Cart Builder</a>
-                        {% endif %}
-                        {% if u.pk != request.user.pk %}
-                        <form method="post" action="{% url 'admin_tools:user_su_start' u.pk %}" class="inline">{% csrf_token %}
-                            <button class="text-xs text-amber-700 hover:underline" onclick="return confirm('Impersonate this user in the customer portal?')">SU as user</button>
-                        </form>
-                        {% endif %}
-                    </div>
-                </td>
-            </tr>
-            {% empty %}
-            <tr><td colspan="6" class="px-4 py-8 text-center text-slate-600 text-sm">No users found.</td></tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
-
-    {% if page_obj.has_other_pages %}
-    <div class="px-4 py-3 border-t border-slate-200 flex items-center gap-2 text-sm">
-        {% if page_obj.has_previous %}<a href="?page={{ page_obj.previous_page_number }}{% if search_q %}&q={{ search_q }}{% endif %}" class="px-3 py-1.5 border border-slate-200 rounded hover:bg-slate-50">← Prev</a>{% endif %}
-        <span class="text-slate-500">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
-        {% if page_obj.has_next %}<a href="?page={{ page_obj.next_page_number }}{% if search_q %}&q={{ search_q }}{% endif %}" class="px-3 py-1.5 border border-slate-200 rounded hover:bg-slate-50">Next →</a>{% endif %}
-    </div>
-    {% endif %}
-</div>
+{% include "admin_tools/partials/users_table.html" with table_label="Customer accounts" %}
+{% include "admin_tools/_pagination.html" %}
 {% endblock %}

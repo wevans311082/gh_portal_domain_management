@@ -19,15 +19,19 @@ class PortalResetPasswordForm(ResetPasswordForm):
     def clean_email(self):
         email = (self.cleaned_data.get("email") or "").strip().lower()
         email = get_adapter().clean_email(email)
-        self.users = list(get_user_model().objects.filter(email__iexact=email, is_active=True))
+        self.users = list(get_user_model().objects.filter(email__iexact=email, is_active=True).order_by("pk")[:2])
+        if len(self.users) > 1:
+            # Legacy case-variant addresses must not turn one reset request
+            # into an arbitrary number of token messages.
+            raise forms.ValidationError("This request cannot be completed. Please contact support.")
         if not self.users and not app_settings.PREVENT_ENUMERATION:
             raise get_adapter().validation_error("unknown_email")
         return email
 
 
 class RegistrationForm(forms.ModelForm):
-    password1 = forms.CharField(label="Password", widget=forms.PasswordInput)
-    password2 = forms.CharField(label="Confirm Password", widget=forms.PasswordInput)
+    password1 = forms.CharField(label="Password", max_length=1024, widget=forms.PasswordInput)
+    password2 = forms.CharField(label="Confirm Password", max_length=1024, widget=forms.PasswordInput)
 
     class Meta:
         model = User

@@ -5,6 +5,7 @@ Tests for:
   - core_tags templatetag filters
 """
 import pytest
+from tests.security_helpers import login_owner
 from datetime import date, timedelta
 from decimal import Decimal
 from unittest.mock import patch, MagicMock
@@ -220,7 +221,7 @@ def test_stats_requires_staff(client, django_user_model):
 @pytest.mark.django_db
 def test_stats_renders_for_staff(client, django_user_model):
     staff = make_user(django_user_model, email="staff@example.com", is_staff=True)
-    client.force_login(staff)
+    login_owner(client, staff)
     response = client.get(reverse("admin_tools:stats"))
     assert response.status_code == 200
     assert b"Stats" in response.content
@@ -231,7 +232,7 @@ def test_stats_shows_expiring_domains(client, django_user_model):
     staff = make_user(django_user_model, email="staff2@example.com", is_staff=True)
     owner = make_user(django_user_model, email="owner@example.com")
     make_domain(owner, name="expiring-soon.com", expires_days=10)
-    client.force_login(staff)
+    login_owner(client, staff)
     response = client.get(reverse("admin_tools:stats"))
     assert b"expiring-soon.com" in response.content
 
@@ -241,7 +242,7 @@ def test_stats_does_not_show_far_expiry(client, django_user_model):
     staff = make_user(django_user_model, email="staff3@example.com", is_staff=True)
     owner = make_user(django_user_model, email="owner2@example.com")
     make_domain(owner, name="farfuture.com", expires_days=60)
-    client.force_login(staff)
+    login_owner(client, staff)
     response = client.get(reverse("admin_tools:stats"))
     assert b"farfuture.com" not in response.content
 

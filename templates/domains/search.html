@@ -57,6 +57,7 @@
             {% octicon "globe" classes="w-3.5 h-3.5" %} Live registry availability
         </span>
         <h1 class="text-3xl md:text-5xl font-bold text-slate-900 mb-3">Find a domain with security in mind</h1>
+        {% if extensions_limited %}<p class="text-sm text-slate-700 mb-3">Search up to {{ search_extension_limit }} extensions at a time. Enter a full domain name to check another supported extension.</p>{% endif %}
         <p class="text-lg text-slate-600">Search supported extensions in real time through Cyber Ask Domains. Results refresh as you type.</p>
     </div>
 
@@ -75,6 +76,7 @@
                 <input
                     type="text"
                     id="domain-search-input"
+                    aria-label="Domain name to search" maxlength="253"
                     name="q"
                     placeholder="Enter your perfect domain..."
                     class="w-full border border-slate-300 rounded-lg pl-10 pr-4 py-3 text-lg focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
@@ -82,7 +84,7 @@
                 <input type="hidden" name="tlds" id="tld-filter-input" value="">
             </div>
             <button type="submit"
-                    class="bg-sky-600 text-white px-6 py-3 rounded-lg hover:bg-sky-700 font-semibold inline-flex items-center gap-2">
+                    class="bg-sky-700 text-white px-6 py-3 rounded-lg hover:bg-sky-800 font-semibold inline-flex items-center gap-2">
                 {% octicon "search" classes="w-4 h-4" %} Search
             </button>
         </form>
@@ -123,7 +125,7 @@
             </button>
             {% endfor %}
         </div>
-        <p class="text-xs text-slate-400 mt-2">Click chips to narrow results. With no filter selected, all extensions are checked.</p>
+        <p class="text-xs text-slate-700 mt-2">Click chips to narrow results. With no filter selected, up to 10 supported extensions are checked.</p>
     </div>
 
     <div id="availability-results" class="max-w-5xl mx-auto"></div>

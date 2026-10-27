@@ -1,6 +1,7 @@
 """Django email backend that sends via Microsoft Graph when enabled."""
 import logging
 import socket
+from dataclasses import replace
 
 from django.conf import settings
 from django.core.mail.backends.base import BaseEmailBackend
@@ -99,9 +100,16 @@ class MicrosoftGraphEmailBackend(BaseEmailBackend):
                 purpose = self._purpose_for(message)
                 mailbox = config.mailbox_for(purpose)
                 config.validate(purpose=purpose)
-                client.send_mail(mailbox=mailbox, message=self._graph_message(message))
+                strict_public = (getattr(message, "extra_headers", {}) or {}).get("X-CyberAsk-No-Fallback") == "1"
+                send_client = MicrosoftGraphMailClient(replace(config, timeout_seconds=min(config.timeout_seconds, 10))) if strict_public else client
+                send_client.send_mail(mailbox=mailbox, message=self._graph_message(message))
                 sent += 1
             except Exception as exc:
+                if (getattr(message, "extra_headers", {}) or {}).get("X-CyberAsk-No-Fallback") == "1":
+                    # Graph may have accepted the send before a timeout. Public
+                    # outbox jobs record an uncertain outcome, never a second
+                    # delivery through a different transport.
+                    raise MicrosoftGraphMailError("Delivery outcome requires review.") from None
                 logger.warning("Microsoft Graph mail failed (%s); trying fallback backend", exc)
                 try:
                     sent += self._safe_fallback_send([message]) or 0

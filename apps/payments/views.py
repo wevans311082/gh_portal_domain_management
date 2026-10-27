@@ -322,7 +322,8 @@ def delete_card(request, pk):
     card = get_object_or_404(SavedPaymentMethod, pk=pk, user=request.user)
     try:
         import stripe
-        stripe.api_key = get_runtime_setting("STRIPE_SECRET_KEY", "")
+        from apps.payments.stripe_service import configure_stripe
+        configure_stripe()
         stripe.PaymentMethod.detach(card.stripe_pm_id)
     except Exception as e:
         logger.warning("Could not detach PM from Stripe: %s", e)

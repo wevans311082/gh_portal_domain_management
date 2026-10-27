@@ -1,0 +1,41 @@
+{% extends "base_admin.html" %}
+{% load static %}
+{% block title %}Global search - {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Global search{% endblock %}
+{% block content %}
+{% include "admin_tools/components/page_header.html" with heading="Search admin records" description="Find records across the areas available to your role." %}
+<section class="admin-card admin-search-form">
+  <form method="get" data-admin-search data-suggestions-url="{% url 'admin_tools:search_suggestions' %}" data-no-field-hints>
+    {% include "admin_tools/components/error_summary.html" %}
+    {% include "admin_tools/components/field.html" with field=form.q %}
+    {{ form.group }}
+    <datalist id="search-suggestions"></datalist>
+    <div class="admin-search-actions">
+      <button type="submit" class="admin-button-primary admin-button">Search</button>
+      {% if selected_group %}<a class="admin-button-secondary admin-button" href="{% url 'admin_tools:search' %}?q={{ form.q.value|urlencode }}">Search all available groups</a>{% endif %}
+      <a class="admin-button-secondary admin-button" href="{% url 'admin_tools:search' %}">Clear search</a>
+    </div>
+    <p class="admin-muted" role="status" data-search-status></p>
+  </form>
+</section>
+{% if sections %}
+<div class="admin-search-results" aria-label="Search results">
+  {% for section in sections %}
+  <section class="admin-card">
+    <div class="admin-search-group-heading"><h2>{{ section.label }}</h2><p>{{ section.count }}{% if section.truncated %}+{% endif %} matching record{{ section.count|pluralize }}</p></div>
+    {% if section.items %}
+    <ul class="admin-search-items">
+      {% for item in section.items %}<li><a href="{{ item.url }}">{{ item.title }}</a><p>{{ item.summary }}</p></li>{% endfor %}
+    </ul>
+    {% if not selected_group and section.count > 5 %}<p class="admin-search-group-footer"><a href="?q={{ form.q.value|urlencode }}&amp;group={{ section.key }}">Browse {{ section.label|lower }} matches</a></p>{% endif %}
+    {% else %}{% include "admin_tools/components/empty_state.html" with empty_heading="No matching records" empty_message="Try a different prefix or identifier." %}{% endif %}
+    {% if section.truncated %}<p class="admin-search-group-footer">Showing at most {{ max_results }} matches. Enter more specific text to narrow the results.</p>{% endif %}
+  </section>
+  {% endfor %}
+</div>
+{% if page_obj %}{% include "admin_tools/_pagination.html" %}{% endif %}
+{% elif not form.errors %}
+{% include "admin_tools/components/empty_state.html" with empty_heading="Start a search" empty_message="Enter at least two characters. Results and suggestions include only the areas your role can access." %}
+{% endif %}
+{% endblock %}
+{% block extra_js %}<script src="{% static 'js/admin-search.js' %}"></script>{% endblock %}

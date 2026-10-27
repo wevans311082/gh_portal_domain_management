@@ -1,0 +1,24 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Request could not be completed</title>
+  <link rel="stylesheet" href="{% static 'css/public-errors.css' %}">
+</head>
+<body>
+  <main class="request-error" aria-labelledby="request-title">
+    <p class="eyebrow">Request {{ status }}</p>
+    <h1 id="request-title">Request could not be completed</h1>
+    <p>{{ message }}</p>
+    {% if retry_after %}<p>Wait up to {{ retry_after }} seconds before trying again. Your request has not been processed.</p>{% endif %}
+    {% if status == 413 %}<p>Shorten your message or remove extra form data, then submit again. Files are not accepted by this form.</p>{% endif %}
+    {% if status == 503 %}<p>Please try again later.</p>{% endif %}
+    <p>Use your browser's Back button to return to your entered details. Avoid reloading a submitted form.</p>
+    <nav aria-label="Recovery actions">
+      <a href="{{ return_path }}">Open a fresh page</a>
+      <a href="/">Go to home page</a>
+    </nav>
+  </main>
+</body>
+</html>

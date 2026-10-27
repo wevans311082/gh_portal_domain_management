@@ -1,4 +1,5 @@
 import pytest
+from tests.security_helpers import login_owner
 from decimal import Decimal
 from django.urls import reverse
 from django.utils import timezone
@@ -21,7 +22,7 @@ def test_manual_register_whm_package_dropdown_uses_snapshot(client, django_user_
     from apps.provisioning.models import WHMPackageSnapshot
 
     staff = django_user_model.objects.create_user(email="admin-pkg@example.com", password="x", is_staff=True)
-    client.force_login(staff)
+    login_owner(client, staff)
     WHMPackageSnapshot.objects.create(name="starter", is_active=True)
     WHMPackageSnapshot.objects.create(name="business", is_active=True)
 
@@ -41,7 +42,7 @@ def test_manual_register_whm_package_dropdown_uses_snapshot(client, django_user_
 def test_manual_register_creates_domain_without_invoice(client, django_user_model, monkeypatch, settings):
     staff = django_user_model.objects.create_user(email="admin@example.com", password="x", is_staff=True)
     customer = django_user_model.objects.create_user(email="buyer@example.com", password="x")
-    client.force_login(staff)
+    login_owner(client, staff)
 
     settings.RESELLERCLUB_CUSTOMER_ID = "cust-1"
     settings.WHM_NAMESERVERS = ["ns1.example.com", "ns2.example.com"]
@@ -102,7 +103,7 @@ def test_manual_register_creates_domain_without_invoice(client, django_user_mode
 def test_manual_generate_invoice_after_registration(client, django_user_model):
     staff = django_user_model.objects.create_user(email="admin2@example.com", password="x", is_staff=True)
     customer = django_user_model.objects.create_user(email="buyer2@example.com", password="x")
-    client.force_login(staff)
+    login_owner(client, staff)
     contact = DomainContact.objects.create(
         user=customer,
         label="P",

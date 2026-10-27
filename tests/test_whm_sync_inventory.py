@@ -1,4 +1,5 @@
 import pytest
+from tests.security_helpers import login_owner
 from django.urls import reverse
 
 from apps.products.models import Package
@@ -321,7 +322,7 @@ def test_whm_integration_detail_refresh_now_runs_sync_immediately(client, django
         password="password123",
         is_staff=True,
     )
-    client.force_login(staff)
+    login_owner(client, staff)
 
     called = {}
 
@@ -350,7 +351,7 @@ def test_whm_integration_detail_reconcile_action_runs_whm_and_registrar(client, 
         password="password123",
         is_staff=True,
     )
-    client.force_login(staff)
+    login_owner(client, staff)
 
     called = {"synced": False, "reported": False}
 
@@ -383,7 +384,7 @@ def test_whm_integration_detail_package_create_runs_whm_and_sync(client, django_
         password="password123",
         is_staff=True,
     )
-    client.force_login(staff)
+    login_owner(client, staff)
 
     called = {"created": False, "synced": False}
 
@@ -415,7 +416,7 @@ def test_whm_integration_detail_includes_synced_inventory_context(client, django
         password="password123",
         is_staff=True,
     )
-    client.force_login(staff)
+    login_owner(client, staff)
 
     WHMServerSnapshot.objects.create(host="whm.example.com", server_version="11.120", payload={})
     WHMPackageSnapshot.objects.create(name="starter", is_active=True)
@@ -437,7 +438,7 @@ def test_whm_integration_detail_includes_reconciliation_context(client, django_u
         password="password123",
         is_staff=True,
     )
-    client.force_login(staff)
+    login_owner(client, staff)
 
     from apps.provisioning.models import WHMSyncRun
 
@@ -472,7 +473,7 @@ def test_resellerclub_integration_detail_includes_domain_expiry_list(client, dja
         password="password123",
         is_staff=True,
     )
-    client.force_login(staff)
+    login_owner(client, staff)
 
     monkeypatch.setattr(
         "apps.domains.resellerclub_client.ResellerClubClient.list_all_domain_orders",
@@ -503,7 +504,7 @@ def test_resellerclub_refresh_now_redirects_to_full_refresh(client, django_user_
         password="password123",
         is_staff=True,
     )
-    client.force_login(staff)
+    login_owner(client, staff)
 
     called = {"ok": False}
 
@@ -538,7 +539,7 @@ def test_resellerclub_full_refresh_requests_all_fields(client, django_user_model
         password="password123",
         is_staff=True,
     )
-    client.force_login(staff)
+    login_owner(client, staff)
 
     captured = {}
 

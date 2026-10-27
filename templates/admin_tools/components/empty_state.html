@@ -1,0 +1,5 @@
+<div class="admin-empty-state">
+  <h3>{{ empty_heading|default:'No results found' }}</h3>
+  <p>{{ empty_message|default:'Try a different search or clear the filters.' }}</p>
+  {% if empty_url and empty_action %}<a class="admin-button-secondary admin-button" href="{{ empty_url }}">{{ empty_action }}</a>{% endif %}
+</div>

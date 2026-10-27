@@ -80,7 +80,11 @@ class ContentSecurityPolicyMiddleware:
                 directives.append(f"{directive_name} {' '.join(sources)}")
 
         if directives:
-            response["Content-Security-Policy"] = "; ".join(directives)
+            policy = "; ".join(directives)
+            existing = response.get("Content-Security-Policy")
+            # Separate policies are enforced together (intersection). Retain
+            # endpoint-specific sandbox/nonces instead of replacing them.
+            response["Content-Security-Policy"] = f"{existing}, {policy}" if existing else policy
 
         return response
 

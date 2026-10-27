@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en"><body>
+<p>You have received a new contact form submission.</p>
+<dl>
+<dt>Name</dt><dd>{{ name }}</dd>
+<dt>Email</dt><dd><a href="mailto:{{ email }}">{{ email }}</a></dd>
+<dt>Phone</dt><dd>{{ phone|default:"—" }}</dd>
+<dt>Subject</dt><dd>{{ subject|default:"—" }}</dd>
+</dl>
+<p><strong>Message</strong></p>
+<div style="white-space:pre-wrap">{{ message }}</div>
+</body></html>

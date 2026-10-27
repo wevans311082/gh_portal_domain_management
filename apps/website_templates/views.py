@@ -134,15 +134,24 @@ def thumbnail(request, slug):
             return HttpResponse(fh.read(), content_type="image/png")
 
     # Return an SVG placeholder
-    initials = template_obj.name[:2].upper()
+    from xml.sax.saxutils import escape
+    # XML 1.0 forbids control/surrogate code points even in escaped text.
+    name = "".join(char for char in template_obj.name if ord(char) in (9, 10, 13) or
+                   0x20 <= ord(char) <= 0xD7FF or 0xE000 <= ord(char) <= 0xFFFD or
+                   0x10000 <= ord(char) <= 0x10FFFF)
+    initials = escape(name[:2].upper())
+    safe_name = escape(name)
     svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="400" height="250">
   <rect width="400" height="250" fill="#0369a1"/>
   <text x="200" y="140" font-family="sans-serif" font-size="64" fill="white"
         text-anchor="middle" dominant-baseline="middle">{initials}</text>
   <text x="200" y="200" font-family="sans-serif" font-size="16" fill="#bae6fd"
-        text-anchor="middle">{template_obj.name}</text>
+        text-anchor="middle">{safe_name}</text>
 </svg>"""
-    return HttpResponse(svg.encode(), content_type="image/svg+xml")
+    response = HttpResponse(svg.encode(), content_type="image/svg+xml")
+    response["Content-Security-Policy"] = "default-src 'none'; sandbox"
+    response["X-Content-Type-Options"] = "nosniff"
+    return response
 
 
 # ---------------------------------------------------------------------------

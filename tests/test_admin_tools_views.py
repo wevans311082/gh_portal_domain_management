@@ -1,4 +1,5 @@
 import pytest
+from tests.security_helpers import login_owner
 from django.urls import reverse
 from django.utils import timezone
 from django_celery_beat.models import IntervalSchedule, PeriodicTask
@@ -43,7 +44,7 @@ def test_staff_can_view_task_management_summary(client, django_user_model):
         result="ok",
     )
 
-    client.force_login(staff_user)
+    login_owner(client, staff_user)
     response = client.get(reverse("admin_tools:task_management"))
 
     assert response.status_code == 200
@@ -59,7 +60,7 @@ def test_staff_dashboard_shows_task_links(client, django_user_model):
         is_staff=True,
     )
 
-    client.force_login(staff_user)
+    login_owner(client, staff_user)
     response = client.get(reverse("admin_tools:dashboard"))
 
     assert response.status_code == 200
@@ -108,7 +109,7 @@ def test_staff_can_review_invoices_and_filter_by_status(client, django_user_mode
         paid_at=timezone.now(),
     )
 
-    client.force_login(staff_user)
+    login_owner(client, staff_user)
 
     response = client.get(reverse("admin_tools:invoices"))
     content = response.content.decode()
@@ -147,7 +148,7 @@ def test_staff_can_view_tld_pricing_and_loss_indicator(client, django_user_model
         is_active=True,
     )
 
-    client.force_login(staff_user)
+    login_owner(client, staff_user)
     response = client.get(reverse("admin_tools:tld_pricing"))
     content = response.content.decode()
 
@@ -173,7 +174,7 @@ def test_staff_can_view_resellerclub_debug_page(client, django_user_model):
         is_staff=True,
     )
 
-    client.force_login(staff_user)
+    login_owner(client, staff_user)
     response = client.get(reverse("admin_tools:resellerclub_debug"))
 
     assert response.status_code == 200
@@ -215,7 +216,7 @@ def test_staff_can_import_all_tlds_and_sync_inline(client, django_user_model, mo
         lambda key, default="": "true" if key == "RESELLERCLUB_DEBUG_MODE" else default,
     )
 
-    client.force_login(staff_user)
+    login_owner(client, staff_user)
     response = client.post(reverse("admin_tools:tld_pricing"), {"action": "import_all_tlds"})
 
     settings_obj = DomainPricingSettings.get_solo()
@@ -256,7 +257,7 @@ def test_staff_sync_all_runs_inline_without_celery(client, django_user_model, mo
     monkeypatch.setattr("apps.domains.pricing.TLDPricingService", lambda: FakePricingService())
     monkeypatch.setattr("apps.admin_tools.views.get_runtime_setting", lambda key, default="": default)
 
-    client.force_login(staff_user)
+    login_owner(client, staff_user)
     response = client.post(reverse("admin_tools:tld_pricing"), {"action": "sync_all"})
 
     assert response.status_code == 200
@@ -282,7 +283,7 @@ def test_staff_cart_builder_creates_invoice_for_selected_customer(client, django
 
     monkeypatch.setattr("apps.billing.services.email_document", lambda *args, **kwargs: None)
 
-    client.force_login(staff_user)
+    login_owner(client, staff_user)
     response = client.post(
         reverse("admin_tools:cart_builder_add_hosting"),
         {
@@ -318,7 +319,7 @@ def test_staff_cart_builder_page_renders_with_featured_tlds(client, django_user_
         is_active=True,
     )
 
-    client.force_login(staff_user)
+    login_owner(client, staff_user)
     response = client.get(reverse("admin_tools:cart_builder"))
 
     assert response.status_code == 200
@@ -340,7 +341,7 @@ def test_staff_can_save_companies_house_api_key(client, django_user_model):
         password="password123",
         is_staff=True,
     )
-    client.force_login(staff_user)
+    login_owner(client, staff_user)
 
     response = client.post(
         reverse("admin_tools:companies_house_config"),
@@ -361,7 +362,7 @@ def test_staff_can_open_settings_setup_step_editor(client, django_user_model):
         password="password123",
         is_staff=True,
     )
-    client.force_login(staff_user)
+    login_owner(client, staff_user)
 
     response = client.get(
         reverse("admin_tools:settings_setup_step", kwargs={"step_key": "registrar"})
@@ -378,9 +379,8 @@ def test_staff_can_save_site_settings_from_normal_admin_settings(client, django_
         password="password123",
         is_staff=True,
     )
-    client.force_login(staff_user)
+    login_owner(client, staff_user)
 
-    monkeypatch.setattr("apps.admin_tools.wizard_views._write_env_key", lambda *args, **kwargs: None)
 
     response = client.post(
         reverse("admin_tools:settings_setup_step", kwargs={"step_key": "site"}),
@@ -408,7 +408,7 @@ def test_settings_editor_hosting_test_uses_saved_whm_token_when_form_token_blank
         password="password123",
         is_staff=True,
     )
-    client.force_login(staff_user)
+    login_owner(client, staff_user)
 
     IntegrationSetting.set_value("WHM_API_TOKEN", "saved-token", is_secret=True)
 
@@ -444,7 +444,7 @@ def test_company_lookup_endpoint_returns_company_data(client, django_user_model,
         password="password123",
         is_staff=True,
     )
-    client.force_login(staff_user)
+    login_owner(client, staff_user)
 
     monkeypatch.setattr(
         "apps.companies.services.CompaniesHouseService.get_company",
@@ -477,7 +477,7 @@ def test_user_create_with_company_number_creates_verified_business_profile(clien
         password="password123",
         is_staff=True,
     )
-    client.force_login(staff_user)
+    login_owner(client, staff_user)
 
     monkeypatch.setattr(
         "apps.admin_tools.forms.CompaniesHouseService.get_company",
@@ -535,9 +535,9 @@ def test_user_mfa_manage_requires_staff(client, django_user_model):
 def test_staff_can_su_as_user_and_stop(client, django_user_model):
     staff = django_user_model.objects.create_user(email="staff@example.com", password="password123", is_staff=True)
     target = django_user_model.objects.create_user(email="portal-user@example.com", password="password123")
-    client.force_login(staff)
+    login_owner(client, staff)
 
-    start = client.post(reverse("admin_tools:user_su_start", args=[target.pk]))
+    start = client.post(reverse("admin_tools:user_su_start", args=[target.pk]), {"reason": "Investigate a customer support request"})
     assert start.status_code == 302
     assert start.url == reverse("portal:dashboard")
 
@@ -556,7 +556,7 @@ def test_staff_can_su_as_user_and_stop(client, django_user_model):
             password="password123",
             is_staff=True,
         )
-        client.force_login(staff)
+        login_owner(client, staff)
 
         response = client.get(reverse("admin_tools:users"))
         content = response.content.decode()
@@ -574,7 +574,7 @@ def test_staff_can_su_as_user_and_stop(client, django_user_model):
             password="password123",
             is_staff=True,
         )
-        client.force_login(staff)
+        login_owner(client, staff)
 
         called = {"import": False}
 
@@ -606,7 +606,7 @@ def test_staff_can_su_as_user_and_stop(client, django_user_model):
             password="password123",
             is_staff=True,
         )
-        client.force_login(staff)
+        login_owner(client, staff)
 
         called = {"export": False}
 
@@ -703,7 +703,7 @@ def test_staff_can_su_as_user_and_stop(client, django_user_model):
             cpanel_username="svcacct",
         )
 
-        client.force_login(staff)
+        login_owner(client, staff)
         response = client.get(reverse("admin_tools:services_list"))
 
         assert response.status_code == 200
@@ -745,7 +745,7 @@ def test_staff_can_su_as_user_and_stop(client, django_user_model):
 
         monkeypatch.setattr("apps.admin_tools.operations_views.WHMClient.suspend_account", fake_suspend)
 
-        client.force_login(staff)
+        login_owner(client, staff)
         response = client.post(
             reverse("admin_tools:services_edit", kwargs={"pk": service.pk}),
             {

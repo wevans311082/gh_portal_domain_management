@@ -7,6 +7,8 @@ Tests for:
 """
 import json
 import pytest
+
+pytestmark = pytest.mark.django_db
 from unittest.mock import patch, MagicMock
 from django.test import RequestFactory, override_settings
 from django.urls import reverse

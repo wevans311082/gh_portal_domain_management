@@ -1,4 +1,5 @@
 """Billing models: invoices, quotes, line items, and document branding."""
+from apps.admin_tools.search_keys import SearchKey
 import uuid
 from decimal import Decimal
 
@@ -6,6 +7,7 @@ from django.db import models
 
 from apps.accounts.models import User
 from apps.core.models import TimeStampedModel
+from .uploads import SafeLogoField, validate_logo, LOGO_HELP
 
 
 # ---------------------------------------------------------------------------
@@ -38,7 +40,7 @@ class BillingDocumentBranding(TimeStampedModel):
     support_phone = models.CharField(max_length=64, blank=True)
     website_url = models.URLField(blank=True)
 
-    logo = models.FileField(upload_to="billing/branding/", blank=True, null=True)
+    logo = SafeLogoField(upload_to="billing/branding/", blank=True, null=True, validators=[validate_logo], help_text=LOGO_HELP)
     accent_colour = models.CharField(max_length=9, default="#0ea5e9", help_text="Hex e.g. #0ea5e9")
 
     # Free text used in PDF + email templates.
@@ -151,6 +153,9 @@ class Invoice(TimeStampedModel):
     )
 
     class Meta:
+        indexes = [
+            models.Index(SearchKey("number"), name="search_invoice_number"),
+        ]
         ordering = ["-created_at"]
 
     def __str__(self):
@@ -266,6 +271,11 @@ class Quote(TimeStampedModel):
     )
 
     class Meta:
+        indexes = [
+            models.Index(SearchKey("number"), name="search_quote_number"),
+            models.Index(SearchKey("lead_email"), name="search_quote_lead_email"),
+            models.Index(SearchKey("lead_name"), name="search_quote_lead_name"),
+        ]
         ordering = ["-created_at"]
 
     def __str__(self):

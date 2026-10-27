@@ -54,25 +54,27 @@ def allow_account_login(user):
 def send_validation_email_if_needed(request, user) -> str:
     """Send the account confirmation email when the address is still unverified.
 
-    Returns ``sent``, ``already_verified``, or ``not_sent``.
+    Returns ``queued``, ``already_verified``, or ``not_sent``.
     """
     if email_is_verified(user):
         return "already_verified"
-    from allauth.account.utils import send_email_confirmation
+    from allauth.account.internal.flows.email_verification import send_verification_email_to_address
+    from allauth.account.models import EmailAddress
 
-    sent = send_email_confirmation(request, user, signup=False, email=user.email)
-    return "sent" if sent else "not_sent"
+    address, _ = EmailAddress.objects.get_or_create(user=user, email=user.email, defaults={"primary": True})
+    sent = send_verification_email_to_address(request, address, signup=False)
+    return "queued" if sent else "not_sent"
 
 
 def validation_email_notice(request, user) -> str:
     """Send a validation email when required and return a short notice."""
     try:
         result = send_validation_email_if_needed(request, user)
-    except Exception as exc:
+    except Exception:
         logger.exception("Validation email failed for %s", getattr(user, "email", ""))
-        return f" The account is not validated, and the validation email failed: {exc}"
-    if result == "sent":
-        return " A validation email was sent because the account is not confirmed."
+        return " The account is not validated, and its validation email could not be queued. Please try again later."
+    if result == "queued":
+        return " A validation email was queued because the account is not confirmed."
     if result == "not_sent":
         return " The account is not confirmed. A validation email is already waiting, or it could not be sent yet."
     return ""

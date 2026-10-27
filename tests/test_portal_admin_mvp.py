@@ -2,6 +2,7 @@ from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
 import pytest
+from tests.security_helpers import login_owner
 from django.urls import reverse
 
 from apps.admin_tools.config_backup import ConfigBackupError, build_backup_zip, import_backup_zip
@@ -43,7 +44,7 @@ def test_package_display_name_falls_back_to_name():
 
 @pytest.mark.django_db
 def test_stats_page_renders_month_axis(client, django_user_model):
-    client.force_login(_staff(django_user_model))
+    login_owner(client, _staff(django_user_model))
     response = client.get(reverse("admin_tools:stats"))
     assert response.status_code == 200
     assert len(response.context["revenue_labels"]) == 12
@@ -55,7 +56,7 @@ def test_stats_page_renders_month_axis(client, django_user_model):
 def test_settings_overview_uses_runtime_database_values(client, django_user_model, settings):
     settings.WHM_HOST = "env.example"
     IntegrationSetting.set_value("WHM_HOST", "db.example", is_secret=False)
-    client.force_login(_staff(django_user_model))
+    login_owner(client, _staff(django_user_model))
     response = client.get(reverse("admin_tools:settings_overview"))
     assert response.status_code == 200
     item = response.context["cfg"]["Integrations"]["WHM_HOST"]
@@ -84,7 +85,7 @@ def test_config_backup_rejects_bad_password():
 @pytest.mark.django_db
 def test_settings_export_download(client, django_user_model):
     staff = _staff(django_user_model, "export@example.com")
-    client.force_login(staff)
+    login_owner(client, staff)
     response = client.post(reverse("admin_tools:settings_export"), {"backup_password": "supersecret"})
     assert response.status_code == 200
     assert response["Content-Type"] == "application/zip"
@@ -94,7 +95,7 @@ def test_settings_export_download(client, django_user_model):
 def test_admin_can_set_user_password(client, django_user_model):
     staff = _staff(django_user_model, "pw-staff@example.com")
     user = _user(django_user_model, "pw-client@example.com")
-    client.force_login(staff)
+    login_owner(client, staff)
     with patch("apps.provisioning.whm_client.sync_user_cpanel_passwords", return_value=(0, [])):
         response = client.post(
             reverse("admin_tools:user_edit", kwargs={"pk": user.pk}),
@@ -141,7 +142,7 @@ def test_companies_house_sends_user_agent(monkeypatch):
 
 @pytest.mark.django_db
 def test_invoice_preview_page(client, django_user_model):
-    client.force_login(_staff(django_user_model, "preview@example.com"))
+    login_owner(client, _staff(django_user_model, "preview@example.com"))
     response = client.get(reverse("admin_tools:invoice_preview"))
     assert response.status_code == 200
     assert b"PREVIEW-0001" in response.content or b"Invoice" in response.content
@@ -150,7 +151,7 @@ def test_invoice_preview_page(client, django_user_model):
 @pytest.mark.django_db
 def test_resellerclub_hub_page(client, django_user_model):
     staff = _staff(django_user_model, "rc@example.com")
-    client.force_login(staff)
+    login_owner(client, staff)
     with patch("apps.admin_tools.resellerclub_views.ResellerClubClient") as mock_cls, patch(
         "apps.admin_tools.resellerclub_views.WHMClient"
     ) as mock_whm:
@@ -186,7 +187,7 @@ def test_resellerclub_hub_sync_all(client, django_user_model):
     staff = _staff(django_user_model, "rc-sync@example.com")
     owner = _user(django_user_model, "owner-sync@example.com")
     Domain.objects.create(user=owner, name="syncme.com", tld="com", status=Domain.STATUS_PENDING)
-    client.force_login(staff)
+    login_owner(client, staff)
     with patch("apps.admin_tools.resellerclub_views.ResellerClubClient") as mock_cls, patch(
         "apps.admin_tools.resellerclub_views.WHMClient"
     ) as mock_whm, patch("apps.admin_tools.resellerclub_views.WHMSyncService") as mock_sync:

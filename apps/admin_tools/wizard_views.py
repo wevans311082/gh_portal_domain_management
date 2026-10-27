@@ -10,9 +10,9 @@ The wizard is split into 7 steps:
   6. hosting    — WHM / cPanel server
   7. cloudflare — Cloudflare API token
 
-Each step writes values directly to the .env file (in development) or
-validates connectivity, then marks itself complete in WizardProgress.
-In production the view is locked to staff users only — it should be used
+Each step stores encrypted database settings or validates connectivity,
+then marks itself complete in WizardProgress. No HTTP handler edits .env.
+The view is locked to recently verified platform owners — it should be used
 once at first-boot and then disabled via the SETUP_WIZARD_DISABLED env var.
 """
 import logging
@@ -22,6 +22,7 @@ import smtplib
 from django import forms
 from django.conf import settings
 from django.contrib import messages
+from django.db import transaction
 from django.shortcuts import render, redirect
 import requests
 
@@ -30,8 +31,6 @@ from .models import IntegrationSetting, WizardProgress
 
 logger = logging.getLogger(__name__)
 
-BASE_DIR = settings.BASE_DIR
-_ENV_PATH = BASE_DIR / ".env"
 
 RESELLERCLUB_LIVE_API_URL = "https://httpapi.com/api"
 RESELLERCLUB_TEST_API_URL = "https://test.httpapi.com/api"
@@ -45,46 +44,9 @@ def _wizard_disabled() -> bool:
     return os.environ.get("SETUP_WIZARD_DISABLED", "").lower() in ("1", "true", "yes")
 
 
-def _write_env_key(key: str, value: str):
-    """Upsert a KEY=value line in the .env file."""
-    if not _ENV_PATH.exists():
-        _ENV_PATH.touch()
-
-    lines = _ENV_PATH.read_text(encoding="utf-8").splitlines()
-    updated = False
-    new_lines = []
-    for line in lines:
-        if line.startswith(f"{key}=") or line.startswith(f"{key} ="):
-            new_lines.append(f'{key}="{value}"')
-            updated = True
-        else:
-            new_lines.append(line)
-    if not updated:
-        new_lines.append(f'{key}="{value}"')
-    _ENV_PATH.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
-
-
 def _read_env_key(key: str, default: str = "") -> str:
-    db_value = IntegrationSetting.get_value(key, "")
-    if db_value not in (None, ""):
-        return db_value
-
-    if _ENV_PATH.exists():
-        for line in _ENV_PATH.read_text(encoding="utf-8").splitlines():
-            if not line or line.lstrip().startswith("#") or "=" not in line:
-                continue
-            env_key, env_val = line.split("=", 1)
-            if env_key.strip() == key:
-                return env_val.strip().strip('"').strip("'")
-
-    env_val = os.environ.get(key)
-    if env_val not in (None, ""):
-        return env_val
-
-    setting_val = getattr(settings, key, "")
-    if setting_val not in (None, ""):
-        return str(setting_val)
-    return default
+    from apps.core.runtime_settings import get_runtime_setting
+    return str(get_runtime_setting(key, default))
 
 
 def _as_bool(value: str) -> bool:
@@ -207,7 +169,7 @@ class RegistrarSettingsForm(forms.Form):
         ),
     )
     resellerclub_api_key = forms.CharField(
-        max_length=255, label="API Key", widget=forms.PasswordInput(render_value=True), required=False,
+        max_length=255, label="API Key", widget=forms.PasswordInput(render_value=False), required=False,
         help_text="Generate under My Account \u2192 API in the ResellerClub control panel.",
     )
     resellerclub_api_mode = forms.ChoiceField(
@@ -631,8 +593,9 @@ def wizard_step(request, step_key: str):
     })
 
 
+@transaction.atomic
 def _process_step(step_key: str, data: dict, request):
-    """Persist the wizard step data — writes .env and performs DB actions."""
+    """Persist encrypted database settings and perform explicit DB actions."""
 
     if step_key == WizardProgress.STEP_ADMIN:
         _create_admin_user(data, request)
@@ -650,11 +613,11 @@ def _process_step(step_key: str, data: dict, request):
             if is_secret and not string_value.strip():
                 continue
 
-            _write_env_key(env_key, string_value)
             IntegrationSetting.set_value(
                 key=env_key,
                 value=string_value,
                 is_secret=is_secret,
+                actor=request.user,
             )
 
 

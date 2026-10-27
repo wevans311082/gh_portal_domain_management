@@ -1,5 +1,7 @@
 import pytest
 
+pytestmark = pytest.mark.django_db
+
 from apps.admin_tools.models import IntegrationSetting
 from apps.core.runtime_settings import get_runtime_setting
 from apps.domains.resellerclub_client import ResellerClubClient

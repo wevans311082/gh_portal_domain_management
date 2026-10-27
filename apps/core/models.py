@@ -1,3 +1,4 @@
+import uuid
 from django.db import models
 
 
@@ -7,6 +8,39 @@ class TimeStampedModel(models.Model):
 
     class Meta:
         abstract = True
+
+
+class PublicSubmission(TimeStampedModel):
+    """A durable, scoped idempotency receipt; no raw request body is retained."""
+    key = models.CharField(max_length=64, unique=True)
+    kind = models.CharField(max_length=16, choices=[("contact", "Contact"), ("quote", "Quote"), ("invoice", "Invoice"), ("account", "Account mail")])
+    owner_digest = models.CharField(max_length=64)
+    payload_digest = models.CharField(max_length=64, db_index=True)
+    result = models.JSONField(default=dict)
+
+
+class PublicDelivery(TimeStampedModel):
+    """One outbox job per submission, with conservative uncertain-send recovery."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    submission = models.OneToOneField(PublicSubmission, on_delete=models.CASCADE, related_name="delivery")
+    state = models.CharField(max_length=16, default="queued", choices=[
+        ("queued", "Queued"), ("preparing", "Preparing"), ("delivering", "Delivering"),
+        ("sent", "Sent"), ("failed", "Preparation failed"), ("unknown", "Delivery needs review"),
+        ("cancelled", "Cancelled"),
+    ], db_index=True)
+    data = models.JSONField(default=dict)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    total_attempts = models.PositiveIntegerField(default=0)
+    available_at = models.DateTimeField(db_index=True)
+    lease_token = models.UUIDField(null=True, editable=False)
+    claimed_at = models.DateTimeField(null=True)
+    completed_at = models.DateTimeField(null=True)
+    error_code = models.CharField(max_length=40, blank=True)
+
+
+class PublicDeliveryGate(models.Model):
+    """A single locked admission row bounds pending/review work across workers."""
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
 
 
 class SiteContentSettings(TimeStampedModel):

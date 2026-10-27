@@ -1,30 +1,18 @@
 from django.shortcuts import render
 from django.shortcuts import get_object_or_404
 from django.http import JsonResponse
-from django.db import connection
-from django.core.cache import cache
+from django.views.decorators.http import require_safe
+from django.views.decorators.cache import never_cache
+from .health import check_application_health
 
 
+@require_safe
 def health_check(request):
-    status = {"status": "ok", "database": "ok", "cache": "ok"}
-    http_status = 200
-
-    try:
-        connection.ensure_connection()
-    except Exception as e:
-        status["database"] = f"error: {str(e)}"
-        status["status"] = "degraded"
-        http_status = 503
-
-    try:
-        cache.set("health_check", "ok", 30)
-        cache.get("health_check")
-    except Exception as e:
-        status["cache"] = f"error: {str(e)}"
-        status["status"] = "degraded"
-        http_status = 503
-
-    return JsonResponse(status, status=http_status)
+    state = check_application_health()
+    response = JsonResponse(state, status=200 if state["status"] == "ok" else 503)
+    response["X-Correlation-ID"] = state["correlation_id"]
+    response["Cache-Control"] = "no-store"
+    return response
 
 
 def home(request):
@@ -108,6 +96,7 @@ def pricing(request):
     )
 
 
+@never_cache
 def contact(request):
     from apps.core.models import ContactFormSettings, ContactSubmission
     from apps.core.forms import ContactForm
@@ -126,68 +115,13 @@ def contact(request):
                     {"form": ContactForm(), "settings": settings, "submitted": True},
                 )
 
-            name = form.cleaned_data["name"]
-            email = form.cleaned_data["email"]
-            phone = form.cleaned_data.get("phone", "")
-            subject = form.cleaned_data.get("subject", "")
-            message = form.cleaned_data["message"]
-
-            def _client_ip():
-                fwd = request.META.get("HTTP_X_FORWARDED_FOR", "")
-                return fwd.split(",")[0].strip() if fwd else request.META.get("REMOTE_ADDR", "")
-
-            # Store in DB if destination includes db
-            if settings.destination in (ContactFormSettings.DESTINATION_DB, ContactFormSettings.DESTINATION_BOTH):
-                ContactSubmission.objects.create(
-                    name=name,
-                    email=email,
-                    phone=phone,
-                    subject=subject,
-                    message=message,
-                    ip_address=_client_ip() or None,
-                    user_agent=request.META.get("HTTP_USER_AGENT", "")[:512],
-                )
-
-            # Send email if destination includes email
-            if settings.destination in (ContactFormSettings.DESTINATION_EMAIL, ContactFormSettings.DESTINATION_BOTH):
-                dest = settings.destination_email
-                if dest:
-                    try:
-                        from django.core.mail import EmailMultiAlternatives
-                        from django.conf import settings as django_settings
-
-                        plain_body = (
-                            f"You have received a new contact form submission.\n\n"
-                            f"Name:    {name}\n"
-                            f"Email:   {email}\n"
-                            f"Phone:   {phone or '—'}\n"
-                            f"Subject: {subject or '—'}\n\n"
-                            f"Message:\n{'-' * 40}\n{message}\n{'-' * 40}"
-                        )
-                        html_body = (
-                            "<html><body style='font-family:sans-serif;font-size:14px;color:#1e293b'>"
-                            "<p>You have received a new contact form submission.</p>"
-                            "<table style='border-collapse:collapse;margin-bottom:16px'>"
-                            f"<tr><td style='padding:4px 12px 4px 0;font-weight:bold'>Name</td><td>{name}</td></tr>"
-                            f"<tr><td style='padding:4px 12px 4px 0;font-weight:bold'>Email</td><td><a href='mailto:{email}'>{email}</a></td></tr>"
-                            f"<tr><td style='padding:4px 12px 4px 0;font-weight:bold'>Phone</td><td>{phone or '—'}</td></tr>"
-                            f"<tr><td style='padding:4px 12px 4px 0;font-weight:bold'>Subject</td><td>{subject or '—'}</td></tr>"
-                            "</table>"
-                            "<p style='font-weight:bold;margin-bottom:4px'>Message:</p>"
-                            f"<div style='background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:12px 16px;white-space:pre-wrap'>{message}</div>"
-                            "</body></html>"
-                        )
-                        msg = EmailMultiAlternatives(
-                            subject=f"[Contact] {subject or 'New enquiry'} from {name}",
-                            body=plain_body,
-                            from_email=django_settings.DEFAULT_FROM_EMAIL,
-                            to=[dest],
-                            headers={"X-CyberAsk-Mailbox-Purpose": "support"},
-                        )
-                        msg.attach_alternative(html_body, "text/html")
-                        msg.send(fail_silently=False)
-                    except Exception:
-                        pass
+            from apps.core.public_submissions import accept_contact, SubmissionConflict
+            try:
+                accept_contact(request, form.cleaned_data, settings)
+            except (SubmissionConflict, ValueError) as error:
+                form.add_error(None, str(error))
+                return render(request, "public/contact.html", {"form": form, "settings": settings, "submitted": False},
+                              status=409 if isinstance(error, SubmissionConflict) else 503)
 
             return render(
                 request,
@@ -195,7 +129,8 @@ def contact(request):
                 {"form": ContactForm(), "settings": settings, "submitted": True},
             )
     else:
-        form = ContactForm()
+        from apps.core.public_submissions import new_submission_key
+        form = ContactForm(initial={"submission_key": new_submission_key(request)})
 
     return render(request, "public/contact.html", {"form": form, "settings": settings, "submitted": False})
 

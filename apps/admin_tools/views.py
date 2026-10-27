@@ -105,6 +105,8 @@ def _build_task_summary():
 
 @staff_member_required
 def dashboard(request):
+    if not request.user.is_superuser:
+        return render(request, "admin_tools/staff_dashboard.html")
     now = timezone.now()
     last_30 = now - timedelta(days=30)
     last_7 = now - timedelta(days=7)
@@ -157,7 +159,21 @@ def dashboard(request):
 
 @staff_member_required
 def task_management(request):
+    from apps.core.models import PublicDelivery
+    from .public_delivery_views import PublicDeliveryReviewForm, review_delivery
+    delivery_form = PublicDeliveryReviewForm(request.POST if request.method == "POST" else None)
+    if request.method == "POST" and delivery_form.is_valid() and review_delivery(request, delivery_form):
+        messages.success(request, "Delivery review recorded.")
+        return redirect("admin_tools:task_management")
     context = _build_task_summary()
+    context["delivery_form"] = delivery_form
+    delivery_filter = request.GET.get("public_state", "review")
+    delivery_states = {"review": ["failed", "unknown"], "queued": ["queued"], "active": ["preparing", "delivering"]}
+    if delivery_filter not in delivery_states:
+        delivery_filter = "review"
+    context["public_delivery_filter"] = delivery_filter
+    context["public_deliveries"] = PublicDelivery.objects.select_related("submission").filter(state__in=delivery_states[delivery_filter]).order_by("created_at")[:25]
+    context["public_delivery_counts"] = list(PublicDelivery.objects.values("state").annotate(count=Count("pk")).order_by("state"))
     context["periodic_tasks"] = PeriodicTask.objects.select_related("interval", "crontab").order_by(
         "name"
     )
@@ -402,7 +418,8 @@ def integrations_overview(request):
 
     # Stripe
     def _stripe():
-        stripe_module.api_key = get_runtime_setting("STRIPE_SECRET_KEY", "")
+        from apps.payments.stripe_service import configure_stripe
+        configure_stripe()
         return stripe_module.Balance.retrieve()
 
     probes.append(_probe("Stripe", _stripe))
@@ -429,7 +446,7 @@ def m365_graph_config(request):
         action = request.POST.get("action", "save")
         form = Microsoft365GraphSettingsForm(request.POST)
         if form.is_valid():
-            form.save_settings()
+            form.save_settings(actor=request.user)
             messages.success(request, "Microsoft 365 Graph mail settings saved.")
             config = MicrosoftGraphMailConfig.load()
             client = MicrosoftGraphMailClient(config)
@@ -837,7 +854,8 @@ def integration_detail(request, service):
             return redirect("admin_tools:integration_detail", service="resellerclub")
 
     # Set Stripe API key before probe
-    stripe_module.api_key = get_runtime_setting("STRIPE_SECRET_KEY", "")
+    from apps.payments.stripe_service import configure_stripe
+    configure_stripe()
 
     tests = []
     for label, fn in SERVICE_TESTS[service]:
@@ -1023,6 +1041,7 @@ def resellerclub_debug(request):
                 "RESELLERCLUB_DEBUG_MODE",
                 "true" if enabled else "false",
                 is_secret=False,
+                actor=request.user,
             )
             messages.success(request, f"ResellerClub debug mode {'enabled' if enabled else 'disabled'}.")
             return redirect(reverse("admin_tools:resellerclub_debug"))
@@ -1414,17 +1433,19 @@ def users(request):
 
     q = request.GET.get("q", "").strip()
     qs = User.objects.select_related("business_profile").order_by("-created_at")
+    if not request.user.is_superuser:
+        qs = qs.filter(is_staff=False, is_superuser=False)
     if q:
-        qs = qs.filter(Q(email__icontains=q) | Q(full_name__icontains=q))
+        qs = qs.filter(Q(email__icontains=q) | Q(first_name__icontains=q) | Q(last_name__icontains=q))
 
     paginator = Paginator(qs, 30)
     page = paginator.get_page(request.GET.get("page"))
     return render(request, "admin_tools/users.html", {
         "page_obj": page,
         "search_q": q,
-        "total_users": User.objects.count(),
-        "staff_count": User.objects.filter(is_staff=True).count(),
-        "superuser_count": User.objects.filter(is_superuser=True).count(),
+        "total_users": qs.count(),
+        "staff_count": User.objects.filter(is_staff=True).count() if request.user.is_superuser else None,
+        "superuser_count": User.objects.filter(is_superuser=True).count() if request.user.is_superuser else None,
     })
 
 
@@ -2071,10 +2092,10 @@ def settings_import(request):
     if not upload:
         messages.error(request, "Choose a backup zip to import.")
         return redirect("admin_tools:settings_overview")
-    from .config_backup import ConfigBackupError, import_backup_zip
+    from .config_backup import ConfigBackupError, import_backup_zip, read_backup_upload
 
     try:
-        count = import_backup_zip(upload.read(), password)
+        count = import_backup_zip(read_backup_upload(upload), password, actor=request.user)
     except ConfigBackupError as exc:
         messages.error(request, str(exc))
         return redirect("admin_tools:settings_overview")
@@ -2104,6 +2125,7 @@ def companies_house_config(request):
                     "COMPANIES_HOUSE_API_KEY",
                     new_key,
                     is_secret=True,
+                    actor=request.user,
                 )
                 key_value = new_key
                 messages.success(request, "Companies House API key saved.")
@@ -2246,15 +2268,12 @@ def feature_flags(request):
     if request.method == "POST":
         for key, _label, _desc in KNOWN_FLAGS:
             value = "true" if request.POST.get(key) == "1" else "false"
-            IntegrationSetting.objects.update_or_create(
-                key=key,
-                defaults={"value": value, "is_secret": False},
-            )
+            IntegrationSetting.set_value(key, value, is_secret=False, actor=request.user)
         from django.contrib import messages
         messages.success(request, "Feature flags updated.")
         return redirect("admin_tools:feature_flags")
 
-    db_values = {s.key: s.value for s in IntegrationSetting.objects.filter(key__startswith="FEATURE_")}
+    db_values = {s.key: s.plaintext_value for s in IntegrationSetting.objects.filter(key__startswith="FEATURE_")}
     flags = [
         {
             "key": key,

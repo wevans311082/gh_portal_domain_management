@@ -1,0 +1,15 @@
+{% extends "base_admin.html" %}
+{% block title %}Your workspace — {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Your staff workspace{% endblock %}
+{% block content %}
+<h3 class="text-xl font-semibold text-slate-900 mb-2">Your workspace</h3>
+<p class="text-sm text-slate-600 mb-6">Tools are shown for your assigned roles. Contact a platform owner if you need additional access.</p>
+<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+{% for section in ADMIN_NAVIGATION %}{% if section.title != 'Overview' %}
+    <section class="fluent-card p-5"><h4 class="font-semibold text-slate-900 mb-3">{{ section.title }}</h4>
+        <ul class="space-y-3">{% for item in section.items %}<li><a class="text-sky-800 underline" href="{{ item.url }}">{{ item.label }}</a></li>{% endfor %}</ul>
+    </section>
+{% endif %}{% endfor %}
+</div>
+{% if ADMIN_NAVIGATION|length == 1 %}<div class="fluent-panel mt-5 p-5 text-slate-700">No operational roles have been assigned yet. Your customer portal and account security settings are still available.</div>{% endif %}
+{% endblock %}

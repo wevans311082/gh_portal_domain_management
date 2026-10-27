@@ -77,7 +77,10 @@ def domain_orders_list(request):
 def domain_order_detail(request, pk):
     order = get_object_or_404(_orders_qs(), pk=pk)
     contacts = DomainContact.objects.filter(user=order.user).order_by("label")
-    users = User.objects.filter(is_active=True).order_by("email")[:300]
+    users_query = User.objects.filter(is_active=True)
+    if not request.user.is_superuser:
+        users_query = users_query.filter(pk=order.user_id)
+    users = users_query.order_by("email")[:300]
 
     if request.method == "POST":
         return _save_order_details(request, order)
@@ -163,7 +166,8 @@ def _save_order_details(request, order: DomainOrder):
 
     order.privacy_enabled = request.POST.get("privacy_enabled") == "on"
     order.auto_renew = request.POST.get("auto_renew") == "on"
-    order.registrar_order_id = (request.POST.get("registrar_order_id") or "").strip()
+    if request.user.is_superuser:
+        order.registrar_order_id = (request.POST.get("registrar_order_id") or "").strip()
     order.last_error = (request.POST.get("last_error") or "").strip()
 
     contact_id = (request.POST.get("registration_contact_id") or "").strip()

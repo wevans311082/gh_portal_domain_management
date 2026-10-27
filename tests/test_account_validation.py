@@ -1,5 +1,6 @@
 """Validation email after a password reset, and staff login overrides."""
 import pytest
+from tests.security_helpers import login_owner
 from allauth.account.forms import default_token_generator
 from allauth.account.models import EmailAddress
 from allauth.account.utils import user_pk_to_url_str
@@ -35,7 +36,9 @@ def _unverified(user):
     )
 
 
-def _confirmation_messages():
+def _deliver_confirmation_messages():
+    from tests.mail_helpers import deliver_account_mail
+    deliver_account_mail()
     return [
         message
         for message in mail.outbox
@@ -53,8 +56,8 @@ def test_validation_email_is_sent_only_for_an_unconfirmed_address(django_user_mo
 
     unverified = _user(django_user_model, "needs-confirm@example.com")
     _unverified(unverified)
-    assert send_validation_email_if_needed(request, unverified) == "sent"
-    assert len(_confirmation_messages()) == 1
+    assert send_validation_email_if_needed(request, unverified) == "queued"
+    assert len(_deliver_confirmation_messages()) == 1
 
     verified = _user(django_user_model, "already-ok@example.com")
     EmailAddress.objects.create(
@@ -76,7 +79,7 @@ def test_admin_edit_shows_validation_and_login_overrides(client, django_user_mod
     staff = _staff(django_user_model)
     user = _user(django_user_model)
     _unverified(user)
-    client.force_login(staff)
+    login_owner(client, staff)
 
     response = client.get(reverse("admin_tools:user_edit", kwargs={"pk": user.pk}))
 
@@ -95,7 +98,7 @@ def test_admin_mark_validated_lets_the_user_sign_in(client, django_user_model):
     staff = _staff(django_user_model)
     user = _user(django_user_model, "blocked@example.com")
     _unverified(user)
-    client.force_login(staff)
+    login_owner(client, staff)
 
     response = client.post(
         reverse("admin_tools:user_edit", kwargs={"pk": user.pk}),
@@ -121,7 +124,7 @@ def test_admin_ok_to_login_activates_and_validates(client, django_user_model):
     staff = _staff(django_user_model)
     user = _user(django_user_model, "inactive@example.com", is_active=False)
     _unverified(user)
-    client.force_login(staff)
+    login_owner(client, staff)
 
     response = client.post(
         reverse("admin_tools:user_edit", kwargs={"pk": user.pk}),
@@ -147,7 +150,7 @@ def test_mark_validated_leaves_an_inactive_account_inactive(client, django_user_
     staff = _staff(django_user_model)
     user = _user(django_user_model, "still-off@example.com", is_active=False)
     _unverified(user)
-    client.force_login(staff)
+    login_owner(client, staff)
 
     client.post(
         reverse("admin_tools:user_edit", kwargs={"pk": user.pk}),
@@ -164,7 +167,7 @@ def test_admin_password_change_sends_validation_email_when_unconfirmed(client, d
     staff = _staff(django_user_model, "pw-staff-validate@example.com")
     user = _user(django_user_model, "pw-client-validate@example.com")
     _unverified(user)
-    client.force_login(staff)
+    login_owner(client, staff)
 
     with patch("apps.provisioning.whm_client.sync_user_cpanel_passwords", return_value=(0, [])):
         response = client.post(
@@ -184,7 +187,7 @@ def test_admin_password_change_sends_validation_email_when_unconfirmed(client, d
     user.refresh_from_db()
     assert user.check_password("BrandNewPass123!")
     assert EmailAddress.objects.get(user=user).verified is False
-    assert len(_confirmation_messages()) == 1
+    assert len(_deliver_confirmation_messages()) == 1
 
 
 @pytest.mark.django_db
@@ -192,7 +195,7 @@ def test_admin_password_reset_email_also_sends_validation(client, django_user_mo
     staff = _staff(django_user_model, "reset-staff@example.com")
     user = _user(django_user_model, "reset-client@example.com")
     _unverified(user)
-    client.force_login(staff)
+    login_owner(client, staff)
 
     response = client.post(
         reverse("admin_tools:user_edit", kwargs={"pk": user.pk}),
@@ -200,9 +203,11 @@ def test_admin_password_reset_email_also_sends_validation(client, django_user_mo
     )
 
     assert response.status_code == 302
+    from tests.mail_helpers import deliver_account_mail
+    deliver_account_mail()
     subjects = " ".join(message.subject.lower() for message in mail.outbox)
     assert "password" in subjects
-    assert len(_confirmation_messages()) == 1
+    assert len(_deliver_confirmation_messages()) == 1
     assert EmailAddress.objects.get(user=user).verified is False
 
 
@@ -219,7 +224,7 @@ def test_login_rejection_sends_the_validation_email(client, django_user_model):
     assert response.status_code == 200
     assert b"Confirm your email" in response.content
     assert "_auth_user_id" not in client.session
-    assert len(_confirmation_messages()) == 1
+    assert len(_deliver_confirmation_messages()) == 1
 
 
 @pytest.mark.django_db
@@ -244,7 +249,7 @@ def test_completing_password_reset_sends_validation_email(client, django_user_mo
     user.refresh_from_db()
     assert user.check_password("BrandNewPass123!")
     assert EmailAddress.objects.get(user=user).verified is False
-    assert len(_confirmation_messages()) == 1
+    assert len(_deliver_confirmation_messages()) == 1
 
 
 @pytest.mark.django_db
@@ -266,4 +271,4 @@ def test_verified_password_reset_does_not_send_another_confirmation(client, djan
 
     user.refresh_from_db()
     assert user.check_password("BrandNewPass123!")
-    assert _confirmation_messages() == []
+    assert _deliver_confirmation_messages() == []

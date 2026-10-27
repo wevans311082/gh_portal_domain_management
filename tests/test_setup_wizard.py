@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+from tests.security_helpers import login_owner
 from django.urls import reverse
 
 from apps.admin_tools.models import WizardProgress
@@ -18,7 +19,7 @@ def test_finished_wizard_still_accessible(client, django_user_model):
         finished=True,
     )
 
-    client.force_login(staff)
+    login_owner(client, staff)
     response = client.get(reverse("admin_tools:wizard_index"))
 
     assert response.status_code == 200
@@ -31,14 +32,14 @@ def test_registrar_step_save_uses_live_url_and_writes_customer_id(client, django
     from apps.admin_tools.models import IntegrationSetting
 
     env_file = Path(tmp_path / ".env")
-    monkeypatch.setattr(wizard_views, "_ENV_PATH", env_file)
+    monkeypatch.setattr(wizard_views.settings, "BASE_DIR", tmp_path)
 
     staff = django_user_model.objects.create_user(
         email="wizard-save@example.com",
         password="password123",
         is_staff=True,
     )
-    client.force_login(staff)
+    login_owner(client, staff)
 
     response = client.post(
         reverse("admin_tools:wizard_step", kwargs={"step_key": WizardProgress.STEP_REGISTRAR}),
@@ -53,9 +54,7 @@ def test_registrar_step_save_uses_live_url_and_writes_customer_id(client, django
     )
 
     assert response.status_code == 302
-    env_text = env_file.read_text(encoding="utf-8")
-    assert 'RESELLERCLUB_API_URL="https://httpapi.com/api"' in env_text
-    assert 'RESELLERCLUB_CUSTOMER_ID="654321"' in env_text
+    assert not env_file.exists()
     assert IntegrationSetting.get_value("RESELLERCLUB_API_URL", "") == "https://httpapi.com/api"
     assert IntegrationSetting.get_value("RESELLERCLUB_CUSTOMER_ID", "") == "654321"
 
@@ -71,7 +70,7 @@ def test_registrar_step_test_connection_does_not_mark_step_done(client, django_u
         password="password123",
         is_staff=True,
     )
-    client.force_login(staff)
+    login_owner(client, staff)
 
     response = client.post(
         reverse("admin_tools:wizard_step", kwargs={"step_key": WizardProgress.STEP_REGISTRAR}),
@@ -97,17 +96,17 @@ def test_hosting_step_save_does_not_clear_existing_whm_token_when_blank(client, 
     from apps.admin_tools.models import IntegrationSetting
 
     env_file = Path(tmp_path / ".env")
-    monkeypatch.setattr(wizard_views, "_ENV_PATH", env_file)
+    monkeypatch.setattr(wizard_views.settings, "BASE_DIR", tmp_path)
 
     staff = django_user_model.objects.create_user(
         email="wizard-hosting-save@example.com",
         password="password123",
         is_staff=True,
     )
-    client.force_login(staff)
+    login_owner(client, staff)
 
     IntegrationSetting.set_value("WHM_API_TOKEN", "saved-token", is_secret=True)
-    wizard_views._write_env_key("WHM_API_TOKEN", "saved-token")
+    env_file.write_text('WHM_API_TOKEN="saved-token"\n', encoding="utf-8")
 
     response = client.post(
         reverse("admin_tools:wizard_step", kwargs={"step_key": WizardProgress.STEP_HOSTING}),
@@ -136,7 +135,7 @@ def test_hosting_step_test_uses_saved_whm_token_when_form_token_blank(client, dj
         password="password123",
         is_staff=True,
     )
-    client.force_login(staff)
+    login_owner(client, staff)
 
     IntegrationSetting.set_value("WHM_API_TOKEN", "saved-token", is_secret=True)
 

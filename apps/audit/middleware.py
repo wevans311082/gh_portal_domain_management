@@ -18,7 +18,7 @@ _AUDIT_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
 
 def _get_client_ip(request) -> str:
-    """Extract the client IP. Last X-Forwarded-For hop is the trusted proxy peer."""
+    """Use the same validated proxy-aware address as application throttles."""
     from apps.core.http import get_client_ip
 
     return get_client_ip(request)
@@ -59,6 +59,7 @@ class AuditLogMiddleware:
                     "status_code": response.status_code,
                     "path": request.path,
                     "method": request.method,
+                    "impersonator_user_id": getattr(getattr(request, "impersonation_actor", None), "pk", None),
                 },
             )
         except Exception:
@@ -85,8 +86,9 @@ class IPAllowlistMiddleware:
             active_entries = IPAllowlistEntry.objects.filter(is_active=True)
             if active_entries.exists():
                 client_ip = _get_client_ip(request)
-                allowed_ips = set(active_entries.values_list("ip_address", flat=True))
-                if client_ip not in allowed_ips:
+                from apps.core.http import normalize_ip
+                allowed_ips = {normalize_ip(value) for value in active_entries.values_list("ip_address", flat=True)}
+                if not client_ip or client_ip not in allowed_ips:
                     logger.warning(
                         "IPAllowlistMiddleware: blocked staff user %s from IP %s",
                         user.email,

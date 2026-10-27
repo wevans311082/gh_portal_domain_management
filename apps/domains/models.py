@@ -1,3 +1,4 @@
+from apps.admin_tools.search_keys import SearchKey
 from decimal import Decimal, ROUND_HALF_UP
 
 from django.db import models
@@ -56,6 +57,9 @@ class Domain(TimeStampedModel):
     epp_code = models.CharField(max_length=255, blank=True)
 
     class Meta:
+        indexes = [
+            models.Index(SearchKey("name"), name="search_domain_name"),
+        ]
         ordering = ["name"]
 
     def __str__(self):

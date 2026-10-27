@@ -1,0 +1,16 @@
+{% extends "base_admin.html" %}
+{% block title %}Staff roles — {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Staff roles and access{% endblock %}
+{% block content %}
+{% include "admin_tools/components/page_header.html" with heading="Staff roles and access" %}
+<p class="text-sm text-slate-600 mb-5">Assign operational roles without granting platform ownership. Security controls, integrations, secret exports and impersonation remain owner-only. Existing staff receive no extra access automatically.</p>
+<div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+    {% include "admin_tools/partials/staff_role_form.html" with card_heading="Change staff roles" %}
+    {% include "admin_tools/partials/staff_role_accounts.html" with card_heading="Current staff access" %}
+</div>
+<section class="mt-6 fluent-card p-5"><h3 class="text-lg font-semibold mb-4">Role capabilities</h3>
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">{% for role in role_definitions %}
+        <article class="border border-slate-300 rounded p-4"><h4 class="font-semibold mb-2">{{ role.name }}</h4><ul class="text-sm text-slate-600 space-y-1">{% for capability in role.capabilities %}<li>{{ capability }}</li>{% endfor %}</ul></article>
+    {% endfor %}</div>
+</section>
+{% endblock %}

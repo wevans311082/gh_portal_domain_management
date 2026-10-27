@@ -1,0 +1,27 @@
+{% extends "admin_tools/components/action_bar.html" %}
+{% block actions %}
+        <form method="get" class="flex flex-wrap gap-2 flex-1 min-w-[260px]">
+            <label class="sr-only" for="customer-search">Search customer accounts</label>
+            <input id="customer-search" type="search" name="q" value="{{ search_q }}" placeholder="Search by email or name…"
+                   class="border border-slate-200 rounded-lg px-3 py-2 text-sm flex-1 min-w-[200px] focus:outline-none focus:ring-2 focus:ring-indigo-400">
+            <button type="submit" class="admin-button-primary text-white px-4 py-2 rounded-lg text-sm font-medium">Search</button>
+            {% if search_q %}<a href="{% url 'admin_tools:users' %}" class="border border-slate-200 text-slate-600 px-4 py-2 rounded-lg text-sm hover:bg-slate-50">Clear</a>{% endif %}
+        </form>
+        {% if IS_PLATFORM_OWNER %}<form id="whm-sync-form" method="post" data-admin-submit="whm-sync-progress" class="flex flex-wrap items-center gap-2">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="sync_whm">
+            <label for="whm-sync-direction" class="text-sm text-slate-600 font-medium">Direction</label>
+            <select
+                name="direction"
+                id="whm-sync-direction"
+                class="h-10 border border-slate-200 rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400"
+            >
+                <option value="import">Import from WHM</option>
+                <option value="export">Export to WHM</option>
+            </select>
+            <button type="submit" class="admin-button-primary inline-flex items-center justify-center h-10 text-white px-4 rounded-lg text-sm font-medium">Sync WHM</button>
+        </form>
+        <a href="{% url 'admin_tools:user_create' %}" class="inline-flex items-center justify-center h-10 bg-emerald-700 text-white px-4 rounded-lg text-sm font-medium hover:bg-emerald-800">+ New User</a>{% endif %}
+    
+{% if IS_PLATFORM_OWNER %}{% include "admin_tools/components/loading.html" with loading_id="whm-sync-progress" loading_message="Syncing WHM accounts. Keep this page open until the request finishes." %}{% endif %}
+{% endblock %}

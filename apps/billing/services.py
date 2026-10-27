@@ -372,6 +372,9 @@ def convert_quote_to_invoice(
     send_email: bool = True,
 ) -> Invoice:
     """Convert an accepted/sent quote into a draft Invoice for payment."""
+    # Reload under the lock so callers with stale model instances see the
+    # existing conversion before allocating another document number.
+    quote = Quote.objects.select_for_update().get(pk=quote.pk)
     if quote.converted_invoice is not None:
         return quote.converted_invoice
     if not quote.user:
@@ -582,11 +585,14 @@ def email_document(
     recipient_email: Optional[str] = None,
     cc: Optional[Sequence[str]] = None,
     custom_message: str = "",
-) -> None:
+    prepare_only: bool = False,
+):
     """Email an Invoice or Quote with a PDF attachment and HTML preview body.
 
     ``kind`` selects the notification template, e.g. ``invoice_issued``,
     ``invoice_paid``, ``quote_sent``, ``quote_accepted``.
+    With ``prepare_only=True``, return the prepared message without sending;
+    this lets a durable outbox fence the external delivery boundary.
     """
     from apps.notifications.services import send_notification
 
@@ -639,7 +645,12 @@ def email_document(
         attachments=attachments,
         recipient_email=recipient,
         cc=list(cc) if cc else None,
+        prepare_only=prepare_only,
     )
+    if prepare_only:
+        if delivered is False:
+            raise RuntimeError("Document message preparation failed.")
+        return delivered
     if not delivered:
         raise RuntimeError(f"Email was not delivered to {recipient}. Check the email log.")
 

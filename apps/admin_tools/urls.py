@@ -7,12 +7,17 @@ from . import operations_views
 from . import manual_order_views
 from . import domain_order_views
 from . import resellerclub_views
+from . import role_views
+from . import search_views
 
 app_name = "admin_tools"
 
 urlpatterns = [
     # Overview
     path("", views.dashboard, name="dashboard"),
+    path("search/", search_views.search, name="search"),
+    path("search/suggestions/", search_views.search_suggestions, name="search_suggestions"),
+    path("search/records/<str:kind>/<int:pk>/", search_views.search_record, name="search_record"),
     path("stats/", views.stats, name="stats"),
     # People
     path("users/", views.users, name="users"),
@@ -99,6 +104,7 @@ urlpatterns = [
     path("integrations/resellerclub/debug/", views.resellerclub_debug, name="resellerclub_debug"),
     path("resellerclub/", resellerclub_views.resellerclub_hub, name="resellerclub_hub"),
     path("security/", views.security, name="security"),
+    path("security/staff-roles/", role_views.staff_roles, name="staff_roles"),
     path("database/", views.database, name="database"),
     path("settings/", views.settings_overview, name="settings_overview"),
     path("settings/export/", views.settings_export, name="settings_export"),

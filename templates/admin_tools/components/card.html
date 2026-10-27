@@ -1,0 +1,4 @@
+<section class="admin-card">
+  {% if card_heading %}<div class="admin-card-header"><h2>{{ card_heading }}</h2>{% if card_description %}<p>{{ card_description }}</p>{% endif %}</div>{% endif %}
+  <div class="admin-card-body">{% block card_body %}{% endblock %}</div>
+</section>

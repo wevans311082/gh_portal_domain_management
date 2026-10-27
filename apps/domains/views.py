@@ -1,6 +1,7 @@
 """Domain management views."""
 from decimal import Decimal
 import logging
+import hashlib
 import re
 import requests
 
@@ -65,6 +66,13 @@ _DOMAIN_LABEL_RE = re.compile(r"^[a-z0-9]([a-z0-9\-]{0,61}[a-z0-9])?$")
 # Cache availability results for 60 seconds to reduce upstream API calls
 _CACHE_TTL = 60
 _PRICING_SYNC_TTL = 900
+MAX_PUBLIC_TLDS = 10
+_TLD_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$")
+
+
+def _public_active_tlds():
+    configured = [tld for tld in get_active_tlds() if len(tld) <= 189 and _TLD_RE.fullmatch(tld)]
+    return configured or list(_FALLBACK_POPULAR_TLDS)
 _WHOIS_TIMEOUT = (5, 12)
 
 
@@ -81,7 +89,10 @@ def _rate_limit_key(request) -> str:
     return f"domain_check_rl:{ip}"
 
 
-def _is_debug_mode_enabled() -> bool:
+def _is_debug_mode_enabled(request) -> bool:
+    from apps.admin_tools.access import is_owner, recent_mfa
+    if not is_owner(request.user) or not recent_mfa(request):
+        return False
     return str(get_runtime_setting("RESELLERCLUB_DEBUG_MODE", "false")).strip().lower() in (
         "1",
         "true",
@@ -202,20 +213,23 @@ def _sync_missing_tld_pricing(tlds):
     if not tlds:
         return
 
-    lock_key = f"domain_pricing_sync:{','.join(sorted(tlds))}"
-    if cache.get(lock_key):
+    lock_key = "domain_pricing_sync:" + hashlib.sha256(",".join(sorted(tlds)).encode()).hexdigest()
+    if not cache.add(lock_key, True, timeout=_PRICING_SYNC_TTL):
         return
 
     try:
         TLDPricingService().sync_pricing(tlds=tlds)
         cache.set(lock_key, True, timeout=_PRICING_SYNC_TTL)
     except Exception as exc:
+        cache.set(lock_key, True, timeout=60)
         logger.warning("Unable to sync missing TLD pricing (%s): %s", tlds, exc)
 
 
+@require_GET
 def domain_search(request):
     """Public domain search page."""
-    active_tlds = get_active_tlds()
+    supported_tlds = _public_active_tlds()
+    active_tlds = supported_tlds[:MAX_PUBLIC_TLDS]
     existing_tlds = set(TLDPricing.objects.filter(tld__in=active_tlds).values_list("tld", flat=True))
     missing_tlds = [tld for tld in active_tlds if tld not in existing_tlds]
     _sync_missing_tld_pricing(missing_tlds)
@@ -229,7 +243,8 @@ def domain_search(request):
         for tld in active_tlds
     ]
     template = "portal/domain_search.html" if request.user.is_authenticated else "domains/search.html"
-    return render(request, template, {"popular_tlds": active_tlds, "featured_tlds": featured_tlds})
+    return render(request, template, {"popular_tlds": active_tlds, "featured_tlds": featured_tlds,
+                                      "search_extension_limit": MAX_PUBLIC_TLDS, "extensions_limited": len(supported_tlds) > MAX_PUBLIC_TLDS})
 
 
 @require_GET
@@ -243,13 +258,8 @@ def domain_check(request):
     query = request.GET.get("q", "").strip().lower()
     if not query:
         return HttpResponse("")
-
-    # Rate limiting: 20 checks per minute per IP
-    rl_key = _rate_limit_key(request)
-    count = cache.get(rl_key, 0)
-    if count >= 20:
-        return HttpResponse("Too many requests. Please wait a moment.", status=429)
-    cache.set(rl_key, count + 1, timeout=60)
+    if len(query) > 253:
+        return HttpResponse("Domain names must contain at most 253 characters.", status=400)
 
     domain_part = query.split(".")[0] if "." in query else query
 
@@ -258,22 +268,29 @@ def domain_check(request):
 
     # If user typed a full domain with TLD (e.g. "example.com"), only check that TLD.
     # Otherwise check the active TLD set, optionally filtered via ?tlds=com,io.
-    active_tlds = get_active_tlds()
+    active_tlds = _public_active_tlds()
     if "." in query:
         _, typed_tld = query.split(".", 1)
+        if len(typed_tld) > 189 or not _TLD_RE.fullmatch(typed_tld) or typed_tld not in active_tlds:
+            return HttpResponse("Choose a supported domain extension.", status=400)
         tlds_to_check = [typed_tld]
     else:
         # Optional filter: ?tlds=com,co.uk,io  (comma-separated for the URL,
         # the registrar client correctly sends them as repeated params).
         raw_filter = (request.GET.get("tlds") or "").strip()
         if raw_filter:
-            requested = [_normalize_tld(t) for t in raw_filter.split(",") if _normalize_tld(t)]
+            parts = raw_filter.split(",")
+            if len(raw_filter) > 512 or len(parts) > MAX_PUBLIC_TLDS:
+                return HttpResponse("Check at most 10 domain extensions at a time.", status=400)
+            requested = [_normalize_tld(t) for t in parts]
             allowed = set(active_tlds)
-            tlds_to_check = [t for t in requested if t in allowed] or active_tlds
+            if any(not t or not _TLD_RE.fullmatch(t) or t not in allowed for t in requested):
+                return HttpResponse("Choose supported domain extensions.", status=400)
+            tlds_to_check = list(dict.fromkeys(requested))
         else:
-            tlds_to_check = active_tlds
+            tlds_to_check = active_tlds[:MAX_PUBLIC_TLDS]
 
-    debug_mode = _is_debug_mode_enabled()
+    debug_mode = _is_debug_mode_enabled(request)
 
     existing_tlds = set(TLDPricing.objects.filter(tld__in=tlds_to_check).values_list("tld", flat=True))
     missing_tlds = [tld for tld in tlds_to_check if tld not in existing_tlds]
@@ -297,6 +314,7 @@ def domain_check(request):
 
     # Single bulk API call for all uncached TLDs (ResellerClub supports multi-TLD in one request)
     live_availability = {}
+    client = None
     if tlds_needing_check:
         try:
             client = ResellerClubClient()
@@ -312,7 +330,7 @@ def domain_check(request):
             for tld in tlds_needing_check:
                 live_availability[tld] = None
 
-    live_prices = _fetch_live_debug_prices(client, tlds_to_check) if debug_mode and tlds_to_check else {}
+    live_prices = _fetch_live_debug_prices(client, tlds_to_check) if debug_mode and tlds_to_check and client is not None else {}
 
     results = []
     for tld in tlds_to_check:
@@ -343,12 +361,15 @@ def domain_check(request):
         "query": query,
         "prices_are_test_mode": prices_are_test_mode,
         "debug_mode": debug_mode,
+        "extensions_limited": "." not in query and not request.GET.get("tlds") and len(active_tlds) > MAX_PUBLIC_TLDS,
     })
 
 
 @require_GET
 def domain_whois(request):
     domain = (request.GET.get("domain") or "").strip().lower().strip(".")
+    if len(domain) > 253 or (domain and any(not _is_valid_label(label) for label in domain.split("."))):
+        return HttpResponse("Enter a valid domain name of at most 253 characters.", status=400)
     if not domain or "." not in domain:
         return render(
             request,

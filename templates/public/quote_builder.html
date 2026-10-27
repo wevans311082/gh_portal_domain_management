@@ -29,14 +29,14 @@
           <span class="text-xl font-bold text-slate-900">{{ branding.company_name|default:SITE_NAME }}</span>
         {% endif %}
       </a>
-      <a href="{% url 'core:home' %}" class="text-sm text-slate-500 hover:text-slate-900">← Back to site</a>
+      <a href="{% url 'core:home' %}" class="text-sm text-slate-600 hover:text-slate-900">← Back to site</a>
     </div>
   </header>
 
   <main class="max-w-7xl mx-auto px-4 py-10">
     <div class="mb-8">
       <h1 class="text-3xl md:text-4xl font-bold text-slate-900">Build your quote</h1>
-      <p class="mt-2 text-slate-600">Drag the services you want into your basket on the right. We'll email you a PDF quote in seconds.</p>
+      <p class="mt-2 text-slate-600">Add services to your basket, then request your quote. We will queue a copy for email delivery.</p>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -45,7 +45,7 @@
       <section class="lg:col-span-2 space-y-8">
         <template x-for="group in catalogue" :key="group.category">
           <div>
-            <h2 class="text-sm uppercase font-bold tracking-wider text-slate-500 mb-3" x-text="group.category"></h2>
+            <h2 class="text-sm uppercase font-bold tracking-wider text-slate-600 mb-3" x-text="group.category"></h2>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <template x-for="item in group.items" :key="item.id">
                 <div class="qb-card bg-white border border-slate-200 rounded-xl p-5 cursor-pointer flex flex-col"
@@ -57,13 +57,13 @@
                     <div>
                       <div class="text-2xl font-bold text-sky-700">
                         <span x-text="formatMoney(item.price_monthly)"></span>
-                        <span class="text-xs font-normal text-slate-500">/ mo</span>
+                        <span class="text-xs font-normal text-slate-600">/ mo</span>
                       </div>
-                      <div class="text-xs text-slate-500" x-show="item.setup_fee > 0">
+                      <div class="text-xs text-slate-600" x-show="item.setup_fee > 0">
                         + <span x-text="formatMoney(item.setup_fee)"></span> setup
                       </div>
                     </div>
-                    <button type="button" class="px-3 py-1.5 rounded bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold">+ Add</button>
+                    <button type="button" :aria-label="'Add ' + item.name" class="px-3 py-1.5 rounded bg-sky-700 hover:bg-sky-800 text-white text-xs font-semibold">+ Add</button>
                   </div>
                 </div>
               </template>
@@ -72,7 +72,7 @@
         </template>
 
         <template x-if="!catalogue.length">
-          <div class="bg-white rounded-xl border border-dashed border-slate-300 p-10 text-center text-slate-500">
+          <div class="bg-white rounded-xl border border-dashed border-slate-300 p-10 text-center text-slate-600">
             No services available right now. Please <a href="{% url 'core:contact' %}" class="text-sky-700 hover:underline">contact us</a> for a custom quote.
           </div>
         </template>
@@ -83,7 +83,7 @@
         <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
           <h2 class="font-bold text-slate-900 mb-3 flex items-center justify-between">
             Your quote
-            <span class="text-xs font-normal text-slate-500" x-text="cart.length + ' item' + (cart.length === 1 ? '' : 's')"></span>
+            <span class="text-xs font-normal text-slate-600" x-text="cart.length + ' item' + (cart.length === 1 ? '' : 's')"></span>
           </h2>
 
           <div x-ref="cart" class="space-y-2 min-h-[80px]">
@@ -92,25 +92,25 @@
                 <span class="cursor-move text-slate-300 select-none handle">⋮⋮</span>
                 <div class="flex-1 min-w-0">
                   <div class="text-sm font-medium truncate" x-text="line.description"></div>
-                  <div class="text-xs text-slate-500">
+                  <div class="text-xs text-slate-600">
                     <span x-text="formatMoney(line.unit_price)"></span> × 
-                    <input type="number" min="1" step="1" x-model.number="line.quantity"
+                    <input type="number" min="1" :max="line.kind === 'setup' ? 1 : 100" step="1" :aria-label="'Quantity for ' + line.description" x-model.number="line.quantity"
                            class="w-12 border border-slate-200 rounded px-1 text-xs">
                   </div>
                 </div>
                 <div class="text-sm font-semibold" x-text="formatMoney(line.unit_price * line.quantity)"></div>
-                <button type="button" @click="removeItem(idx)" class="text-rose-500 hover:text-rose-700 text-xs">×</button>
+                <button type="button" @click="removeItem(idx)" :aria-label="'Remove ' + line.description" class="text-rose-500 hover:text-rose-700 text-xs">×</button>
               </div>
             </template>
           </div>
 
           <template x-if="!cart.length">
-            <p class="text-sm text-slate-500 italic mt-2">Click or drag a service to start your quote.</p>
+            <p class="text-sm text-slate-600 italic mt-2">Click or drag a service to start your quote.</p>
           </template>
 
           <dl class="text-sm space-y-1 mt-4 pt-4 border-t border-slate-200">
-            <div class="flex justify-between"><dt class="text-slate-500">Subtotal</dt><dd x-text="formatMoney(subtotal())"></dd></div>
-            <div class="flex justify-between"><dt class="text-slate-500">VAT ({{ branding.default_vat_rate }}%)</dt><dd x-text="formatMoney(vatAmount())"></dd></div>
+            <div class="flex justify-between"><dt class="text-slate-600">Subtotal</dt><dd x-text="formatMoney(subtotal())"></dd></div>
+            <div class="flex justify-between"><dt class="text-slate-600">VAT ({{ branding.default_vat_rate }}%)</dt><dd x-text="formatMoney(vatAmount())"></dd></div>
             <div class="flex justify-between text-base font-bold border-t pt-2 mt-2"><dt>Estimated total</dt><dd x-text="formatMoney(total())"></dd></div>
           </dl>
         </div>
@@ -118,31 +118,39 @@
         <!-- Lead form -->
         <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-3">
           <h2 class="font-bold text-slate-900">Your details</h2>
-          <input type="text" x-model="lead.name" placeholder="Full name *" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
-          <input type="email" x-model="lead.email" placeholder="Email *" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
-          <input type="text" x-model="lead.company" placeholder="Company (optional)" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
-          <input type="text" x-model="lead.phone" placeholder="Phone (optional)" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
-          <textarea x-model="lead.notes" rows="3" placeholder="Anything else we should know? (optional)" class="w-full border border-slate-300 rounded px-3 py-2 text-sm"></textarea>
+          <div data-no-field-hints>
+            <label for="quote-name" class="block text-sm font-medium text-slate-800">Full name (required)</label>
+            <input id="quote-name" type="text" maxlength="200" autocomplete="name" x-model="lead.name" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+            <label for="quote-email" class="block text-sm font-medium text-slate-800 mt-3">Email (required)</label>
+            <input id="quote-email" type="email" maxlength="254" autocomplete="email" x-model="lead.email" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+            <label for="quote-company" class="block text-sm font-medium text-slate-800 mt-3">Company (optional)</label>
+            <input id="quote-company" type="text" maxlength="255" autocomplete="organization" x-model="lead.company" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+            <label for="quote-phone" class="block text-sm font-medium text-slate-800 mt-3">Phone (optional)</label>
+            <input id="quote-phone" type="tel" maxlength="50" autocomplete="tel" x-model="lead.phone" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+            <label for="quote-notes" class="block text-sm font-medium text-slate-800 mt-3">Additional details (optional)</label>
+            <textarea id="quote-notes" x-model="lead.notes" maxlength="4000" aria-describedby="quote-limits" rows="3" class="w-full border border-slate-300 rounded px-3 py-2 text-sm"></textarea>
+            <p id="quote-limits" class="text-sm text-slate-700 mt-2">Details: up to 4,000 characters. Choose up to 20 lines, with whole quantities from 1 to 100. Setup fees have quantity 1. For quotes above 100,000, contact us.</p>
+          </div>
           <!-- honeypot -->
           <input type="text" x-model="hp" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-10000px;width:1px;height:1px;opacity:0">
 
           <button type="button"
                   @click="submitQuote()"
                   :disabled="submitting || !cart.length || !lead.name || !lead.email"
-                  :class="(submitting || !cart.length || !lead.name || !lead.email) ? 'bg-slate-300 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700'"
+                  :class="(submitting || !cart.length || !lead.name || !lead.email) ? 'bg-slate-300 cursor-not-allowed' : 'bg-emerald-700 hover:bg-emerald-800'"
                   class="w-full px-4 py-3 rounded text-white font-semibold transition">
             <span x-show="!submitting">Get my quote</span>
             <span x-show="submitting">Preparing your quote…</span>
           </button>
-          <p x-show="error" x-text="error" class="text-xs text-rose-600"></p>
-          <p class="text-xs text-slate-400">By requesting a quote you agree to our terms. We'll email a PDF copy.</p>
+          <p x-show="error" x-text="error" role="alert" class="text-sm text-red-800"></p>
+          <p class="text-xs text-slate-700">By requesting a quote you agree to our terms. We'll email a PDF copy.</p>
         </div>
       </aside>
     </div>
   </main>
 </div>
 
-<script id="quote-catalogue" type="application/json">{{ catalogue_json|safe }}</script>
+{{ catalogue|json_script:"quote-catalogue" }}
 <script>
 function quoteBuilder() {
   return {
@@ -150,6 +158,7 @@ function quoteBuilder() {
     cart: [],
     lead: { name: '', email: '', company: '', phone: '', notes: '' },
     hp: '',
+    submissionKey: '{{ submission_key|escapejs }}',
     submitting: false,
     error: '',
     vatRate: {{ branding.default_vat_rate }},
@@ -168,20 +177,24 @@ function quoteBuilder() {
       }
     },
     addItem(item) {
-      const existing = this.cart.find(l => l.product_id === item.id);
+      const existing = this.cart.find(l => l.product_id === item.id && l.kind === 'monthly');
       if (existing) {
-        existing.quantity += 1;
+        existing.quantity = Math.min(100, existing.quantity + 1);
         return;
       }
+      const needsSetup = item.setup_fee > 0 && !this.cart.some(l => l.product_id === item.id && l.kind === 'setup');
+      if (this.cart.length + (needsSetup ? 2 : 1) > 20) { this.error = 'Choose up to 20 quote lines. Contact us for a larger order.'; return; }
       this.cart.push({
+        kind: 'monthly',
         uid: 'l' + Date.now() + Math.random(),
         product_id: item.id,
         description: item.name + ' (monthly)',
         quantity: 1,
         unit_price: item.price_monthly,
       });
-      if (item.setup_fee > 0) {
+      if (needsSetup) {
         this.cart.push({
+          kind: 'setup',
           uid: 'l' + Date.now() + Math.random() + '-s',
           product_id: item.id,
           description: item.name + ' — setup fee',
@@ -213,9 +226,11 @@ function quoteBuilder() {
           body: JSON.stringify({
             lead: this.lead,
             hp: this.hp,
+            submission_key: this.submissionKey,
             items: this.cart.map(l => ({
               description: l.description,
               quantity: l.quantity,
+              kind: l.kind,
               package_id: l.product_id,
               product_id: l.product_id,
             })),
@@ -224,6 +239,7 @@ function quoteBuilder() {
         const data = await res.json();
         if (!res.ok) {
           this.error = data.error || 'Something went wrong. Please try again.';
+          if (res.status === 429 && Number.isInteger(data.retry_after)) this.error += ' Wait up to ' + data.retry_after + ' seconds. Your details and quote have been kept.';
           this.submitting = false;
           return;
         }

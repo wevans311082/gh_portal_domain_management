@@ -5,6 +5,8 @@ from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.http import HttpResponse
 from django.template.loader import render_to_string
+from django.views.decorators.http import require_GET
+from django.views.decorators.cache import never_cache
 
 from apps.billing.models import Invoice
 
@@ -30,6 +32,8 @@ def invoice_detail(request, pk):
 
 
 @login_required
+@require_GET
+@never_cache
 def invoice_pdf(request, pk):
     """Download invoice as PDF via the canonical billing PDF service."""
     invoice = get_object_or_404(Invoice, pk=pk, user=request.user)

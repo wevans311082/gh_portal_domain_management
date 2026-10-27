@@ -224,7 +224,9 @@ def test_domain_check_shows_transfer_price_and_whois_for_taken_domain(client, mo
 
 
 @pytest.mark.django_db
-def test_domain_check_debug_mode_bypasses_cache_and_calls_api(client, monkeypatch):
+def test_domain_check_debug_mode_bypasses_cache_and_calls_api(client, monkeypatch, django_user_model):
+    from tests.security_helpers import login_owner
+    login_owner(client, django_user_model.objects.create_user(email="domain-debug-owner@example.test"))
     TLDPricing.objects.create(tld="com", registration_cost=Decimal("8.00"), renewal_cost=Decimal("9.00"), transfer_cost=Decimal("10.00"))
 
     calls = {"availability": 0, "costs": 0}

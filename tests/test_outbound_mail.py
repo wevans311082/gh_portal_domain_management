@@ -32,6 +32,8 @@ def test_account_mail_uses_the_portal_name_and_customer_domains(client, django_u
     )
 
     assert response.status_code == 302
+    from tests.mail_helpers import deliver_account_mail
+    deliver_account_mail()
     message = mail.outbox[0]
     identity = canonical_portal_site()
     combined = f"{message.subject}\n{message.body}".lower()
@@ -50,6 +52,7 @@ def test_account_mail_uses_the_portal_name_and_customer_domains(client, django_u
         {"email": user.email, "password": "password123"},
         HTTP_HOST="domains.cyberask.co.uk",
     )
+    deliver_account_mail()
     confirmation = mail.outbox[0]
     text = f"{confirmation.subject}\n{confirmation.body}".lower()
     assert "example.com" not in text
@@ -65,6 +68,8 @@ def test_password_reset_matches_mixed_case_and_is_logged(client, django_user_mod
     response = client.post(reverse("account_reset_password"), {"email": "paul.lee@example.com"})
 
     assert response.status_code == 302
+    from tests.mail_helpers import deliver_account_mail
+    deliver_account_mail()
     assert len(mail.outbox) == 1
     body = mail.outbox[0].body
     assert "http" in body

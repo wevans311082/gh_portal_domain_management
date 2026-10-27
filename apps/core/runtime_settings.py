@@ -1,8 +1,8 @@
 """Runtime setting accessors with DB-first fallback."""
 from django.conf import settings
-from django.core.cache import cache
+from django.apps import apps
+from django.db import OperationalError, ProgrammingError
 
-_CACHE_TTL = 60
 _SENTINEL = object()
 
 
@@ -10,12 +10,14 @@ def _from_db(key: str):
     try:
         from apps.admin_tools.models import IntegrationSetting
 
-        value = IntegrationSetting.objects.filter(key=key).values_list("value", flat=True).first()
-        if value in (None, ""):
+        item = IntegrationSetting.objects.filter(key=key).first()
+        return item.plaintext_value if item is not None else _SENTINEL
+    except (OperationalError, ProgrammingError):
+        # Import-time callers must allow initial database creation. Once the
+        # application is ready, storage failures must not switch credentials.
+        if not apps.ready:
             return _SENTINEL
-        return value
-    except Exception:
-        return _SENTINEL
+        raise
 
 
 def get_runtime_setting_with_source(key: str, default=""):
@@ -36,13 +38,7 @@ def get_runtime_setting_with_source(key: str, default=""):
 
 
 def get_runtime_setting(key: str, default=""):
-    cache_key = f"runtime_setting:{key}"
-    cached = cache.get(cache_key, _SENTINEL)
-    if cached is not _SENTINEL:
-        return cached
-
     value, _source = get_runtime_setting_with_source(key, default)
-    cache.set(cache_key, value, timeout=_CACHE_TTL)
     return value
 
 

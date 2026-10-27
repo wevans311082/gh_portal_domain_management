@@ -17,7 +17,7 @@ def site_settings(request):
         "on",
     )
     user = getattr(request, "user", None)
-    show_debug = debug_mode and bool(user and getattr(user, "is_authenticated", False) and user.is_staff)
+    show_debug = debug_mode and bool(user and getattr(user, "is_authenticated", False) and user.is_staff and user.is_superuser)
     return {
         "SITE_NAME": settings.SITE_NAME,
         "SITE_DOMAIN": settings.SITE_DOMAIN,

@@ -120,6 +120,17 @@ def branding_edit(request):
     branding = BillingDocumentBranding.get_solo()
 
     if request.method == "POST":
+        from django.core.exceptions import ValidationError
+        from apps.billing.uploads import sanitize_logo
+        upload = request.FILES.get("logo")
+        try:
+            if upload and request.POST.get("clear_logo") == "1":
+                raise ValidationError("Choose a new logo or remove the current logo, not both.")
+            clean_logo = sanitize_logo(upload) if upload else None
+        except ValidationError as error:
+            return render(request, "admin_tools/billing/branding.html", {
+                "branding": branding, "logo_errors": error.messages,
+            })
         for field in [
             "company_name",
             "registered_address",
@@ -152,8 +163,8 @@ def branding_edit(request):
             except (TypeError, ValueError):
                 pass
 
-        if request.FILES.get("logo"):
-            branding.logo = request.FILES["logo"]
+        if clean_logo:
+            branding.logo = clean_logo
         if request.POST.get("clear_logo") == "1" and branding.logo:
             branding.logo.delete(save=False)
             branding.logo = None

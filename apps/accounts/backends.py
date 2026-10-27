@@ -1,11 +1,6 @@
-import logging
-
 from django.contrib.auth.backends import ModelBackend
 
 from .models import User
-
-logger = logging.getLogger(__name__)
-
 
 class EmailBackend(ModelBackend):
     """
@@ -22,12 +17,24 @@ class EmailBackend(ModelBackend):
     """
 
     def authenticate(self, request, email=None, password=None, totp_token=None, **kwargs):
+        email = email or kwargs.get("username")
+        user = self.authenticate_password(email, password)
+        if user is None:
+            return None
+
+        # A primary factor is never sufficient for an MFA-enabled account.
+        if user.mfa_enabled and (not totp_token or not self.verify_totp(user, totp_token)):
+            return None
+        return user
+
+    def authenticate_password(self, email, password):
+        """Verify only the primary factor; callers must not treat this as a login."""
         if not email or not password:
             return None
 
         try:
             user = User.objects.get(email__iexact=email.strip())
-        except User.DoesNotExist:
+        except (User.DoesNotExist, User.MultipleObjectsReturned):
             # Run the hasher anyway to prevent user-enumeration via timing
             User().set_password(password)
             return None
@@ -38,42 +45,11 @@ class EmailBackend(ModelBackend):
         if not self.user_can_authenticate(user):
             return None
 
-        # --- MFA check ---
-        if user.mfa_enabled:
-            if not totp_token:
-                logger.info(
-                    "MFA required but no token supplied for user %s", user.pk
-                )
-                # Signal to the view that MFA is required without leaking
-                # whether the password was correct
-                return None
-            if not self.verify_totp(user, totp_token):
-                logger.warning(
-                    "Invalid MFA token for user %s from IP %s",
-                    user.pk,
-                    request.META.get("REMOTE_ADDR", "unknown") if request else "unknown",
-                )
-                return None
-
         return user
 
     @staticmethod
     def verify_totp(user: User, token: str) -> bool:
-        """Return True if *token* is a valid current TOTP code for *user*."""
-        try:
-            import pyotp  # soft dependency — only needed when MFA is in use
-        except ImportError:
-            logger.error(
-                "pyotp is not installed but MFA is enabled for user %s. "
-                "Install it: pip install pyotp",
-                user.pk,
-            )
-            return False
+        """Consume a valid, unused TOTP code within the account attempt limit."""
+        from .mfa import verify_factor
 
-        if not user.mfa_secret:
-            return False
-
-        totp = pyotp.TOTP(user.mfa_secret)
-        # valid_window=1 accepts the previous/current/next 30-second window
-        # to tolerate small clock skew between client and server
-        return totp.verify(token, valid_window=1)
+        return verify_factor(user, token, allow_backup=False)

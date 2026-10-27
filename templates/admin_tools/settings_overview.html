@@ -18,21 +18,21 @@
         <form method="post" action="{% url 'admin_tools:settings_export' %}" class="space-y-3">
             {% csrf_token %}
             <label class="block text-sm font-semibold text-slate-700">Password (min 8 characters)
-                <input type="password" name="backup_password" minlength="8" required class="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm">
+                <input type="password" name="backup_password" minlength="8" maxlength="1024" required class="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm">
             </label>
             <button class="px-4 py-2 rounded-lg bg-slate-800 text-white text-sm font-semibold hover:bg-slate-900">Download encrypted zip</button>
         </form>
     </div>
     <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
         <h2 class="text-sm font-semibold text-slate-800 mb-1">Import backup</h2>
-        <p class="text-xs text-slate-500 mb-3">Restore settings from a zip exported here. This overwrites matching keys.</p>
+        <p id="backup-import-help" class="text-sm text-slate-600 mb-3">Restore an encrypted backup exported here, up to 2 MB. All settings are validated before matching values are replaced. If validation or saving fails, no imported changes are kept. Only supported application settings can be restored.</p>
         <form method="post" action="{% url 'admin_tools:settings_import' %}" enctype="multipart/form-data" class="space-y-3">
             {% csrf_token %}
             <label class="block text-sm font-semibold text-slate-700">Backup zip
-                <input type="file" name="backup_file" accept=".zip" required class="mt-1 w-full text-sm">
+                <input type="file" name="backup_file" accept=".zip,application/zip" aria-describedby="backup-import-help" required class="mt-1 w-full text-sm">
             </label>
             <label class="block text-sm font-semibold text-slate-700">Password
-                <input type="password" name="backup_password" minlength="8" required class="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm">
+                <input type="password" name="backup_password" minlength="8" maxlength="1024" required class="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm">
             </label>
             <button class="admin-button-primary px-4 py-2 rounded-lg text-white text-sm font-semibold">Import settings</button>
         </form>

@@ -7,14 +7,16 @@ import qrcode
 import qrcode.image.svg
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth import login, authenticate
+from django.contrib.auth import login, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
 from django.http import HttpResponse
 from django.shortcuts import render, redirect
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
+from django.views.decorators.cache import never_cache
 from django.utils.crypto import get_random_string
 
 from apps.audit.models import AuditLog
@@ -26,13 +28,15 @@ from .forms import (
     RegistrationForm,
     TOTPVerifyForm,
 )
-from .mfa import active_backup_code_count, consume_backup_code, regenerate_backup_codes
+from .mfa import (
+    active_backup_code_count, clear_challenge, finish_challenge,
+    pending_challenge, regenerate_backup_codes, start_challenge, verify_factor,
+)
 from .models import ClientProfile, User
 
 logger = logging.getLogger(__name__)
 
 # Session key used to park a partially-authenticated user during MFA step
-_MFA_USER_SESSION_KEY = "_mfa_pending_user_id"
 _LOGIN_RATE_MAX = getattr(settings, "LOGIN_RATE_LIMIT_MAX_ATTEMPTS", 5)
 _LOGIN_RATE_WINDOW = getattr(settings, "LOGIN_RATE_LIMIT_WINDOW_SECONDS", 300)
 _SUPPORT_LOGIN_CODE_SESSION_KEY = "support_login_code"
@@ -115,7 +119,7 @@ def register(request):
             user = form.save()
             ClientProfile.objects.create(user=user)
             from allauth.account.models import EmailAddress
-            from allauth.account.utils import send_email_confirmation
+            from allauth.account.internal.flows.email_verification import send_verification_email_to_address
 
             EmailAddress.objects.update_or_create(
                 user=user,
@@ -123,9 +127,11 @@ def register(request):
                 defaults={"primary": True, "verified": False},
             )
             try:
-                send_email_confirmation(request, user, signup=True)
+                address = EmailAddress.objects.get(user=user, email=user.email)
+                send_verification_email_to_address(request, address, signup=True)
             except Exception:
-                logger.exception("Failed to send registration confirmation to %s", user.email)
+                logger.error("Registration confirmation could not be queued user_id=%s", user.pk)
+                messages.warning(request, "Your account was created, but its confirmation email could not be queued. Sign in later to request a new confirmation.")
             messages.success(
                 request,
                 "Account created. Confirm your email address before signing in.",
@@ -142,6 +148,7 @@ def register(request):
 # Custom two-step login (password → optional MFA)
 # ──────────────────────────────────────────────────────────────────────────────
 
+@never_cache
 def custom_login(request):
     """
     Step 1 of login: validate email + password.
@@ -157,6 +164,7 @@ def custom_login(request):
     support_code = _issue_support_login_code(request)
 
     if request.method == "POST":
+        clear_challenge(request)
         # Rate limiting by IP
         rl_key = _login_rate_key(request)
         attempts = cache.get(rl_key, 0)
@@ -177,34 +185,12 @@ def custom_login(request):
         email = request.POST.get("email", "").strip()
         password = request.POST.get("password", "")
 
-        # Authenticate without TOTP first to check password validity
-        user = authenticate(request, email=email, password=password)
+        from .backends import EmailBackend
+
+        # Deliberately validate the primary factor, without creating a login.
+        user = EmailBackend().authenticate_password(email, password)
 
         if user is None:
-            # Check if the user exists and has MFA — we need to differentiate
-            # "wrong password" from "correct password but MFA required"
-            try:
-                db_user = User.objects.get(email__iexact=email)
-                if db_user.mfa_enabled and db_user.check_password(password):
-                    if not _email_is_verified(db_user):
-                        return _reject_unverified(
-                            request,
-                            db_user,
-                            next_url,
-                            support_email,
-                            support_code,
-                        )
-                    # Password correct, MFA required → redirect to TOTP step.
-                    # Increment the counter so attackers cannot silently enumerate
-                    # valid passwords for MFA-protected accounts without cost.
-                    # The counter is cleared on successful MFA completion.
-                    cache.set(rl_key, attempts + 1, timeout=_LOGIN_RATE_WINDOW)
-                    request.session[_MFA_USER_SESSION_KEY] = db_user.pk
-                    request.session.modified = True
-                    return redirect("accounts_custom:mfa_verify")
-            except User.DoesNotExist:
-                pass
-
             # Increment failure counter
             cache.set(rl_key, attempts + 1, timeout=_LOGIN_RATE_WINDOW)
             messages.error(request, "Invalid email or password.")
@@ -227,11 +213,18 @@ def custom_login(request):
                 support_code,
             )
 
+        if user.mfa_enabled:
+            if not user.mfa_secret:
+                messages.error(request, "Your authenticator setup needs account support.")
+                return redirect("account_login")
+            start_challenge(request, user, next_url)
+            return redirect("accounts_custom:mfa_verify")
+
         # No MFA — complete login immediately; reset failure counter
         cache.delete(rl_key)
         login(request, user, backend="apps.accounts.backends.EmailBackend")
 
-        if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+        if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
             return redirect(next_url)
         if user.is_staff:
             return redirect("admin_tools:dashboard")
@@ -248,54 +241,49 @@ def custom_login(request):
     )
 
 
+@never_cache
 def mfa_verify(request):
     """
     Step 2 of login: validate TOTP token for users with MFA enabled.
     The user id is pulled from the session set in custom_login().
     """
-    user_id = request.session.get(_MFA_USER_SESSION_KEY)
-    if not user_id:
+    challenge = pending_challenge(request)
+    if not challenge:
+        messages.info(request, "Your sign-in challenge expired. Please sign in again.")
         return redirect("accounts_custom:login")
-
-    try:
-        pending_user = User.objects.get(pk=user_id, mfa_enabled=True)
-    except User.DoesNotExist:
-        del request.session[_MFA_USER_SESSION_KEY]
-        return redirect("accounts_custom:login")
-
-    next_url = request.GET.get("next", "") or request.POST.get("next", "")
+    pending_user = challenge.user
+    next_url = challenge.return_to
 
     support_email = _resolve_support_email()
     support_code = _issue_support_login_code(request)
 
     if request.method == "POST":
         form = MFALoginVerifyForm(request.POST)
-        if form.is_valid():
-            token = form.cleaned_data["code"]
-            totp = pyotp.TOTP(pending_user.mfa_secret)
-            if token.isdigit() and len(token) == 6 and totp.verify(token, valid_window=1):
-                del request.session[_MFA_USER_SESSION_KEY]
-                login(request, pending_user, backend="apps.accounts.backends.EmailBackend")
-                cache.delete(_login_rate_key(request))  # reset counter after successful MFA
-                if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
-                    return redirect(next_url)
-                if pending_user.is_staff:
-                    return redirect("admin_tools:dashboard")
-                return redirect("portal:dashboard")
-            if consume_backup_code(pending_user, token):
-                del request.session[_MFA_USER_SESSION_KEY]
-                login(request, pending_user, backend="apps.accounts.backends.EmailBackend")
-                cache.delete(_login_rate_key(request))  # reset counter after successful backup-code MFA
-                messages.warning(
-                    request,
-                    "Signed in using a backup code. Generate a fresh set soon.",
-                )
-                if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
-                    return redirect(next_url)
-                if pending_user.is_staff:
-                    return redirect("admin_tools:dashboard")
-                return redirect("portal:dashboard")
-
+        valid_form = form.is_valid()
+        # Empty/malformed submissions count towards the same database throttle.
+        user, destination, used_backup, error = finish_challenge(
+            request, form.cleaned_data["code"] if valid_form else ""
+        )
+        if user:
+            login(request, user, backend="apps.accounts.backends.EmailBackend")
+            cache.delete(_login_rate_key(request))
+            if used_backup:
+                messages.warning(request, "Signed in using a backup code. Generate a fresh set soon.")
+            if destination:
+                return redirect(destination)
+            return redirect("admin_tools:dashboard" if user.is_staff else "portal:dashboard")
+        if error == "expired":
+            clear_challenge(request)
+            messages.error(request, "Your sign-in challenge expired. Please sign in again.")
+            return redirect("accounts_custom:login")
+        if error == "limited":
+            clear_challenge(request)
+            messages.error(request, "Too many authentication-code attempts. Wait five minutes before signing in again.")
+            response = redirect("accounts_custom:login")
+            response.status_code = 303
+            response["Retry-After"] = str(settings.MFA_RATE_LIMIT_WINDOW_SECONDS)
+            return response
+        if valid_form:
             logger.warning("Invalid MFA code for user %s", pending_user.pk)
             form.add_error("code", "Invalid authenticator or backup code. Please try again.")
     else:
@@ -368,6 +356,7 @@ def profile(request):
 # ──────────────────────────────────────────────────────────────────────────────
 
 @login_required
+@never_cache
 def mfa_setup(request):
     """
     Generate a new TOTP secret and show the QR code for scanning.
@@ -375,6 +364,9 @@ def mfa_setup(request):
     at which point it is saved to the database and MFA is enabled.
     """
     user = request.user
+    if user.mfa_enabled:
+        messages.info(request, "MFA is already enabled. Use the security settings to manage it.")
+        return redirect("accounts_custom:mfa_manage")
 
     if request.method == "POST":
         form = TOTPVerifyForm(request.POST)
@@ -388,7 +380,13 @@ def mfa_setup(request):
             if totp.verify(form.cleaned_data["token"], valid_window=1):
                 user.mfa_secret = secret
                 user.mfa_enabled = True
-                user.save(update_fields=["mfa_secret", "mfa_enabled"])
+                current_step = int(timezone.now().timestamp()) // totp.interval
+                user.mfa_last_verified_step = next(
+                    step for step in (current_step, current_step - 1, current_step + 1)
+                    if totp.at(step * totp.interval) == form.cleaned_data["token"]
+                )
+                user.save(update_fields=["mfa_secret", "mfa_enabled", "mfa_last_verified_step"])
+                update_session_auth_hash(request, user)
                 fresh_codes = regenerate_backup_codes(user)
                 request.session["fresh_mfa_backup_codes"] = fresh_codes
                 del request.session["mfa_setup_secret"]
@@ -433,11 +431,11 @@ def mfa_disable(request):
         return redirect("accounts_custom:profile")
 
     token = request.POST.get("token", "")
-    totp = pyotp.TOTP(user.mfa_secret)
-    if totp.verify(token, valid_window=1):
+    if verify_factor(user, token, allow_backup=False):
         user.mfa_enabled = False
         user.mfa_secret = ""
         user.save(update_fields=["mfa_enabled", "mfa_secret"])
+        update_session_auth_hash(request, user)
         user.mfa_backup_codes.all().delete()
         messages.success(request, "Two-factor authentication has been disabled.")
     else:
@@ -446,6 +444,7 @@ def mfa_disable(request):
 
 
 @login_required
+@never_cache
 def mfa_manage(request):
     user = request.user
     regenerate_form = MFARegenerateBackupCodesForm()
@@ -458,8 +457,7 @@ def mfa_manage(request):
                 messages.error(request, "Enable MFA before generating backup codes.")
             elif regenerate_form.is_valid():
                 token = regenerate_form.cleaned_data["token"]
-                totp = pyotp.TOTP(user.mfa_secret)
-                if totp.verify(token, valid_window=1):
+                if verify_factor(user, token, allow_backup=False):
                     request.session["fresh_mfa_backup_codes"] = regenerate_backup_codes(user)
                     messages.success(request, "Backup codes regenerated. Save them now.")
                     return redirect("accounts_custom:mfa_manage")
@@ -476,6 +474,46 @@ def mfa_manage(request):
             "regenerate_form": regenerate_form,
         },
     )
+
+
+@login_required
+@never_cache
+def reauthenticate(request):
+    from django import forms
+    from apps.admin_tools.access import safe_return_url
+    from .reauthentication import confirm_identity
+
+    class IdentityForm(forms.Form):
+        password = forms.CharField(label="Current password", widget=forms.PasswordInput(attrs={"autocomplete": "current-password"}), max_length=1024)
+        code = forms.CharField(label="New authenticator code or unused backup code", max_length=16, widget=forms.TextInput(attrs={"autocomplete": "one-time-code"}))
+
+    if request.session.get("impersonator_user_id"):
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied("End customer impersonation before confirming your identity.")
+    destination = safe_return_url(request, request.GET.get("next") or request.POST.get("next"),
+        fallback=reverse("admin_tools:dashboard" if request.user.is_staff else "portal:dashboard"))
+    form = IdentityForm(request.POST if request.method == "POST" else None)
+    status = 200
+    if request.method == "POST":
+        valid = form.is_valid()
+        result = confirm_identity(request, form.cleaned_data.get("password", "") if valid else "", form.cleaned_data.get("code", "") if valid else "")
+        if not result:
+            messages.success(request, "Identity confirmed. Submit your intended action again if needed.")
+            return redirect(destination)
+        if result == "limited":
+            form.add_error(None, "Too many attempts. Wait five minutes before trying again.")
+            status = 429
+        elif result == "unavailable":
+            form.add_error(None, "Enable MFA on your account before using protected actions.")
+            status = 403
+        else:
+            form.add_error(None, "The password or authentication code was not accepted.")
+    response = render(request, "accounts/reauthenticate.html", {
+        "form": form, "next": destination, "mfa_enrolled": request.user.mfa_enabled,
+    }, status=status)
+    if status == 429:
+        response["Retry-After"] = str(settings.MFA_RATE_LIMIT_WINDOW_SECONDS)
+    return response
 
 
 # ──────────────────────────────────────────────────────────────────────────────

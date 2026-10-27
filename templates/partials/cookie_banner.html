@@ -5,7 +5,7 @@
       <p class="text-sm text-slate-700">{{ CONTENT_SETTINGS.cookie_banner_text }}</p>
       <div class="flex gap-2">
         <button id="cookie-reject" class="px-3 py-2 text-xs border border-slate-300 rounded">Reject non-essential</button>
-        <button id="cookie-accept" class="px-3 py-2 text-xs bg-emerald-600 text-white rounded">Accept all</button>
+        <button id="cookie-accept" class="px-3 py-2 text-xs bg-emerald-700 text-white rounded">Accept all</button>
         <a href="{% if CONTENT_SETTINGS.cookie_policy_slug %}{% url 'core:legal_page' CONTENT_SETTINGS.cookie_policy_slug %}{% else %}{% url 'core:contact' %}{% endif %}" class="px-3 py-2 text-xs text-sky-700 underline">Cookie policy</a>
       </div>
     </div>

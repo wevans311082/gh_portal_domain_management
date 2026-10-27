@@ -1,0 +1,9 @@
+{% extends "admin_tools/components/card.html" %}
+{% block card_body %}
+        <ul class="divide-y divide-slate-200">{% for staff in staff_accounts %}
+            <li class="py-3"><p class="font-semibold break-all">{{ staff.email }}</p>
+                {% if staff.is_superuser %}<span class="chip chip-info">Platform owner</span>
+                {% else %}<p class="text-sm text-slate-600">{% for group in staff.groups.all %}{{ group.name }}{% if not forloop.last %}, {% endif %}{% empty %}No assigned roles{% endfor %}</p>{% endif %}
+                {% if not staff.is_active %}<span class="chip chip-danger">Inactive</span>{% endif %}
+            </li>{% endfor %}</ul>
+    {% endblock %}

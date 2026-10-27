@@ -5,12 +5,14 @@ _TEXTAREA_CSS = _INPUT_CSS + " resize-y"
 
 
 class ContactForm(forms.Form):
+    submission_key = forms.UUIDField(required=False, widget=forms.HiddenInput)
     name = forms.CharField(
         max_length=200,
         label="Full name",
         widget=forms.TextInput(attrs={"class": _INPUT_CSS, "placeholder": "e.g. Jane Smith"}),
     )
     email = forms.EmailField(
+        max_length=254,
         label="Email address",
         widget=forms.EmailInput(attrs={"class": _INPUT_CSS, "placeholder": "e.g. jane@example.com"}),
     )
@@ -27,8 +29,10 @@ class ContactForm(forms.Form):
         widget=forms.TextInput(attrs={"class": _INPUT_CSS, "placeholder": "e.g. General enquiry"}),
     )
     message = forms.CharField(
+        max_length=10000,
+        help_text="Up to 10,000 characters. Files are not accepted.",
         label="Message",
         widget=forms.Textarea(attrs={"class": _TEXTAREA_CSS, "rows": 5, "placeholder": "How can we help?"}),
     )
     # Honeypot — must remain empty; bots tend to fill every field
-    website = forms.CharField(required=False, widget=forms.HiddenInput)
+    website = forms.CharField(required=False, max_length=200, widget=forms.HiddenInput)

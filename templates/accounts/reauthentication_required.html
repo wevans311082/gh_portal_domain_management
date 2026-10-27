@@ -1,0 +1,14 @@
+{% extends "base_auth.html" %}
+{% block title %}Confirm your identity — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<h2 class="text-2xl font-semibold text-slate-900 mb-3">Confirm your identity</h2>
+{% if mfa_enrolled %}
+<p class="text-sm text-slate-600 mb-5">This protected action requires a recent password and MFA check.</p>
+<a href="{{ reauth_url }}" class="btn-primary inline-flex items-center justify-center">Confirm identity</a>
+{% else %}
+<p class="text-sm text-slate-600 mb-5">Enable two-factor authentication before using owner security controls.</p>
+<a href="{% url 'accounts_custom:mfa_setup' %}" class="btn-primary inline-flex items-center justify-center">Set up MFA</a>
+{% endif %}
+{% if action_was_submitted %}<p role="status" class="mt-5 text-sm text-slate-700">Your action has not been performed. After confirming your identity, return to the form and submit it again.</p>{% endif %}
+<p class="mt-5"><a href="{% url 'admin_tools:dashboard' %}" class="text-sm text-sky-800 underline">Return to your workspace</a></p>
+{% endblock %}

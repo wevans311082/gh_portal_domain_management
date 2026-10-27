@@ -189,9 +189,7 @@ def test_mfa_verify_no_session_redirects(client):
 @pytest.mark.django_db
 def test_mfa_verify_valid_token_logs_in(client, django_user_model):
     user, secret = make_mfa_user(django_user_model, email="mfav@test.com")
-    session = client.session
-    session["_mfa_pending_user_id"] = user.pk
-    session.save()
+    client.post(reverse("accounts_custom:login"), {"email": user.email, "password": "pass1234!"})
 
     token = pyotp.TOTP(secret).now()
     response = client.post(reverse("accounts_custom:mfa_verify"), {"code": token})
@@ -202,9 +200,7 @@ def test_mfa_verify_valid_token_logs_in(client, django_user_model):
 @pytest.mark.django_db
 def test_mfa_verify_invalid_token_shows_error(client, django_user_model):
     user, _ = make_mfa_user(django_user_model, email="mfabad@test.com")
-    session = client.session
-    session["_mfa_pending_user_id"] = user.pk
-    session.save()
+    client.post(reverse("accounts_custom:login"), {"email": user.email, "password": "pass1234!"})
 
     response = client.post(reverse("accounts_custom:mfa_verify"), {"code": "000000"})
     assert response.status_code == 200
@@ -218,9 +214,7 @@ def test_mfa_verify_accepts_backup_code(client, django_user_model):
     user, _ = make_mfa_user(django_user_model, email="mfabackup@test.com")
     codes = regenerate_backup_codes(user, count=1)
 
-    session = client.session
-    session["_mfa_pending_user_id"] = user.pk
-    session.save()
+    client.post(reverse("accounts_custom:login"), {"email": user.email, "password": "pass1234!"})
 
     response = client.post(reverse("accounts_custom:mfa_verify"), {"code": codes[0]})
     assert response.status_code == 302

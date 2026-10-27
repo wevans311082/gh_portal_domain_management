@@ -1,0 +1,5 @@
+<div class="admin-card admin-stat-card">
+  <p class="admin-stat-label">{{ label }}</p>
+  <p class="admin-stat-value">{% if prefix %}{{ prefix }} {% endif %}{{ value }}</p>
+  {% if detail %}<p class="admin-muted">{{ detail }}</p>{% endif %}
+</div>

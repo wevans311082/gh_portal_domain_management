@@ -12,9 +12,18 @@ Callers should use :func:`render_document_pdf`. The returned tuple is
 from __future__ import annotations
 
 import logging
+import importlib.util
+import json
+from pathlib import Path
+import shutil
+import sys
+import tempfile
+import time
+import uuid
 from typing import Mapping, Optional, Tuple
 
 from django.template.loader import render_to_string
+from apps.core.process_limits import ProcessLimitError, run_bounded
 
 logger = logging.getLogger(__name__)
 
@@ -31,67 +40,75 @@ _DEFAULT_OPTIONS = {
 }
 
 
-def _try_pdfkit(html: str, *, header_html: Optional[str], footer_html: Optional[str]) -> Optional[bytes]:
-    """Try to render with wkhtmltopdf. Return ``None`` if it isn't available."""
+MAX_HTML_BYTES = 1024 * 1024
+MAX_PDF_BYTES = 10 * 1024 * 1024
+RENDER_SECONDS = 15
+
+
+def _remaining(deadline):
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise ProcessLimitError("timeout")
+    return remaining
+
+
+def _try_pdfkit(html: str, *, header_html: Optional[str], footer_html: Optional[str], deadline=None) -> Optional[bytes]:
     try:
-        import pdfkit  # type: ignore
+        import pdfkit
     except ImportError:
         return None
-
+    binary = shutil.which("wkhtmltopdf")
+    if not binary:
+        return None
+    deadline = time.monotonic() + RENDER_SECONDS if deadline is None else deadline
     options = dict(_DEFAULT_OPTIONS)
-
-    # wkhtmltopdf header/footer arguments must be paths to HTML files.
-    import tempfile
-
-    tmp_paths = []
     try:
-        if header_html:
-            f = tempfile.NamedTemporaryFile(
-                "w", suffix=".html", delete=False, encoding="utf-8"
-            )
-            f.write(header_html)
-            f.close()
-            tmp_paths.append(f.name)
-            options["header-html"] = f.name
-            options["margin-top"] = "30mm"
-        if footer_html:
-            f = tempfile.NamedTemporaryFile(
-                "w", suffix=".html", delete=False, encoding="utf-8"
-            )
-            f.write(footer_html)
-            f.close()
-            tmp_paths.append(f.name)
-            options["footer-html"] = f.name
-            options["margin-bottom"] = "25mm"
-
-        try:
-            pdf_bytes = pdfkit.from_string(html, False, options=options)
-            return pdf_bytes
-        except (OSError, IOError) as exc:
-            logger.warning("wkhtmltopdf unavailable or failed: %s", exc)
-            return None
-        except Exception as exc:  # pdfkit.exceptions.PDFKitError, etc.
-            logger.warning("pdfkit raised %s: %s", type(exc).__name__, exc)
-            return None
-    finally:
-        import os
-        for path in tmp_paths:
-            try:
-                os.unlink(path)
-            except OSError:
-                pass
-
-
-def _try_weasyprint(html: str, *, base_url: Optional[str]) -> Optional[bytes]:
-    try:
-        from weasyprint import HTML  # type: ignore
-    except ImportError:
+        with tempfile.TemporaryDirectory(prefix="portal-document-") as directory:
+            for kind, content in (("header", header_html), ("footer", footer_html)):
+                if content:
+                    path = Path(directory) / f"{kind}.html"
+                    path.write_text(content, encoding="utf-8")
+                    options[f"{kind}-html"] = str(path)
+                    options["margin-top" if kind == "header" else "margin-bottom"] = "30mm" if kind == "header" else "25mm"
+            # Do not discover arbitrary options from HTML meta tags. The random
+            # prefix is selected after rendering and cannot occur in that input.
+            configuration = pdfkit.configuration(wkhtmltopdf=binary, meta_tag_prefix=f"portal-{uuid.uuid4().hex}-")
+            runner = pdfkit.PDFKit(html, "string", options=options, configuration=configuration)
+            result = run_bounded(runner.command(), html.encode("utf-8"), timeout=_remaining(deadline),
+                                 max_input=MAX_HTML_BYTES, max_output=MAX_PDF_BYTES)
+            if not result.startswith(b"%PDF-"):
+                raise ProcessLimitError("invalid_pdf")
+            return result
+    except OSError:
+        logger.warning("wkhtmltopdf is unavailable")
         return None
+    except ProcessLimitError as error:
+        if error.code in {"engine_unavailable", "engine_failed"}:
+            logger.warning("wkhtmltopdf failed code=%s", error.code)
+            return None
+        raise
+
+
+def _try_weasyprint(html: str, *, base_url: Optional[str], deadline=None) -> Optional[bytes]:
     try:
-        return HTML(string=html, base_url=base_url).write_pdf()
-    except Exception as exc:
-        logger.warning("WeasyPrint failed: %s", exc)
+        if importlib.util.find_spec("weasyprint") is None:
+            return None
+    except (ImportError, ValueError):
         return None
+    deadline = time.monotonic() + RENDER_SECONDS if deadline is None else deadline
+    packet = json.dumps({"html": html, "base_url": base_url}, ensure_ascii=False).encode("utf-8")
+    try:
+        result = run_bounded([sys.executable, "-m", "apps.billing.pdf_worker"], packet,
+                             timeout=_remaining(deadline), max_input=2 * MAX_HTML_BYTES + 65536,
+                             max_output=MAX_PDF_BYTES, cwd=Path(__file__).resolve().parents[2])
+        if not result.startswith(b"%PDF-"):
+            raise ProcessLimitError("invalid_pdf")
+        return result
+    except ProcessLimitError as error:
+        if error.code in {"engine_unavailable", "engine_failed"}:
+            logger.warning("WeasyPrint failed code=%s", error.code)
+            return None
+        raise
 
 
 def render_document_pdf(
@@ -110,17 +127,23 @@ def render_document_pdf(
     header_html = render_to_string(header_template, dict(context)) if header_template else None
     footer_html = render_to_string(footer_template, dict(context)) if footer_template else None
 
-    pdf_bytes = _try_pdfkit(html, header_html=header_html, footer_html=footer_html)
-    if pdf_bytes:
-        return pdf_bytes, "application/pdf", "pdf"
-
-    pdf_bytes = _try_weasyprint(html, base_url=base_url)
-    if pdf_bytes:
-        return pdf_bytes, "application/pdf", "pdf"
+    if sum(len(value.encode("utf-8")) for value in (html, header_html or "", footer_html or "")) > MAX_HTML_BYTES:
+        raise ProcessLimitError("input_limit")
+    if base_url is not None and len(base_url) > 2048:
+        raise ProcessLimitError("input_limit")
+    deadline = time.monotonic() + RENDER_SECONDS
+    try:
+        pdf_bytes = _try_pdfkit(html, header_html=header_html, footer_html=footer_html, deadline=deadline)
+        if pdf_bytes:
+            return pdf_bytes, "application/pdf", "pdf"
+        pdf_bytes = _try_weasyprint(html, base_url=base_url, deadline=deadline)
+        if pdf_bytes:
+            return pdf_bytes, "application/pdf", "pdf"
+    except ProcessLimitError as error:
+        logger.warning("Document engine stopped code=%s", error.code)
 
     logger.warning("No PDF engine available; serving HTML fallback for %s", template_name)
     banner = (
-        "<!-- PDF engine unavailable: returning HTML. Install wkhtmltopdf "
-        "for production-grade PDFs. -->\n"
+        "<!-- PDF engine unavailable or limited: returning the rendered document as HTML. -->\n"
     )
     return (banner + html).encode("utf-8"), "text/html", "html"

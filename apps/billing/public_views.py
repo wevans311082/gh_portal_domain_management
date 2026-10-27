@@ -5,25 +5,19 @@ itself) and route through ``apps.billing.services`` for persistence.
 """
 from __future__ import annotations
 
-import json
 import logging
-from decimal import Decimal, InvalidOperation
-from typing import List
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.http import Http404, HttpResponse, JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
-from django.utils import timezone
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST, require_http_methods
+from django.views.decorators.cache import never_cache
 
 from apps.billing.models import BillingDocumentBranding, Quote
 from apps.billing.services import (
-    LineItemSpec,
-    convert_quote_to_invoice,
     create_quote,
-    email_document,
     render_quote_pdf,
 )
 from apps.products.models import Package
@@ -63,7 +57,9 @@ def _build_catalogue():
 # ---------------------------------------------------------------------------
 
 
+@never_cache
 def quote_builder(request):
+    from apps.core.public_submissions import new_submission_key
     branding = BillingDocumentBranding.get_solo()
     catalogue = _build_catalogue()
     return render(
@@ -72,12 +68,13 @@ def quote_builder(request):
         {
             "branding": branding,
             "catalogue": catalogue,
-            "catalogue_json": json.dumps(catalogue),
+            "submission_key": new_submission_key(request),
         },
     )
 
 
 @require_POST
+@never_cache
 def quote_submit(request):
     """Honeypot-protected public quote submission.
 
@@ -88,77 +85,47 @@ def quote_submit(request):
           "hp": ""  # honeypot - must be empty
         }
     """
+    from django import forms
+    from apps.core.abuse import bounded_json
+    from .public_validation import validate_public_quote
     try:
-        payload = json.loads(request.body.decode("utf-8") or "{}")
-    except json.JSONDecodeError:
-        return JsonResponse({"error": "Invalid JSON"}, status=400)
+        if len(request.body) > 64 * 1024:
+            return JsonResponse({"error": "The submitted data is too large."}, status=413)
+        payload = getattr(request, "public_json", None)
+        if payload is None:
+            payload = bounded_json(request.body)
+        honeypot = payload.get("hp", "")
+        if not isinstance(honeypot, str) or len(honeypot) > 200:
+            raise ValueError("Invalid form data.")
+        if honeypot.strip():
+            return JsonResponse({"ok": True, "redirect": reverse("billing_public:quote_thanks")})
+        lead, line_items = validate_public_quote(payload)
+    except (ValueError, forms.ValidationError) as error:
+        message = error.messages[0] if isinstance(error, forms.ValidationError) else str(error)
+        return JsonResponse({"error": message}, status=400)
+    name, email = lead["name"], lead["email"]
 
-    if (payload.get("hp") or "").strip():
-        # silent reject
-        logger.warning("Quote submit honeypot tripped from %s", _client_ip(request))
-        return JsonResponse({"ok": True, "redirect": reverse("billing_public:quote_thanks")})
-
-    lead = payload.get("lead") or {}
-    email = (lead.get("email") or "").strip()
-    name = (lead.get("name") or "").strip()
-    if not email or not name:
-        return JsonResponse({"error": "Name and email are required."}, status=400)
-
-    raw_items = payload.get("items") or []
-    line_items: List[LineItemSpec] = []
-    for idx, item in enumerate(raw_items):
-        package_id = item.get("package_id") or item.get("product_id")
-        if not package_id:
-            continue
-        package = Package.objects.filter(pk=package_id, is_active=True, is_quotable=True).first()
-        if not package:
-            continue
-        desc = (item.get("description") or "").strip() or package.name
-        try:
-            qty = Decimal(str(item.get("quantity") or "1"))
-        except (InvalidOperation, ValueError):
-            continue
-        if qty <= 0:
-            continue
-        is_setup = "setup" in desc.lower()
-        price = package.setup_fee if is_setup else package.price_monthly
-        if price < 0:
-            continue
-        line_items.append(
-            LineItemSpec(description=desc, quantity=qty, unit_price=price, position=idx)
+    from apps.core.public_submissions import accept_submission, SubmissionConflict, SubmissionUnavailable
+    def create_result():
+        quote = create_quote(
+            user=request.user if request.user.is_authenticated else None,
+            line_items=line_items, lead_email=email, lead_name=name,
+            lead_company=lead["company"], lead_phone=lead["phone"], notes=lead["notes"], status=Quote.STATUS_SENT,
         )
-
-    if not line_items:
-        return JsonResponse({"error": "Add at least one item to your quote."}, status=400)
-
-    user = request.user if request.user.is_authenticated else None
-
-    quote = create_quote(
-        user=user,
-        line_items=line_items,
-        lead_email=email,
-        lead_name=name,
-        lead_company=(lead.get("company") or "").strip(),
-        lead_phone=(lead.get("phone") or "").strip(),
-        notes=(lead.get("notes") or "").strip(),
-        status=Quote.STATUS_SENT,
-    )
-
-    # Save token in session so we can link Quote.user post-registration.
-    request.session["pending_quote_token"] = str(quote.public_token)
-
+        result = {"quote_number": quote.number, "token": str(quote.public_token),
+                  "redirect": reverse("billing_public:quote_public", args=[str(quote.public_token)])}
+        return result, {"quote_id": quote.pk, "recipient": email}
     try:
-        email_document(quote, kind="quote_sent")
-    except Exception:
-        logger.exception("Failed to email quote %s", quote.number)
-
-    return JsonResponse(
-        {
-            "ok": True,
-            "quote_number": quote.number,
-            "redirect": reverse("billing_public:quote_public", args=[str(quote.public_token)]),
-        }
-    )
+        result, created = accept_submission(request, "quote", {"lead": lead, "items": payload["items"]},
+                                            create_result, key=payload.get("submission_key"))
+    except SubmissionConflict as error:
+        return JsonResponse({"error": str(error)}, status=409)
+    except SubmissionUnavailable as error:
+        response = JsonResponse({"error": str(error)}, status=503)
+        response["Retry-After"] = "60"
+        return response
+    request.session["pending_quote_token"] = result["token"]
+    return JsonResponse({"ok": True, "quote_number": result["quote_number"], "redirect": result["redirect"]})
 
 
 def quote_thanks(request):
@@ -175,6 +142,8 @@ def _get_quote_by_token(token):
     return quote
 
 
+@require_GET
+@never_cache
 def quote_public(request, token):
     quote = _get_quote_by_token(token)
     branding = BillingDocumentBranding.get_solo()
@@ -191,6 +160,8 @@ def quote_public(request, token):
     )
 
 
+@require_GET
+@never_cache
 def quote_public_pdf(request, token):
     quote = _get_quote_by_token(token)
     pdf_bytes, content_type, ext = render_quote_pdf(
@@ -205,66 +176,47 @@ def quote_public_pdf(request, token):
 
 
 @require_POST
+@never_cache
 def quote_public_accept(request, token):
     quote = _get_quote_by_token(token)
-
-    if not quote.is_acceptable:
-        messages.error(request, "This quote can no longer be accepted.")
-        return redirect("billing_public:quote_public", token=token)
-
     if not request.user.is_authenticated:
-        # Park the token; bounce to register/login with quote_token in URL
+        if not quote.is_acceptable:
+            messages.error(request, "This quote can no longer be accepted.")
+            return redirect("billing_public:quote_public", token=token)
         request.session["pending_quote_token"] = str(quote.public_token)
         login_url = reverse("account_login")
         return redirect(f"{login_url}?next={reverse('billing_public:quote_public_accept_continue', args=[token])}&quote_token={token}")
+    return _finalize_quote_acceptance(request, token)
 
-    # Reject if this quote is already linked to a different user.
-    if quote.user_id is not None and quote.user_id != request.user.pk:
-        from django.core.exceptions import PermissionDenied
-        raise PermissionDenied("This quote belongs to another account.")
 
-    # Link quote to logged-in user if not already linked
-    if quote.user_id is None:
-        quote.user = request.user
-        quote.save(update_fields=["user"])
-
-    quote.accepted_at = timezone.now()
-    quote.accepted_by_ip = _client_ip(request)
-    quote.save(update_fields=["accepted_at", "accepted_by_ip"])
-
-    invoice = convert_quote_to_invoice(quote, by_user=request.user)
-    messages.success(
-        request,
-        f"Quote {quote.number} accepted — invoice {invoice.number} is ready to pay.",
-    )
+def _finalize_quote_acceptance(request, token):
+    from django import forms
+    from apps.core.public_submissions import SubmissionUnavailable
+    from .acceptance import accept_public_quote
+    try:
+        invoice = accept_public_quote(request, token)
+    except forms.ValidationError:
+        messages.error(request, "This quote can no longer be accepted.")
+        return redirect("billing_public:quote_public", token=token)
+    except SubmissionUnavailable:
+        response = render(request, "public/quote_acceptance_unavailable.html", {"token": token}, status=503)
+        response["Retry-After"] = "60"
+        return response
+    if request.session.get("pending_quote_token") == str(token):
+        request.session.pop("pending_quote_token", None)
+    messages.success(request, f"Quote accepted ? invoice {invoice.number} is ready to pay.")
     return redirect("invoices:detail", pk=invoice.pk)
 
 
 @login_required
+@require_http_methods(["GET", "POST"])
+@never_cache
 def quote_public_accept_continue(request, token):
-    """After login/register, finalize an acceptance that was started anonymously."""
+    """Returning from sign-in only displays confirmation; POST finalizes."""
+    if request.method == "POST":
+        return _finalize_quote_acceptance(request, token)
     quote = _get_quote_by_token(token)
-    if not quote.is_acceptable:
-        messages.error(request, "This quote can no longer be accepted.")
-        return redirect("billing_public:quote_public", token=token)
-
-    # Reject if this quote is already linked to a different user.
+    from django.core.exceptions import PermissionDenied
     if quote.user_id is not None and quote.user_id != request.user.pk:
-        from django.core.exceptions import PermissionDenied
         raise PermissionDenied("This quote belongs to another account.")
-
-    if quote.user_id is None:
-        quote.user = request.user
-        quote.save(update_fields=["user"])
-
-    quote.accepted_at = timezone.now()
-    quote.accepted_by_ip = _client_ip(request)
-    quote.save(update_fields=["accepted_at", "accepted_by_ip"])
-
-    invoice = convert_quote_to_invoice(quote, by_user=request.user)
-    request.session.pop("pending_quote_token", None)
-    messages.success(
-        request,
-        f"Quote {quote.number} accepted — invoice {invoice.number} is ready to pay.",
-    )
-    return redirect("invoices:detail", pk=invoice.pk)
+    return render(request, "public/quote_acceptance_confirm.html", {"quote": quote})

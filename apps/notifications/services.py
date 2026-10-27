@@ -92,6 +92,7 @@ def send_notification(
     attachments: Optional[Sequence[AttachmentTuple]] = None,
     recipient_email: Optional[str] = None,
     cc: Optional[Iterable[str]] = None,
+    prepare_only: bool = False,
 ):
     """Send a templated notification email to a user.
 
@@ -99,6 +100,8 @@ def send_notification(
     - ``attachments``: iterable of ``(filename, bytes, content_type)`` tuples.
     - ``recipient_email``: explicit recipient (used for anonymous quotes).
     - ``cc``: optional iterable of CC addresses.
+    - ``prepare_only``: build and return the message without delivery/audit;
+      return None when preferences suppress it, False on preparation failure.
     """
     # Check user notification preference (skip only when user object exists and preference is explicitly disabled)
     if user is not None and hasattr(user, "pk") and user.pk:
@@ -107,7 +110,7 @@ def send_notification(
             pref = NotificationPreference.objects.filter(user=user, template_name=template_name).first()
             if pref is not None and not pref.enabled:
                 logger.info("Notification %s suppressed by preference for user %s", template_name, user.pk)
-                return True
+                return None if prepare_only else True
         except Exception:  # pragma: no cover - DB may not be ready in tests
             pass
 
@@ -165,6 +168,8 @@ def send_notification(
         for filename, content, content_type in attachments or []:
             msg.attach(filename, content, content_type)
 
+        if prepare_only:
+            return msg
         msg.send()
 
         try:

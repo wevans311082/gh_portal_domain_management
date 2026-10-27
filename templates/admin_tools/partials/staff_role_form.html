@@ -1,0 +1,12 @@
+{% extends "admin_tools/components/card.html" %}
+{% block card_body %}
+        <p class="text-sm text-slate-600 mb-4">Selected roles replace their existing portal roles. Leave all roles unchecked to remove operational access. Changes revoke their existing sessions.</p>
+        <form method="post" class="space-y-4" data-no-form-card data-no-field-hints>
+            {% csrf_token %}
+            {% include "admin_tools/components/error_summary.html" %}
+            {% include "admin_tools/components/field.html" with field=form.user %}
+            {% include "admin_tools/components/field.html" with field=form.roles %}
+            {% include "admin_tools/components/field.html" with field=form.reason %}
+            <button class="admin-button-primary px-4 py-2" type="submit">Save roles and revoke sessions</button>
+        </form>
+    {% endblock %}

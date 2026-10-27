@@ -36,13 +36,13 @@ def domains_list(request):
 @staff_member_required
 def domains_create(request):
     if request.method == "POST":
-        form = DomainForm(request.POST)
+        form = DomainForm(request.POST, actor=request.user)
         if form.is_valid():
             obj = form.save()
             messages.success(request, f"Domain {obj.name} created.")
             return redirect("admin_tools:domains_edit", pk=obj.pk)
     else:
-        form = DomainForm()
+        form = DomainForm(actor=request.user)
     return render(request, "admin_tools/ops/domain_form.html", {"form": form, "mode": "create"})
 
 
@@ -50,13 +50,13 @@ def domains_create(request):
 def domains_edit(request, pk):
     obj = get_object_or_404(Domain, pk=pk)
     if request.method == "POST":
-        form = DomainForm(request.POST, instance=obj)
+        form = DomainForm(request.POST, instance=obj, actor=request.user)
         if form.is_valid():
             form.save()
             messages.success(request, f"Domain {obj.name} updated.")
             return redirect("admin_tools:domains_edit", pk=obj.pk)
     else:
-        form = DomainForm(instance=obj)
+        form = DomainForm(instance=obj, actor=request.user)
     return render(request, "admin_tools/ops/domain_form.html", {"form": form, "mode": "edit", "obj": obj})
 
 
@@ -88,13 +88,13 @@ def services_list(request):
 @staff_member_required
 def services_create(request):
     if request.method == "POST":
-        form = ServiceForm(request.POST)
+        form = ServiceForm(request.POST, actor=request.user)
         if form.is_valid():
             obj = form.save()
             messages.success(request, f"Service #{obj.pk} created.")
             return redirect("admin_tools:services_edit", pk=obj.pk)
     else:
-        form = ServiceForm()
+        form = ServiceForm(actor=request.user)
     return render(request, "admin_tools/ops/service_form.html", {"form": form, "mode": "create"})
 
 
@@ -104,7 +104,7 @@ def services_edit(request, pk):
     if request.method == "POST":
         previous_status = obj.status
         previous_package_id = obj.package_id
-        form = ServiceForm(request.POST, instance=obj)
+        form = ServiceForm(request.POST, instance=obj, actor=request.user)
         if form.is_valid():
             updated = form.save()
             metadata_fields = []
@@ -173,7 +173,7 @@ def services_edit(request, pk):
             messages.success(request, f"Service #{obj.pk} updated.")
             return redirect("admin_tools:services_edit", pk=obj.pk)
     else:
-        form = ServiceForm(instance=obj)
+        form = ServiceForm(instance=obj, actor=request.user)
     return render(request, "admin_tools/ops/service_form.html", {"form": form, "mode": "edit", "obj": obj})
 
 

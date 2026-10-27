@@ -4,6 +4,8 @@ This folder contains a point-in-time security review of the Cyber Ask Domains co
 
 - [Full review](security-review.md) — scope, findings, evidence, fixes, and positive controls.
 - [Remediation plan](remediation-plan.md) — ordered work plan and acceptance criteria.
+- [Application roadmap](application-roadmap.md) — 20 product improvements and new features, plus application security fixes; excludes Swarm and deployment changes.
+- [Implementation status](implementation-status.md) — progress and verification evidence for every roadmap item.
 
 The review identified **1 critical, 5 high, 3 moderate, and 1 low** severity findings. The most urgent issue is a confirmed MFA bypass caused by the production authentication-backend configuration.
 

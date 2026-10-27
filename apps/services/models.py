@@ -1,3 +1,4 @@
+from apps.admin_tools.search_keys import SearchKey
 from django.db import models
 from apps.core.models import TimeStampedModel
 from apps.accounts.models import User
@@ -64,6 +65,10 @@ class Service(TimeStampedModel):
     notes = models.TextField(blank=True)
 
     class Meta:
+        indexes = [
+            models.Index(SearchKey("domain_name"), name="search_service_domain_name"),
+            models.Index(SearchKey("cpanel_domain"), name="search_service_cpanel_domain"),
+        ]
         verbose_name = "Service"
         verbose_name_plural = "Services"
 

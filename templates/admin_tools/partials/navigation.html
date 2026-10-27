@@ -1,0 +1,17 @@
+{% for section in ADMIN_NAVIGATION %}
+<details class="admin-nav-section mb-3" {% if section.open %}open{% endif %}>
+    <summary class="cursor-pointer px-2 text-xs uppercase tracking-wider font-semibold mb-1 flex items-center justify-between">
+        <span>{{ section.title }}</span><span aria-hidden="true"><span class="admin-nav-plus">+</span><span class="admin-nav-minus">−</span></span>
+    </summary>
+    <div class="space-y-0.5">{% for item in section.items %}
+        <a href="{{ item.url }}" class="admin-nav-link flex items-center gap-2.5 px-3 py-2 rounded-lg transition-colors{% if item.active %} is-active{% endif %}" {% if item.active %}aria-current="page"{% endif %}>
+            <svg aria-hidden="true" class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5h16v14H4zM8 9h8M8 13h5"/></svg>
+            {{ item.label }}
+        </a>
+    {% endfor %}</div>
+</details>
+{% endfor %}
+<div class="border-t border-slate-700 pt-3 mt-3">
+    {% if IS_PLATFORM_OWNER %}<a href="/{{ DJANGO_ADMIN_URL }}" class="admin-nav-link flex px-3 py-2 rounded-lg">Django Admin ↗</a>{% endif %}
+    <a href="{% url 'portal:dashboard' %}" class="admin-nav-link flex px-3 py-2 rounded-lg">Client portal</a>
+</div>

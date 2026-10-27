@@ -1,4 +1,5 @@
 import pytest
+from tests.security_helpers import login_owner
 from django.urls import reverse
 from django.utils import timezone
 
@@ -29,7 +30,7 @@ def test_services_list_displays_domain_and_cpanel_username(client, django_user_m
         cpanel_username="svcacct",
     )
 
-    client.force_login(staff)
+    login_owner(client, staff)
     response = client.get(reverse("admin_tools:services_list"))
 
     assert response.status_code == 200
@@ -72,7 +73,7 @@ def test_services_edit_suspended_status_pushes_to_whm(client, django_user_model,
 
     monkeypatch.setattr("apps.admin_tools.operations_views.WHMClient.suspend_account", fake_suspend)
 
-    client.force_login(staff)
+    login_owner(client, staff)
     response = client.post(
         reverse("admin_tools:services_edit", kwargs={"pk": service.pk}),
         {
@@ -130,7 +131,7 @@ def test_services_edit_whm_failure_records_metadata(client, django_user_model, m
 
     monkeypatch.setattr("apps.admin_tools.operations_views.WHMClient.suspend_account", fake_suspend)
 
-    client.force_login(staff)
+    login_owner(client, staff)
     response = client.post(
         reverse("admin_tools:services_edit", kwargs={"pk": service.pk}),
         {
@@ -185,7 +186,7 @@ def test_services_edit_page_shows_whm_sync_panel(client, django_user_model):
         whm_last_sync_message="Suspended in WHM successfully",
     )
 
-    client.force_login(staff)
+    login_owner(client, staff)
     response = client.get(reverse("admin_tools:services_edit", kwargs={"pk": service.pk}))
 
     assert response.status_code == 200

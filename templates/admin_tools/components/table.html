@@ -1,0 +1,9 @@
+<div class="admin-card">
+  <div class="admin-table-scroll" role="region" tabindex="0" aria-label="{{ table_label|default:'Results' }} (scroll horizontally for more columns)">
+    <table class="admin-table">
+      <caption class="sr-only">{{ table_label|default:'Results' }}</caption>
+      <thead>{% block table_head %}{% endblock %}</thead>
+      <tbody>{% block table_body %}{% endblock %}</tbody>
+    </table>
+  </div>
+</div>

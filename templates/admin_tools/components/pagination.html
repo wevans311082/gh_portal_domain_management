@@ -1,0 +1,9 @@
+{% if page_obj.has_other_pages %}
+<nav class="admin-pagination" aria-label="{{ label }}">
+  <p>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }} · {{ page_obj.paginator.count }} total</p>
+  <div class="admin-pagination-actions">
+    {% if previous_url %}<a class="admin-button-secondary admin-button" rel="prev" href="{{ previous_url }}">Previous</a>{% endif %}
+    {% if next_url %}<a class="admin-button-secondary admin-button" rel="next" href="{{ next_url }}">Next</a>{% endif %}
+  </div>
+</nav>
+{% endif %}

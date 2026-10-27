@@ -1,4 +1,5 @@
 from django import forms
+from django.db import transaction
 from django.contrib.auth.password_validation import validate_password
 from django.utils import timezone
 
@@ -77,14 +78,15 @@ class Microsoft365GraphSettingsForm(forms.Form):
                 data[field_name] = get_runtime_setting(setting_key, env_default or "")
         return data
 
-    def save_settings(self):
+    @transaction.atomic
+    def save_settings(self, actor=None):
         for field_name, (setting_key, is_secret) in self.SETTING_MAP.items():
             value = self.cleaned_data.get(field_name)
             if field_name == "client_secret" and not value:
                 continue
             if isinstance(value, bool):
                 value = "true" if value else "false"
-            IntegrationSetting.set_value(setting_key, str(value or ""), is_secret=is_secret)
+            IntegrationSetting.set_value(setting_key, str(value or ""), is_secret=is_secret, actor=actor)
 
 
 class AdminUserCreateForm(forms.ModelForm):
@@ -220,10 +222,10 @@ class AdminUserUpdateForm(forms.ModelForm):
             "is_active",
             "is_staff",
             "is_superuser",
-            "mfa_enabled",
         ]
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, actor=None, **kwargs):
+        self.actor = actor
         super().__init__(*args, **kwargs)
         self._companies_house_payload = None
         self.fields["company_name"].help_text = "Associate this user account with a business profile."
@@ -247,6 +249,13 @@ class AdminUserUpdateForm(forms.ModelForm):
 
     def clean(self):
         cleaned = super().clean()
+        if self.actor and self.actor.pk == self.instance.pk:
+            original = User.objects.get(pk=self.instance.pk)
+            for field in ("is_staff", "is_superuser", "is_active", "mfa_enabled"):
+                if field in cleaned and cleaned[field] != getattr(original, field):
+                    self.add_error(field, "You cannot change your own access or MFA flags here.")
+        if cleaned.get("is_superuser") and not cleaned.get("is_staff"):
+            self.add_error("is_staff", "A platform owner must have staff access.")
         p1 = cleaned.get("new_password1")
         p2 = cleaned.get("new_password2")
         if p1 or p2:
@@ -347,6 +356,12 @@ class HomeServiceCardForm(forms.ModelForm):
 
 
 class PackageCardForm(forms.ModelForm):
+    def __init__(self, *args, actor=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if actor and not actor.is_superuser:
+            for name in ("name", "whm_package_name", "price_monthly", "price_annually", "setup_fee", "provisioning_provider", "provisioning_config", "is_active"):
+                self.fields.pop(name, None)
+
     class Meta:
         model = Package
         fields = [
@@ -395,6 +410,13 @@ class SiteContentSettingsForm(forms.ModelForm):
 
 
 class DomainForm(forms.ModelForm):
+    def __init__(self, *args, actor=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if actor and not actor.is_superuser:
+            self.fields["user"].queryset = User.objects.filter(is_staff=False, is_superuser=False)
+            if self.instance.pk:
+                self.fields["user"].disabled = True
+
     class Meta:
         model = Domain
         fields = [
@@ -444,6 +466,15 @@ class DomainContactAdminForm(forms.ModelForm):
 
 
 class ServiceForm(forms.ModelForm):
+    def __init__(self, *args, actor=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if actor and not actor.is_superuser:
+            self.fields["user"].queryset = User.objects.filter(is_staff=False, is_superuser=False)
+            if self.instance.pk:
+                self.fields["user"].disabled = True
+            for name in ("cpanel_username", "cpanel_domain", "cpanel_ip", "cpanel_server", "provisioning_provider", "provisioning_config"):
+                self.fields.pop(name, None)
+
     class Meta:
         model = Service
         fields = [

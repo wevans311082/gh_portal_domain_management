@@ -5,6 +5,12 @@
 {% block page_title %}Billing document branding{% endblock %}
 
 {% block content %}
+{% if logo_errors %}
+<div class="rounded-xl border border-red-300 bg-red-50 p-4 mb-4 text-red-900" role="alert" aria-labelledby="logo-error-heading">
+  <h2 id="logo-error-heading" class="font-semibold">The branding was not saved</h2>
+  <ul>{% for error in logo_errors %}<li><a href="#id_logo" class="underline">{{ error }}</a></li>{% endfor %}</ul>
+</div>
+{% endif %}
 <form method="post" enctype="multipart/form-data" class="space-y-6">
   {% csrf_token %}
 
@@ -45,8 +51,8 @@
   <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
     <h2 class="font-semibold text-slate-900 mb-4">Look &amp; feel</h2>
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-      <label class="block lg:col-span-2">
-        <span class="text-xs uppercase font-semibold text-slate-500">Logo</span>
+      <div class="block lg:col-span-2">
+        <label for="id_logo" class="text-xs uppercase font-semibold text-slate-500">Logo</label>
         {% if branding.logo %}
           <div class="mt-1 flex items-center gap-3">
             <img src="{{ branding.logo.url }}" alt="logo" class="h-12 bg-slate-50 rounded p-1 border">
@@ -55,8 +61,9 @@
             </label>
           </div>
         {% endif %}
-        <input type="file" name="logo" accept="image/*" class="mt-2 text-sm">
-      </label>
+        <input id="id_logo" type="file" name="logo" accept="image/png,image/jpeg,image/webp" class="mt-2 text-sm" aria-describedby="logo-help{% if logo_errors %} logo-error-heading{% endif %}"{% if logo_errors %} aria-invalid="true"{% endif %}>
+        <p id="logo-help" class="mt-2 text-sm text-slate-600">PNG, JPEG or WebP, up to 5 MB, 4096 pixels per side and 8 million pixels total. Stored as PNG.</p>
+      </div>
       <label class="block">
         <span class="text-xs uppercase font-semibold text-slate-500">Accent colour</span>
         <input type="color" name="accent_colour" value="{{ branding.accent_colour|default:'#0ea5e9' }}" class="mt-1 h-10 w-full border border-slate-300 rounded">

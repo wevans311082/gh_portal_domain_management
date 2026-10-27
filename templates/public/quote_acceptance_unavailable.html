@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Quote acceptance temporarily unavailable{% endblock %}
+{% block body %}
+<main class="max-w-2xl mx-auto px-4 py-12">
+  <section class="bg-white border border-slate-300 rounded-xl p-6 md:p-8" aria-labelledby="acceptance-error-title">
+    <h1 id="acceptance-error-title" class="text-2xl font-bold text-slate-900">Please retry quote acceptance</h1>
+    <p class="mt-4 text-slate-700">We could not finish this request. Return to the confirmation page and try again shortly. A retry will use any invoice already created for your account.</p>
+    <a class="inline-block mt-6 text-sky-800 underline" href="{% url 'billing_public:quote_public_accept_continue' token %}">Return to confirmation</a>
+  </section>
+</main>
+{% endblock %}

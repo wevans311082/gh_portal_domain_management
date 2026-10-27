@@ -81,7 +81,7 @@ def user_edit(request, pk):
             messages.success(request, f"{user.email} is validated and allowed to log in.")
             return redirect("admin_tools:user_edit", pk=user.pk)
 
-        form = AdminUserUpdateForm(request.POST, instance=user)
+        form = AdminUserUpdateForm(request.POST, instance=user, actor=request.user)
         if form.is_valid():
             form.save()
             if form.cleaned_data.get("new_password1"):
@@ -93,7 +93,7 @@ def user_edit(request, pk):
                 messages.success(request, f"User {user.email} saved.")
             return redirect("admin_tools:user_edit", pk=user.pk)
     else:
-        form = AdminUserUpdateForm(instance=user)
+        form = AdminUserUpdateForm(instance=user, actor=request.user)
     from apps.accounts.verification import can_login, email_is_verified
 
     return render(
@@ -154,6 +154,9 @@ def user_mfa_manage(request, pk):
     generated_codes = None
 
     if request.method == "POST":
+        if user.pk == request.user.pk:
+            from django.core.exceptions import PermissionDenied
+            raise PermissionDenied("Manage your own MFA through your account security settings.")
         action = (request.POST.get("action") or "").strip()
 
         if action == "disable_mfa":
@@ -194,34 +197,13 @@ def user_mfa_manage(request, pk):
 @require_POST
 def user_su_start(request, pk):
     target = get_object_or_404(User, pk=pk)
-    actor = request.user
-
-    if actor.pk == target.pk:
-        messages.info(request, "You are already this user.")
-        return redirect("portal:dashboard")
-
-    if request.session.get("impersonator_user_id"):
-        messages.error(request, "Finish the current impersonation session before starting another.")
-        return redirect("admin_tools:users")
-
+    from .impersonation import start_impersonation
+    from django.core.exceptions import ValidationError
     try:
-        from apps.audit.models import AuditLog
-
-        AuditLog.objects.create(
-            user=actor,
-            action="impersonation.started",
-            model_name="accounts.User",
-            object_id=str(target.pk),
-            ip_address=request.META.get("REMOTE_ADDR") or None,
-            data={"target_email": target.email},
-        )
-    except Exception:
-        pass
-
-    login(request, target, backend="apps.accounts.backends.EmailBackend")
-    request.session["impersonator_user_id"] = actor.pk
-    request.session["impersonator_started_at"] = timezone.now().isoformat()
-    request.session.modified = True
+        start_impersonation(request, target, request.POST.get("reason"))
+    except ValidationError as exc:
+        messages.error(request, exc.messages[0])
+        return redirect("admin_tools:users")
     messages.warning(request, f"Impersonating {target.email}. Actions are audited.")
     return redirect("portal:dashboard")
 
@@ -229,32 +211,9 @@ def user_su_start(request, pk):
 @login_required
 @require_POST
 def user_su_stop(request):
-    impersonator_id = request.session.get("impersonator_user_id")
-    if not impersonator_id:
-        messages.info(request, "No active impersonation session.")
-        return redirect("admin_tools:dashboard")
-
-    impersonator = get_object_or_404(User, pk=impersonator_id, is_staff=True)
-    request.session.pop("impersonator_user_id", None)
-    request.session.pop("impersonator_started_at", None)
-    request.session.modified = True
-
-    try:
-        from apps.audit.models import AuditLog
-
-        AuditLog.objects.create(
-            user=impersonator,
-            action="impersonation.stopped",
-            model_name="accounts.User",
-            object_id=str(request.user.pk),
-            ip_address=request.META.get("REMOTE_ADDR") or None,
-            data={"acted_as_email": request.user.email},
-        )
-    except Exception:
-        pass
-
-    login(request, impersonator, backend="apps.accounts.backends.EmailBackend")
-    messages.success(request, f"Returned to staff account {impersonator.email}.")
+    from .impersonation import stop_impersonation
+    stop_impersonation(request)
+    messages.success(request, "Returned to your owner account. Confirm your identity again before another protected action.")
     return redirect("admin_tools:users")
 
 
@@ -389,7 +348,7 @@ def package_card_list(request):
 def package_card_edit(request, pk):
     package = get_object_or_404(Package, pk=pk)
     if request.method == "POST":
-        form = PackageCardForm(request.POST, instance=package)
+        form = PackageCardForm(request.POST, instance=package, actor=request.user)
         if form.is_valid():
             package = form.save()
 
@@ -421,7 +380,7 @@ def package_card_edit(request, pk):
             messages.success(request, "Package card saved.")
             return redirect("admin_tools:package_card_edit", pk=package.pk)
     else:
-        form = PackageCardForm(instance=package)
+        form = PackageCardForm(instance=package, actor=request.user)
 
     feature_lines = "\n".join(
         [

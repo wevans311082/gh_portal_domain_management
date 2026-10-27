@@ -12,6 +12,15 @@ SECRET_KEY = env("DJANGO_SECRET_KEY")
 
 DEBUG = env.bool("DJANGO_DEBUG", default=False)
 
+# Trust forwarding headers only from explicitly configured socket peers.
+TRUSTED_PROXY_CIDRS = env.list("TRUSTED_PROXY_CIDRS", default=[])
+PUBLIC_ABUSE_CACHE_ALIAS = "default"
+
+# Base64-encoded 32-byte keys supplied outside the database. Never derive these
+# from SECRET_KEY; retaining previous identifiers allows controlled rotation.
+INTEGRATION_ENCRYPTION_KEYS = env.json("INTEGRATION_ENCRYPTION_KEYS", default={})
+INTEGRATION_ENCRYPTION_ACTIVE_KEY = env("INTEGRATION_ENCRYPTION_ACTIVE_KEY", default="")
+
 ALLOWED_HOSTS = env.list(
     "DJANGO_ALLOWED_HOSTS",
     default=[
@@ -27,7 +36,7 @@ ALLOWED_HOSTS = env.list(
 )
 
 DJANGO_APPS = [
-    "django.contrib.admin",
+    "apps.accounts.admin_site.SecureAdminConfig",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
@@ -75,6 +84,7 @@ MIDDLEWARE = [
     "django.contrib.sessions.middleware.SessionMiddleware",
     "apps.core.middleware.SubdomainURLRoutingMiddleware",
     "django.middleware.common.CommonMiddleware",
+    "apps.core.abuse.PublicEndpointBoundaryMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
@@ -86,6 +96,8 @@ MIDDLEWARE = [
     "apps.core.middleware.ContentSecurityPolicyMiddleware",
     "apps.audit.middleware.AuditLogMiddleware",
     "apps.audit.middleware.IPAllowlistMiddleware",
+    "apps.admin_tools.middleware.ImpersonationBoundaryMiddleware",
+    "apps.admin_tools.middleware.IntegrationSecretFailureMiddleware",
 ]
 
 ROOT_URLCONF = "cyberask_domains.urls"
@@ -109,6 +121,7 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
                 "apps.core.context_processors.site_settings",
                 "apps.core.context_processors.announcement_banners",
+                "apps.admin_tools.navigation.navigation_context",
             ],
         },
     },
@@ -141,7 +154,6 @@ AUTH_PASSWORD_VALIDATORS = [
 
 AUTHENTICATION_BACKENDS = [
     "apps.accounts.backends.EmailBackend",
-    "allauth.account.auth_backends.AuthenticationBackend",
 ]
 
 # Session hardening
@@ -156,6 +168,11 @@ X_FRAME_OPTIONS = "DENY"
 # Login rate limiting — max 5 failures per 5 minutes per IP
 LOGIN_RATE_LIMIT_MAX_ATTEMPTS = env.int("LOGIN_RATE_LIMIT_MAX_ATTEMPTS", default=5)
 LOGIN_RATE_LIMIT_WINDOW_SECONDS = env.int("LOGIN_RATE_LIMIT_WINDOW_SECONDS", default=300)
+MFA_CHALLENGE_LIFETIME_SECONDS = 300
+MFA_MAX_ATTEMPTS = 5
+MFA_RATE_LIMIT_WINDOW_SECONDS = 300
+RECENT_MFA_SECONDS = 300
+IMPERSONATION_LIFETIME_SECONDS = 1800
 
 # Content Security Policy (additional sources can be added here via env)
 CSP_DEFAULT_SRC = ["'self'"]
@@ -194,6 +211,9 @@ CELERY_TASK_TIME_LIMIT = 30 * 60
 CELERY_RESULT_EXPIRES = 60 * 60 * 24 * 7  # 7 days — prevents unbounded Redis growth
 CELERY_RESULT_EXTENDED = True
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
+CELERY_BEAT_SCHEDULE = {
+    "public-delivery-dispatch": {"task": "core.dispatch_public_deliveries", "schedule": 60.0},
+}
 CELERY_TASK_DEFAULT_QUEUE = "default"
 CELERY_IMPORTS = ("apps.provisioning.tasks",)
 
@@ -236,12 +256,12 @@ EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=True)
 EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
 EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="Cyber Ask Domains <noreply@cyberask.co.uk>")
+EMAIL_TIMEOUT = 15
 SERVER_EMAIL = DEFAULT_FROM_EMAIL
 
 ACCOUNT_USER_MODEL_USERNAME_FIELD = None
-ACCOUNT_EMAIL_REQUIRED = True
-ACCOUNT_USERNAME_REQUIRED = False
-ACCOUNT_AUTHENTICATION_METHOD = "email"
+ACCOUNT_LOGIN_METHODS = {"email"}
+ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]
 ACCOUNT_EMAIL_VERIFICATION = "mandatory"
 ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
 ACCOUNT_ADAPTER = "apps.accounts.adapter.PortalAccountAdapter"
@@ -277,6 +297,9 @@ DJANGO_ADMIN_URL = env("DJANGO_ADMIN_URL", default="manage-site-a3f7c2/")
 
 STRIPE_PUBLISHABLE_KEY = env("STRIPE_PUBLISHABLE_KEY", default="")
 STRIPE_SECRET_KEY = env("STRIPE_SECRET_KEY", default="")
+# Preserve the existing Stripe 8.x wire contract across SDK upgrades. A future
+# provider API migration must be tested explicitly, including webhook schemas.
+STRIPE_API_VERSION = "2023-10-16"
 STRIPE_WEBHOOK_SECRET = env("STRIPE_WEBHOOK_SECRET", default="")
 
 GOCARDLESS_ACCESS_TOKEN = env("GOCARDLESS_ACCESS_TOKEN", default="")

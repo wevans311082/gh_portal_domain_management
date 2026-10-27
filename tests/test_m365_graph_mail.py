@@ -1,6 +1,7 @@
 from unittest.mock import Mock, patch
 
 import pytest
+from tests.security_helpers import login_owner
 from django.core import mail
 from django.core.mail import EmailMultiAlternatives
 from django.test import override_settings
@@ -65,7 +66,7 @@ def test_m365_admin_config_saves_settings(client, django_user_model):
         password="password123",
         is_staff=True,
     )
-    client.force_login(staff)
+    login_owner(client, staff)
 
     response = client.post(
         reverse("admin_tools:m365_graph_config"),

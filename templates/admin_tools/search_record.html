@@ -1,0 +1,13 @@
+{% extends "base_admin.html" %}
+{% block title %}{{ item.title }} - {{ SITE_NAME }}{% endblock %}
+{% block page_title %}{{ record_heading }}{% endblock %}
+{% block content %}
+{% include "admin_tools/components/page_header.html" with heading=record_heading description=item.title %}
+<section class="admin-card admin-record-details" aria-label="Record details">
+  <dl>{% for label,value in details %}<div><dt>{{ label }}</dt><dd>{{ value|default:"Not recorded" }}</dd></div>{% endfor %}</dl>
+</section>
+<div class="admin-search-actions">
+  <a href="{% url 'admin_tools:search' %}" class="admin-button-secondary admin-button">Back to search</a>
+  {% if manage_route %}{% with route="admin_tools:"|add:manage_route %}<a href="{% url route record_pk %}" class="admin-button-primary admin-button">Manage this record</a>{% endwith %}{% endif %}
+</div>
+{% endblock %}

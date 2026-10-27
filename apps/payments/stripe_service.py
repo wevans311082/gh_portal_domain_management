@@ -1,11 +1,17 @@
 """Stripe payment service."""
 import logging
 import stripe
+from django.conf import settings
 from django.urls import reverse
 
 from apps.core.runtime_settings import get_runtime_setting
 
 logger = logging.getLogger(__name__)
+
+
+def configure_stripe():
+    stripe.api_key = get_runtime_setting("STRIPE_SECRET_KEY", "")
+    stripe.api_version = settings.STRIPE_API_VERSION
 
 
 class StripeService:
@@ -14,7 +20,7 @@ class StripeService:
     @staticmethod
     def create_checkout_session(invoice, request) -> str:
         """Create a Stripe Checkout Session for an invoice and return the session URL."""
-        stripe.api_key = get_runtime_setting("STRIPE_SECRET_KEY", "")
+        configure_stripe()
         line_items = []
         for item in invoice.line_items.all():
             line_items.append({
@@ -68,7 +74,7 @@ class StripeService:
     @staticmethod
     def handle_webhook(payload: bytes, sig_header: str):
         """Verify and process a Stripe webhook event."""
-        stripe.api_key = get_runtime_setting("STRIPE_SECRET_KEY", "")
+        configure_stripe()
         try:
             event = stripe.Webhook.construct_event(
                 payload, sig_header, get_runtime_setting("STRIPE_WEBHOOK_SECRET", "")
@@ -82,7 +88,7 @@ class StripeService:
     @staticmethod
     def create_refund(payment_intent_id: str, amount_pence: int = None) -> dict:
         """Create a refund for a payment."""
-        stripe.api_key = get_runtime_setting("STRIPE_SECRET_KEY", "")
+        configure_stripe()
         params = {"payment_intent": payment_intent_id}
         if amount_pence:
             params["amount"] = amount_pence
@@ -92,19 +98,19 @@ class StripeService:
     def get_or_create_customer(user) -> str:
         """Return existing Stripe Customer ID or create one for the user."""
         from apps.payments.models import StripeCustomer
-        stripe.api_key = get_runtime_setting("STRIPE_SECRET_KEY", "")
+        configure_stripe()
         try:
             sc = StripeCustomer.objects.get(user=user)
             return sc.stripe_customer_id
         except StripeCustomer.DoesNotExist:
-            customer = stripe.Customer.create(email=user.email, name=user.get_full_name() or user.email)
+            customer = stripe.Customer.create(email=user.email, name=user.full_name or user.email)
             StripeCustomer.objects.create(user=user, stripe_customer_id=customer["id"])
             return customer["id"]
 
     @staticmethod
     def create_setup_intent(user) -> dict:
         """Create a Stripe SetupIntent to save a card for future use."""
-        stripe.api_key = get_runtime_setting("STRIPE_SECRET_KEY", "")
+        configure_stripe()
         customer_id = StripeService.get_or_create_customer(user)
         intent = stripe.SetupIntent.create(
             customer=customer_id,
@@ -117,7 +123,7 @@ class StripeService:
     def attach_payment_method(user, stripe_pm_id: str, set_as_default: bool = True):
         """Attach a confirmed payment method to the user and save it to the DB."""
         from apps.payments.models import SavedPaymentMethod
-        stripe.api_key = get_runtime_setting("STRIPE_SECRET_KEY", "")
+        configure_stripe()
         customer_id = StripeService.get_or_create_customer(user)
 
         pm = stripe.PaymentMethod.retrieve(stripe_pm_id)
@@ -141,7 +147,7 @@ class StripeService:
     def charge_saved_payment_method(user, amount_pence: int, description: str, invoice=None) -> dict:
         """Charge the user's default saved payment method via PaymentIntent."""
         from apps.payments.models import SavedPaymentMethod, Payment
-        stripe.api_key = get_runtime_setting("STRIPE_SECRET_KEY", "")
+        configure_stripe()
 
         default_pm = SavedPaymentMethod.objects.filter(user=user, is_default=True).first()
         if not default_pm:

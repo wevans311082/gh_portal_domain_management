@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Confirm quote acceptance{% endblock %}
+{% block body %}
+<main class="max-w-2xl mx-auto px-4 py-12">
+  <section class="bg-white border border-slate-300 rounded-xl p-6 md:p-8" aria-labelledby="confirmation-title">
+    <h1 id="confirmation-title" class="text-2xl font-bold text-slate-900">Confirm quote acceptance</h1>
+    <p class="mt-4 text-slate-700">You are signed in as {{ request.user.email }}. Review quote {{ quote.number }} before creating your invoice.</p>
+    <p class="mt-4 text-lg font-semibold text-slate-900">Total: {{ quote.currency }} {{ quote.total|floatformat:2 }}</p>
+    {% if quote.is_acceptable %}
+    <p class="mt-4 text-slate-700">Accepting creates an invoice for this account and queues an email copy. Payment is a separate step.</p>
+    <form method="post" class="mt-6">
+      {% csrf_token %}
+      <button type="submit" class="px-5 py-3 bg-sky-700 hover:bg-sky-800 text-white font-semibold rounded-lg">Accept quote and create invoice</button>
+    </form>
+    {% else %}
+    <p class="mt-4 text-slate-700">This quote has already been accepted or is no longer available for acceptance.</p>
+    {% endif %}
+    <a class="inline-block mt-6 text-sky-800 underline" href="{% url 'billing_public:quote_public' quote.public_token %}">Review quote details</a>
+  </section>
+</main>
+{% endblock %}

@@ -1,0 +1,4 @@
+<div class="admin-page-header">
+  <div><h1>{{ heading }}</h1>{% if description %}<p>{{ description }}</p>{% endif %}</div>
+  {% if action_url and action_label %}<a class="admin-button-primary admin-button" href="{{ action_url }}">{{ action_label }}</a>{% endif %}
+</div>

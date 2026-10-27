@@ -1,0 +1,39 @@
+<section class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 mb-8" aria-labelledby="public-delivery-heading">
+  <h2 id="public-delivery-heading" class="text-lg font-semibold text-slate-900">Public enquiry and quote deliveries</h2>
+  <p class="mt-2 text-sm text-slate-700">Preparation retries stop after three attempts. An uncertain send is never retried automatically. Check the provider using the message reference before confirming delivery or closing the job.</p>
+  <ul class="flex flex-wrap gap-4 my-4 text-sm text-slate-800" aria-label="Delivery totals">
+    {% for item in public_delivery_counts %}<li>{{ item.state|capfirst }}: <strong>{{ item.count }}</strong></li>{% empty %}<li>No deliveries yet.</li>{% endfor %}
+  </ul>
+  <form method="get" class="flex flex-wrap items-end gap-3 mb-4" data-no-form-card data-no-field-hints>
+    <div><label for="public-delivery-state" class="block text-sm font-semibold text-slate-900 mb-1">Show deliveries</label>
+      <select id="public-delivery-state" name="public_state" class="rounded-lg border border-slate-400 bg-white px-3 py-2 text-sm text-slate-900">
+        <option value="review"{% if public_delivery_filter == 'review' %} selected{% endif %}>Needing review</option>
+        <option value="queued"{% if public_delivery_filter == 'queued' %} selected{% endif %}>Queued</option>
+        <option value="active"{% if public_delivery_filter == 'active' %} selected{% endif %}>In progress</option>
+      </select>
+    </div><button class="btn-secondary" type="submit">Show deliveries</button>
+  </form>
+  <div class="overflow-x-auto" role="region" aria-label="Deliveries needing review" tabindex="0">
+    <table class="min-w-full text-sm text-left">
+      <caption class="text-left text-slate-700 mb-2">Oldest 25 matching deliveries</caption>
+      <thead><tr><th class="p-3">Reference / Message-ID</th><th class="p-3">Type</th><th class="p-3">State</th><th class="p-3">Attempts</th><th class="p-3">Submitted</th></tr></thead>
+      <tbody>{% for job in public_deliveries %}<tr class="border-t border-slate-200">
+        <td class="p-3"><code class="break-all">{{ job.pk }}</code><br><span class="text-xs">public-{{ job.pk }}@portal.invalid</span></td>
+        <td class="p-3">{{ job.submission.get_kind_display }}</td><td class="p-3">{{ job.get_state_display }}</td>
+        <td class="p-3">{{ job.total_attempts }} total</td><td class="p-3 whitespace-nowrap">{{ job.created_at|date:"d M Y H:i" }}</td>
+      </tr>{% empty %}<tr><td class="p-4 text-slate-700" colspan="5">No deliveries need review.</td></tr>{% endfor %}</tbody>
+    </table>
+  </div>
+  <details class="mt-5"{% if delivery_form.errors %} open{% endif %}>
+    <summary class="cursor-pointer text-sm font-semibold text-sky-800">Review a delivery</summary>
+    <form method="post" class="mt-4 space-y-4 max-w-xl" data-no-form-card data-no-field-hints>
+      {% csrf_token %}
+      {% if delivery_form.errors %}<div role="alert" class="border border-red-300 bg-red-50 text-red-900 rounded-lg p-4">
+        <p class="font-semibold">The delivery was not changed</p><ul>{% for field in delivery_form %}{% for error in field.errors %}<li><a class="underline" href="#{{ field.id_for_label }}">{{ field.label }}: {{ error }}</a></li>{% endfor %}{% endfor %}</ul>
+      </div>{% endif %}
+      {% for field in delivery_form %}<div><label class="block text-sm font-semibold text-slate-900 mb-1" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.errors %}<p id="{{ field.id_for_label }}_error" class="mt-1 text-sm text-red-800">{{ field.errors|join:" " }}</p>{% endif %}</div>{% endfor %}
+      <p class="text-sm text-slate-700">Retry applies only to preparation failures. Confirming or closing an uncertain send does not send another message. Record the provider evidence or support reference in the reason.</p>
+      <button class="btn-primary" type="submit">Record delivery review</button>
+    </form>
+  </details>
+</section>

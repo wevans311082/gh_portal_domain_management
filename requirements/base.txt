@@ -1,26 +1,26 @@
-Django==5.1.4
-psycopg2-binary==2.9.9
-django-environ==0.11.2
-celery==5.3.6
-django-celery-beat==2.7.0
-django-celery-results==2.5.1
-redis==5.0.1
-django-redis==5.4.0
-Pillow==10.3.0
-stripe==8.8.0
-django-allauth==65.3.0
-cryptography==42.0.5
-requests==2.31.0
-whitenoise==6.6.0
-gunicorn==21.2.0
-django-storages==1.14.3
-boto3==1.34.82
+Django==5.2.18
+psycopg2-binary==2.9.13
+django-environ==0.14.0
+celery==5.6.3
+django-celery-beat==2.9.0
+django-celery-results==2.6.0
+redis==8.1.0
+django-redis==7.0.0
+Pillow==13.0.0
+stripe==16.0.1
+django-allauth==65.21.0
+cryptography==50.0.2
+requests==2.34.2
+whitenoise==6.12.0
+gunicorn==26.2.0
+django-storages==1.14.6
+boto3==1.43.119
 django-ratelimit==4.1.0
-pyotp==2.9.0
-qrcode==7.4.2
-django-model-utils==4.4.0
-django-extensions==3.2.3
-factory-boy==3.3.0
+pyotp==2.10.0
+qrcode==8.2
+django-model-utils==5.0.0
+django-extensions==4.1
+factory-boy==3.3.3
+# Unpatched upstream advisory: see docs/security-review-271026/dependency-updates.md.
 pdfkit==1.0.0
-# weasyprint kept as a fallback PDF engine; install only if you cannot run wkhtmltopdf.
-# weasyprint==62.3
+# Optional PDF engines require a separate current-version and host-library review.

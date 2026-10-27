@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from .models import ClientProfile, MFABackupCode, User
+from django.core.exceptions import PermissionDenied
 
 
 @admin.register(User)
@@ -13,7 +14,7 @@ class UserAdmin(BaseUserAdmin):
         (None, {"fields": ("email", "password")}),
         ("Personal Info", {"fields": ("first_name", "last_name", "phone")}),
         ("Permissions", {"fields": ("is_active", "is_staff", "is_superuser", "groups", "user_permissions")}),
-        ("MFA", {"fields": ("mfa_enabled", "mfa_secret")}),
+        ("MFA", {"fields": ("mfa_enabled",)}),
         ("Dates", {"fields": ("last_login",)}),
     )
     add_fieldsets = (
@@ -23,6 +24,22 @@ class UserAdmin(BaseUserAdmin):
         }),
     )
     filter_horizontal = ("groups", "user_permissions")
+
+    def get_readonly_fields(self, request, obj=None):
+        fields = list(super().get_readonly_fields(request, obj))
+        # TOTP secrets are enrolled by their owner, not entered in raw admin forms.
+        fields.append("mfa_enabled")
+        if obj and obj.pk == request.user.pk:
+            fields.extend(["is_active", "is_staff", "is_superuser", "groups", "user_permissions"])
+        return list(dict.fromkeys(fields))
+
+    def has_delete_permission(self, request, obj=None):
+        return not (obj and obj.pk == request.user.pk) and super().has_delete_permission(request, obj)
+
+    def delete_queryset(self, request, queryset):
+        if queryset.filter(pk=request.user.pk).exists():
+            raise PermissionDenied("You cannot delete your own owner account.")
+        return super().delete_queryset(request, queryset)
 
 
 @admin.register(ClientProfile)

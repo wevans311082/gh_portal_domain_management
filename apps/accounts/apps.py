@@ -7,6 +7,7 @@ class AccountsConfig(AppConfig):
     label = "accounts"
 
     def ready(self):
+        from . import checks  # noqa: F401 - register authentication policy checks
         from allauth.account.signals import password_reset
 
         from apps.accounts.verification import send_validation_after_password_reset

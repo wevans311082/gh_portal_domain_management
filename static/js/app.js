@@ -113,6 +113,9 @@ console.log('CyberAsk Domains portal loaded');
     }
 
     scopedRoot.querySelectorAll('input, select, textarea').forEach(function (field) {
+        if (field.closest('[data-no-field-hints]')) {
+            return;
+        }
         if (field.dataset.exampleApplied === '1') {
             return;
         }
@@ -148,3 +151,26 @@ console.log('CyberAsk Domains portal loaded');
         field.dataset.exampleApplied = '1';
     });
 })();
+// Bound public-request failures stay inside the HTMX results area. Build text
+// nodes only: response messages must never become executable HTML.
+document.addEventListener('htmx:responseError', function (event) {
+    var xhr = event.detail.xhr;
+    var target = event.detail.target;
+    if (!xhr || xhr.getResponseHeader('X-Public-Request-Error') !== '1' || !target) return;
+    var payload;
+    try { payload = JSON.parse(xhr.responseText); } catch (error) { return; }
+    var panel = document.createElement('div');
+    panel.className = 'public-request-error';
+    panel.setAttribute('role', 'alert');
+    panel.setAttribute('tabindex', '-1');
+    var message = document.createElement('p');
+    message.textContent = payload.error || 'The request could not be completed.';
+    panel.appendChild(message);
+    if (Number.isInteger(payload.retry_after) && payload.retry_after > 0) {
+        var retry = document.createElement('p');
+        retry.textContent = 'Wait up to ' + payload.retry_after + ' seconds, then search again. Your search text has been kept.';
+        panel.appendChild(retry);
+    }
+    target.replaceChildren(panel);
+    // Live search must not move keyboard focus away from the search input.
+});

@@ -1,0 +1,21 @@
+{% extends "base_auth.html" %}
+{% block title %}Confirm your identity — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<h2 class="text-2xl font-semibold text-slate-900 mb-3">Confirm your identity</h2>
+<p id="identity-help" class="text-sm text-slate-600 mb-5">Enter your password and a new authenticator code or unused backup code. Confirmation lasts five minutes.</p>
+{% if mfa_enrolled %}
+<form method="post" class="space-y-4" data-no-form-card data-no-field-hints>
+    {% csrf_token %}<input type="hidden" name="next" value="{{ next }}">
+    {% if form.errors %}<div id="identity-errors" role="alert" class="bg-red-50 border border-red-300 text-red-800 rounded p-3 text-sm">{{ form.non_field_errors }}{% for field in form %}{{ field.errors }}{% endfor %}</div>{% endif %}
+    {% for field in form %}<div>
+        <label for="{{ field.id_for_label }}" class="block text-sm font-semibold text-slate-700 mb-1">{{ field.label }}</label>
+        {{ field }}
+    </div>{% endfor %}
+    <button type="submit" class="btn-primary w-full">Confirm identity</button>
+</form>
+{% else %}
+<p class="text-sm text-slate-700 mb-4">MFA is not enabled on this account.</p>
+<a href="{% url 'accounts_custom:mfa_setup' %}" class="btn-primary inline-flex">Set up MFA</a>
+{% endif %}
+<p class="mt-5"><a href="{% url 'admin_tools:dashboard' %}" class="text-sm text-sky-800 underline">Cancel and return to your workspace</a></p>
+{% endblock %}

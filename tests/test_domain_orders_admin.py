@@ -1,4 +1,5 @@
 import pytest
+from tests.security_helpers import login_owner
 from django.urls import reverse
 
 from apps.domains.models import DomainContact, DomainOrder
@@ -8,7 +9,7 @@ from apps.domains.models import DomainContact, DomainOrder
 def test_domain_orders_list_open_filter(client, django_user_model):
     staff = django_user_model.objects.create_user(email="s@example.com", password="x", is_staff=True)
     user = django_user_model.objects.create_user(email="u@example.com", password="x")
-    client.force_login(staff)
+    login_owner(client, staff)
     contact = DomainContact.objects.create(
         user=user,
         label="P",
@@ -52,7 +53,7 @@ def test_domain_orders_list_open_filter(client, django_user_model):
 def test_domain_order_cancel_and_delete(client, django_user_model):
     staff = django_user_model.objects.create_user(email="s2@example.com", password="x", is_staff=True)
     user = django_user_model.objects.create_user(email="u2@example.com", password="x")
-    client.force_login(staff)
+    login_owner(client, staff)
     contact = DomainContact.objects.create(
         user=user,
         label="P",

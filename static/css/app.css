@@ -265,6 +265,12 @@ body {
     box-shadow: 0 0 0 1px var(--color-primary);
 }
 
+/* Authentication placeholders must remain readable on white fields. */
+.auth-shell input::placeholder {
+    color: #526175;
+    opacity: 1;
+}
+
 /* Tables */
 .fluent-table-wrap {
     overflow-x: auto;
@@ -357,3 +363,13 @@ body {
         transition: none !important;
     }
 }
+.public-request-error {
+    color: #7f1d1d;
+    background: #fff7f5;
+    border: 1px solid #cf8e85;
+    border-radius: .75rem;
+    padding: 1rem 1.25rem;
+    line-height: 1.6;
+}
+.public-request-error p + p { margin-top: .5rem; }
+form[data-no-field-hints] .errorlist { color: #991b1b; font-size: .875rem; margin-top: .25rem; }
