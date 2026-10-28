@@ -70,7 +70,8 @@ def test_nonzero_exit_never_exposes_diagnostics():
 def tree_source(path):
     return ("import sys,subprocess,time,os,json,pathlib; sys.stdin.buffer.read(); "
             "child=subprocess.Popen([sys.executable,'-c','import time;time.sleep(60)']); "
-            f"pathlib.Path({str(path)!r}).write_text(json.dumps([os.getpid(),child.pid])); time.sleep(60)")
+            f"record=pathlib.Path({str(path)!r}); staging=record.with_suffix('.tmp'); "
+            "staging.write_text(json.dumps([os.getpid(),child.pid])); staging.replace(record); time.sleep(60)")
 
 
 def test_deadline_kills_parent_and_descendant(tmp_path):

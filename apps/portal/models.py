@@ -77,6 +77,7 @@ class PortalCart(TimeStampedModel):
 
 
 class PortalCartItem(TimeStampedModel):
+	publication_decision = models.ForeignKey("domains.RegistrantPublicationDecision", on_delete=models.PROTECT, null=True, blank=True)
 	TYPE_HOSTING = "hosting"
 	TYPE_DOMAIN_REGISTRATION = "domain_registration"
 	TYPE_DOMAIN_RENEWAL = "domain_renewal"

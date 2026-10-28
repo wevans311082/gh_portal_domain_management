@@ -67,7 +67,7 @@ def request_verification_action(domain, actor, kind, key, *, automatic=False):
         if not _identifier(order.remote_registrant_id):
             raise ValidationError("The registrar contact must be linked before verification.")
         # RAA email resend is not a universal ccTLD/KYC mechanism.
-        if kind == "resend" and order.tld not in {"com", "net", "org"}:
+        if order.tld not in {"com", "net", "org"}:
             raise ValidationError("Contact support for this extension's verification process.")
         open_jobs = VerificationAction.objects.filter(status__in=["queued", "running", "unknown"])
         if open_jobs.filter(domain_order=order, kind=kind, status="unknown").exists():

@@ -384,6 +384,57 @@ class RegistrarContactBinding(TimeStampedModel):
         )]
 
 
+class RegistrantPublicationDecision(TimeStampedModel):
+    """Explicit per-request publication choice, bound to a contact version."""
+
+    customer = models.ForeignKey(User, on_delete=models.PROTECT, related_name="registrant_publication_decisions")
+    contact = models.ForeignKey(DomainContact, on_delete=models.PROTECT, related_name="publication_decisions")
+    domain_name = models.CharField(max_length=255)
+    choice = models.CharField(max_length=8, choices=[("redact", "Keep redacted"), ("publish", "Publish organization")])
+    subject_digest = models.CharField(max_length=64)
+    policy_version = models.CharField(max_length=32)
+    withdrawn_at = models.DateTimeField(null=True, blank=True)
+    withdrawal_ticket = models.ForeignKey("support.SupportTicket", on_delete=models.SET_NULL, null=True, blank=True)
+
+
+class DomainContactChange(TimeStampedModel):
+    """Proposed domain associations remain separate until provider confirmation."""
+
+    domain = models.ForeignKey(Domain, on_delete=models.PROTECT, related_name="contact_changes")
+    user = models.ForeignKey(User, on_delete=models.PROTECT)
+    key = models.UUIDField(unique=True)
+    token = models.UUIDField(default=uuid.uuid4, editable=False)
+    status = models.CharField(max_length=16, default="queued", choices=[
+        ("queued", "Queued"), ("preparing", "Preparing contacts"), ("submitting", "Submission started"),
+        ("awaiting", "Awaiting registrar confirmation"), ("confirmed", "Confirmed by registrar"),
+        ("failed", "Stopped before submission"), ("unknown", "Provider review required"), ("cancelled", "Cancelled"),
+    ])
+    registration_contact = models.ForeignKey(DomainContact, on_delete=models.PROTECT, related_name="registrant_changes")
+    admin_contact = models.ForeignKey(DomainContact, on_delete=models.PROTECT, null=True, blank=True, related_name="admin_changes")
+    tech_contact = models.ForeignKey(DomainContact, on_delete=models.PROTECT, null=True, blank=True, related_name="tech_changes")
+    billing_contact = models.ForeignKey(DomainContact, on_delete=models.PROTECT, null=True, blank=True, related_name="billing_changes")
+    publication_decision = models.ForeignKey(RegistrantPublicationDecision, on_delete=models.PROTECT, null=True, blank=True)
+    domain_name = models.CharField(max_length=255)
+    registrar_order_id = models.CharField(max_length=19)
+    provider_scope = models.CharField(max_length=64)
+    customer_id = models.CharField(max_length=19)
+    subject = models.JSONField(default=dict)
+    role_ids = models.JSONField(default=dict)
+    action_id = models.CharField(max_length=19, blank=True)
+    irtp_status = models.CharField(max_length=20, blank=True)
+    available_at = models.DateTimeField(default=timezone.now)
+    lease_until = models.DateTimeField(null=True, blank=True)
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    checked_at = models.DateTimeField(null=True, blank=True)
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at", "-pk"]
+        constraints = [models.UniqueConstraint(fields=["domain"], condition=models.Q(
+            status__in=["queued", "preparing", "submitting", "awaiting", "unknown"]), name="one_open_domain_contact_change")]
+        indexes = [models.Index(fields=["status", "available_at"], name="contact_change_dispatch")]
+
+
 class DomainRegistrationAttempt(TimeStampedModel):
     """Durable paid-call admission. An uncertain request is never replayed."""
 
@@ -409,6 +460,7 @@ class DomainRegistrationAttempt(TimeStampedModel):
 
 
 class DomainOrder(TimeStampedModel):
+    publication_decision = models.ForeignKey(RegistrantPublicationDecision, on_delete=models.PROTECT, null=True, blank=True)
     STATUS_DRAFT = "draft"
     STATUS_PENDING_PAYMENT = "pending_payment"
     STATUS_PAID = "paid"
@@ -543,6 +595,7 @@ class DomainTransferAttempt(TimeStampedModel):
 
 
 class DomainTransfer(TimeStampedModel):
+    publication_decision = models.ForeignKey(RegistrantPublicationDecision, on_delete=models.PROTECT, null=True, blank=True)
     STATUS_PENDING_PAYMENT = "pending_payment"
     STATUS_PAID = "paid"
     STATUS_PROCESSING = "processing"

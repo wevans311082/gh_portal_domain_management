@@ -1,0 +1,6 @@
+{% extends "base_portal.html" %}
+{% block title %}Registrant review required · {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Registrant review required{% endblock %}
+{% block content %}
+<section class="max-w-3xl rounded-lg border border-amber-300 bg-amber-50 p-5 text-amber-950" aria-labelledby="registry-review-heading"><h1 id="registry-review-heading" class="text-2xl font-bold">Registrant review required</h1><p class="mt-3 break-words font-semibold">{{ domain.name }}</p><p class="mt-3 text-sm">{{ review_message }}</p><p class="mt-3 text-sm">This is a local requirements check. Support must confirm current registrar data and any exceptional registry decision before continuing.</p><div class="mt-5 flex flex-wrap gap-3"><a class="btn-secondary" href="{% url 'domains:detail' domain.pk %}">Back to domain</a><a class="btn-primary" href="{% url 'support:create' %}">Contact support</a></div></section>
+{% endblock %}

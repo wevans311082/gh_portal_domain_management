@@ -5,6 +5,7 @@
 
 {% block header_actions %}
 <a href="{% url 'domains:search' %}" class="btn-primary text-xs">+ Register domain</a>
+<a href="{% url 'domains:publication_decisions' %}" class="btn-secondary text-xs">Publication consent</a>
 {% endblock %}
 
 {% block content %}
@@ -59,11 +60,11 @@
                 {% for domain in domains %}
                 <tr>
                     <td>
-                        {% if not domain.order.registration_attempt.legacy_review_required %}{% if domain.status == 'active' or domain.status == 'expired' %}
+                        {% if not domain.order.registration_attempt.legacy_review_required and not domain.registry_renewal_review %}{% if domain.status == 'active' or domain.status == 'expired' %}
                         <input type="checkbox" name="domain_id" value="{{ domain.pk }}" aria-label="Select {{ domain.name }} for renewal" class="domain-checkbox rounded border-gray-300">
                         {% endif %}{% endif %}
                     </td>
-                    <td class="font-medium">{{ domain.name }}</td>
+                    <td class="font-medium">{{ domain.name }}{% if domain.registry_renewal_review %}<p class="mt-1 text-sm font-semibold text-amber-900">Renewal needs registrant review</p>{% endif %}</td>
                     <td>
                         <span class="chip {% if domain.order.registration_attempt.legacy_review_required %}chip-warning{% elif domain.status == 'active' %}chip-success{% elif domain.status == 'expired' %}chip-danger{% elif domain.status == 'suspended' %}chip-warning{% else %}chip-neutral{% endif %}">
                             {% if domain.order.registration_attempt.legacy_review_required %}Registrar review required{% else %}{{ domain.get_status_display }}{% endif %}
@@ -72,7 +73,9 @@
                     <td class="text-fluent-muted">{% if domain.order.registration_attempt.legacy_review_required %}Not confirmed{% else %}{{ domain.expires_at|default:"—" }}{% endif %}</td>
                     <td>
                         {% if domain.auto_renew %}
+                        {% if domain.registry_renewal_review %}<span class="text-amber-900 text-sm font-semibold">Needs review</span>{% else %}
                         <span class="text-emerald-700 text-sm font-medium">On</span>
+                        {% endif %}
                         {% else %}
                         <span class="text-fluent-muted text-sm">Off</span>
                         {% endif %}

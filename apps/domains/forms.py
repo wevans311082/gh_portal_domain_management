@@ -5,6 +5,7 @@ from django.utils import timezone
 from apps.domains.models import ContactVerification, Domain, DomainContact
 from apps.companies.services import CompaniesHouseService
 from apps.domains.contact_codes import CountryChoiceField
+from apps.domains.publication_consent import CHOICES, DISCLOSURE
 
 _INPUT = "block w-full rounded-md border-gray-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm"
 _SELECT = _INPUT
@@ -167,6 +168,8 @@ class DomainContactForm(forms.ModelForm):
 
 
 class DomainRegistrationForm(forms.Form):
+    publication_choice = forms.ChoiceField(choices=CHOICES, required=False, initial="redact",
+        label="Organization publication for this request", help_text=DISCLOSURE)
     domain_name = forms.CharField(max_length=255, widget=forms.HiddenInput)
     registration_years = forms.TypedChoiceField(
         choices=[(1, "1 year"), (2, "2 years"), (3, "3 years")],
@@ -194,6 +197,7 @@ class DomainRegistrationForm(forms.Form):
         from apps.domains.registrar_policy import policy_for, tld_for_domain
         domain_hint = self.data.get("domain_name") if self.is_bound else self.initial.get("domain_name")
         self.policy_review_message = ""
+        self.registry_guidance = ""
         if domain_hint:
             try:
                 policy = policy_for(tld_for_domain(domain_hint))
@@ -205,6 +209,14 @@ class DomainRegistrationForm(forms.Form):
                     self.fields["privacy_enabled"].initial = False
                     self.initial["privacy_enabled"] = False
                     self.fields["privacy_enabled"].help_text = "Registrar privacy protection is not supported for this extension."
+                from apps.domains.registry_requirements import UK_EXTENSIONS
+                if tld_for_domain(domain_hint) in UK_EXTENSIONS:
+                    self.registry_guidance = "UK domains use only the registrant contact and do not use registrar locks or EPP codes. Supply the actual full registrant name; individuals do not need a company number."
+                    self.registry_guidance += " A sole trader registering as a person should select Individual and use their actual full name, not a trading name."
+                    if tld_for_domain(domain_hint) == "me.uk":
+                        self.registry_guidance += " .me.uk requires an individual registrant for a personal namespace. Exceptional registry decisions require support review."
+                    elif tld_for_domain(domain_hint) == "org.uk":
+                        self.registry_guidance += " .org.uk is intended for not-for-profit or public-service activities; this is not a company-number requirement."
 
     def clean_contact(self):
         contact = self.cleaned_data["contact"]
@@ -224,9 +236,21 @@ class DomainRegistrationForm(forms.Form):
     def clean_domain_name(self):
         return self.cleaned_data["domain_name"].strip().lower()
 
+    def clean_publication_choice(self):
+        from apps.domains.publication_consent import posted_choice
+        return posted_choice(self.data)
+
     def clean(self):
         cleaned = super().clean()
         domain = cleaned.get("domain_name")
+        choice = cleaned.get("publication_choice") or "redact"
+        cleaned["publication_choice"] = choice
+        if domain:
+            from apps.domains.publication_consent import validate_choice
+            try:
+                validate_choice(choice, cleaned.get("contact"), domain)
+            except forms.ValidationError as exc:
+                self.add_error("publication_choice", exc)
         if domain:
             from apps.domains.registrar_policy import policy_for, tld_for_domain
             try:
@@ -236,4 +260,10 @@ class DomainRegistrationForm(forms.Form):
             else:
                 if not policy.privacy_supported:
                     cleaned["privacy_enabled"] = False
+                if cleaned.get("contact") and cleaned.get("registration_years"):
+                    from apps.domains.registry_requirements import validate_registration
+                    try:
+                        validate_registration(domain, cleaned["contact"], cleaned["registration_years"])
+                    except forms.ValidationError as exc:
+                        self.add_error("contact", " ".join(exc.messages))
         return cleaned

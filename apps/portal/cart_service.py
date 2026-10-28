@@ -66,6 +66,7 @@ def add_hosting_item(*, user, package_id: int, billing_period: str, domain_name:
     )
 
 
+@transaction.atomic
 def add_domain_registration_item(
     *,
     user,
@@ -76,6 +77,7 @@ def add_domain_registration_item(
     auto_renew: bool = True,
     dns_provider: str = Domain.DNS_PROVIDER_CPANEL,
     created_by_staff=None,
+    publication_choice="redact",
 ) -> PortalCartItem:
     cart = get_active_cart(user, created_by_staff=created_by_staff)
     normalized = (domain_name or "").strip().lower()
@@ -97,6 +99,9 @@ def add_domain_registration_item(
     if contact is None:
         contact = _default_domain_contact(user)
 
+    from apps.domains.publication_consent import capture_decision
+    decision = capture_decision(customer=user, contact=contact, domain_name=normalized,
+        choice=publication_choice, actor=created_by_staff or user)
     item, _created = PortalCartItem.objects.update_or_create(
         cart=cart,
         item_type=PortalCartItem.TYPE_DOMAIN_REGISTRATION,
@@ -108,6 +113,7 @@ def add_domain_registration_item(
             "quantity": 1,
             "domain_contact": contact,
             "privacy_enabled": privacy_enabled,
+            "publication_decision": decision,
             "auto_renew": auto_renew,
             "dns_provider": dns_provider,
             "sort_order": cart.items.count(),
@@ -128,6 +134,12 @@ def add_domain_renewal_item(
     from apps.domains.registrar_review import registrar_review_required, REVIEW_MESSAGE
     if registrar_review_required(domain):
         raise CartPreflightError(REVIEW_MESSAGE)
+    from apps.domains.registry_requirements import validate_renewal_registrant
+    from django.core.exceptions import ValidationError
+    try:
+        validate_renewal_registrant(domain)
+    except ValidationError as exc:
+        raise CartPreflightError(" ".join(exc.messages)) from None
     pricing = TLDPricing.objects.filter(tld=domain.tld, is_active=True).first()
     if not pricing:
         raise CartPreflightError(f"Renewal pricing is not available for .{domain.tld}.")
@@ -150,6 +162,7 @@ def add_domain_renewal_item(
     return item
 
 
+@transaction.atomic
 def add_domain_transfer_item(
     *,
     user,
@@ -159,6 +172,7 @@ def add_domain_transfer_item(
     auto_renew: bool = True,
     dns_provider: str = Domain.DNS_PROVIDER_CPANEL,
     created_by_staff=None,
+    publication_choice="redact",
 ) -> PortalCartItem:
     cart = get_active_cart(user, created_by_staff=created_by_staff)
     normalized = (domain_name or "").strip().lower()
@@ -178,6 +192,9 @@ def add_domain_transfer_item(
     if contact is None:
         contact = _default_domain_contact(user)
 
+    from apps.domains.publication_consent import capture_decision
+    decision = capture_decision(customer=user, contact=contact, domain_name=normalized,
+        choice=publication_choice, actor=created_by_staff or user)
     item, _created = PortalCartItem.objects.update_or_create(
         cart=cart,
         item_type=PortalCartItem.TYPE_DOMAIN_TRANSFER,
@@ -188,6 +205,7 @@ def add_domain_transfer_item(
             "quantity": 1,
             "domain_contact": contact,
             "transfer_auth_code": (auth_code or "").strip(),
+            "publication_decision": decision,
             "auto_renew": auto_renew,
             "dns_provider": dns_provider,
             "sort_order": cart.items.count(),
@@ -260,6 +278,12 @@ def preflight_cart_domains(cart: PortalCart):
     from apps.domains.registrar_review import REVIEW_MESSAGE, registrar_review_required
     if any(registrar_review_required(domain) for domain in owned_domains.values()):
         raise CartPreflightError(REVIEW_MESSAGE)
+    from apps.domains.registry_requirements import validate_renewal_registrant
+    for domain in owned_domains.values():
+        try:
+            validate_renewal_registrant(domain)
+        except ValidationError as exc:
+            raise CartPreflightError(" ".join(exc.messages)) from None
     result = {}
     for item in domain_items:
         if item.item_type == PortalCartItem.TYPE_DOMAIN_TRANSFER and (
@@ -290,9 +314,20 @@ def preflight_cart_domains(cart: PortalCart):
                 for field, messages in exc.message_dict.items() for message in messages
             ]
             raise CartPreflightError(
-                f"Update contact {contact.label} for {item.domain_name}.",
+                f"Update contact {contact.label} for {item.domain_name}. " + " ".join(exc.messages),
                 contact_id=contact.pk, issues=issues,
             ) from None
+        if item.item_type == PortalCartItem.TYPE_DOMAIN_REGISTRATION:
+            from apps.domains.registry_requirements import validate_registration
+            try:
+                validate_registration(item.domain_name, contact, item.registration_years)
+            except ValidationError as exc:
+                raise CartPreflightError(" ".join(exc.messages)) from None
+        from apps.domains.publication_consent import publication_snapshot
+        try:
+            publication_snapshot(item, contact, customer_id=current.user_id)
+        except ValidationError as exc:
+            raise CartPreflightError(" ".join(exc.messages)) from None
         result[item.pk] = contact
     return result
 
@@ -364,6 +399,7 @@ def materialize_cart_to_invoice(cart: PortalCart, invoice: Invoice) -> Invoice:
                     "total_price": item.line_total,
                     "status": DomainOrder.STATUS_PENDING_PAYMENT,
                     "privacy_enabled": item.privacy_enabled and policy_for(tld).privacy_supported,
+                    "publication_decision_id": item.publication_decision_id,
                     "auto_renew": item.auto_renew,
                     "dns_provider": item.dns_provider,
                     "registration_contact": contact,
@@ -403,6 +439,7 @@ def materialize_cart_to_invoice(cart: PortalCart, invoice: Invoice) -> Invoice:
                     "user": invoice.user,
                     "tld": tld,
                     "auth_code": item.transfer_auth_code,
+                    "publication_decision_id": item.publication_decision_id,
                     "quoted_price": item.unit_price,
                     "total_price": item.line_total,
                     "status": DomainTransfer.STATUS_PENDING_PAYMENT,

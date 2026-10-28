@@ -472,10 +472,14 @@ class ResellerClubClient:
         nameservers: list,
         purchase_privacy: bool = True,
         auto_renew: bool = True,
+        registrant_org_consent: bool = False,
     ) -> dict:
         """Register a domain name."""
         from apps.domains.registrar_policy import policy_for, registration_contact_ids, tld_for_domain
         policy = policy_for(tld_for_domain(domain_name))
+        from apps.domains.registry_requirements import validate_registration, validate_nameservers
+        validate_registration(domain_name, years=years)
+        validate_nameservers(domain_name, nameservers)
         reg_contact_id, admin_contact_id, tech_contact_id, billing_contact_id = registration_contact_ids(
             domain_name, reg_contact_id, admin_contact_id, tech_contact_id, billing_contact_id
         )
@@ -492,6 +496,8 @@ class ResellerClubClient:
             "purchase-privacy": bool(purchase_privacy and policy.privacy_supported),
             "auto-renew": auto_renew,
         }
+        from apps.domains.publication_consent import publication_attributes
+        data.update(publication_attributes(domain_name, registrant_org_consent))
         return self._post("domains/register", data)
 
     def renew_domain(self, order_id: str, years: int, current_expiry_date: int, auto_renew: bool = True) -> dict:
@@ -515,6 +521,7 @@ class ResellerClubClient:
         nameservers: list,
         auth_code: str = "",
         auto_renew: bool = True,
+        registrant_org_consent: bool = False,
     ) -> dict:
         """Transfer a domain name into the registrar account."""
         from django.core.exceptions import ValidationError
@@ -534,6 +541,8 @@ class ResellerClubClient:
         }
         if auth_code:
             data["auth-code"] = auth_code
+        from apps.domains.publication_consent import publication_attributes
+        data.update(publication_attributes(domain_name, registrant_org_consent))
         return self._post("domains/transfer", data)
 
     def get_order_details(self, order_id: str) -> dict:
@@ -1040,3 +1049,18 @@ class ResellerClubClient:
     def get_contact(self, contact_id: str) -> dict:
         """Fetch a single domain contact from ResellerClub."""
         return self._get("contacts/details", {"contact-id": contact_id})
+
+    def change_domain_contacts(self, order_id, role_ids, *, registrant_org_consent=False):
+        """Associate immutable contacts without bypassing registrant authorization."""
+        if type(registrant_org_consent) is not bool:
+            raise ValueError("Publication consent must be an explicit boolean.")
+        return self._post("domains/modify-contact", {
+            "order-id": order_id, "reg-contact-id": role_ids["reg"], "admin-contact-id": role_ids["admin"],
+            "tech-contact-id": role_ids["tech"], "billing-contact-id": role_ids["billing"],
+            "designated-agent": False, "sixty-day-lock-optout": False,
+            "attr-name1": "registrant-org-consent", "attr-value1": "true" if registrant_org_consent else "false",
+        })
+
+    def get_irtp_status(self, order_id):
+        # The current 2804 contract documents POST for this read-only lookup.
+        return self._post("domains/irtp/verification/details", {"order-id": order_id})

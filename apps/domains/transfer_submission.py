@@ -35,10 +35,13 @@ def _audit(attempt, action):
 
 def _identity(transfer):
     fields = ("user_id", "invoice_id", "domain_name", "tld", "auto_renew", "dns_provider", "quoted_price", "total_price")
-    return {"transfer": {field: str(getattr(transfer, field)) if isinstance(getattr(transfer, field), Decimal)
+    result = {"transfer": {field: str(getattr(transfer, field)) if isinstance(getattr(transfer, field), Decimal)
                          else getattr(transfer, field) for field in fields},
             "roles": {role: getattr(transfer, role + "_id") for role in ALL_ROLES},
             "auth_digest": hashlib.sha256(transfer.auth_code.encode()).hexdigest()}
+    if transfer.publication_decision_id:
+        result["transfer"]["publication_decision_id"] = transfer.publication_decision_id
+    return result
 
 
 def _same_transfer(attempt, transfer):
@@ -72,6 +75,8 @@ def _locked_subject(transfer_id, customer_id):
     for role in ALL_ROLES:
         setattr(transfer, role, contacts[getattr(transfer, role + "_id")])
     validate_order_contacts(transfer, customer_id, transfer.tld)
+    from apps.domains.publication_consent import publication_snapshot
+    publication = publication_snapshot(transfer, transfer.registration_contact)
     if len(transfer.auth_code) > 255 or any(ord(char) < 32 or ord(char) == 127 for char in transfer.auth_code):
         raise ValidationError("The transfer authorization code contains unsupported characters.")
     if transfer.domain_id or Domain.objects.filter(name__iexact=transfer.domain_name).exists():
@@ -79,6 +84,7 @@ def _locked_subject(transfer_id, customer_id):
     if DomainOrder.objects.filter(domain_name__iexact=transfer.domain_name).exists():
         raise ValidationError("A registration request exists for this domain. Review both workflows before submitting a transfer.")
     subject = _identity(transfer)
+    subject["publication"] = publication
     subject["contacts"] = {str(pk): ContactVerification.digest_for(contact) for pk, contact in contacts.items()}
     if transfer.invoice_id:
         subject["invoice"] = {"pk": invoice.pk, "user_id": invoice.user_id, "total": str(invoice.total),
@@ -172,7 +178,7 @@ def submit_transfer(transfer_id, customer_id, nameservers, *, client):
             response = client.transfer_domain(domain_name=current.domain_name, customer_id=customer_id,
                 reg_contact_id=role_ids["reg"], admin_contact_id=role_ids["admin"], tech_contact_id=role_ids["tech"],
                 billing_contact_id=role_ids["billing"], nameservers=list(nameservers), auth_code=current.auth_code,
-                auto_renew=current.auto_renew)
+                auto_renew=current.auto_renew, registrant_org_consent=subject["publication"]["consent"])
             identifier = ""
             if isinstance(response, dict) and str(response.get("status", "")).lower() != "error" and str(response.get("actionstatus", "")).lower() not in {"error", "failed", "failure"}:
                 identifier = _identifier(response.get("entityid") or response.get("orderid") or response.get("order-id"))

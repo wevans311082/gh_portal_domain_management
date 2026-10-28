@@ -456,6 +456,14 @@ def execute_domain_renewal(renewal_id: int):
         renewal.save(update_fields=["status", "last_error", "updated_at"])
         return
 
+    from apps.domains.registry_requirements import validate_renewal_registrant
+    from django.core.exceptions import ValidationError
+    try:
+        validate_renewal_registrant(domain)
+    except ValidationError as exc:
+        renewal.status, renewal.last_error = DomainRenewal.STATUS_FAILED, " ".join(exc.messages)
+        renewal.save(update_fields=["status", "last_error", "updated_at"])
+        return
 
     if not domain.registrar_id:
         logger.error("execute_domain_renewal: domain %s has no registrar_id", domain.name)
@@ -608,6 +616,13 @@ def process_auto_renewals(days_ahead: int = 7):
     for domain in domains:
         from apps.domains.registrar_review import registrar_review_required
         if registrar_review_required(domain):
+            continue
+        from apps.domains.registry_requirements import validate_renewal_registrant
+        from django.core.exceptions import ValidationError
+        try:
+            validate_renewal_registrant(domain)
+        except ValidationError:
+            logger.info("Auto-renewal domain %s needs a registrar eligibility review", domain.pk)
             continue
         # Skip if a non-failed renewal already exists
         has_open_renewal = DomainRenewal.objects.filter(

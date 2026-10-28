@@ -187,6 +187,53 @@ def main():
             postcode="SW1A 1AA", country="GB", phone_country_code="44", phone="07700900000",
         )
         search_customer.email = "customer-" + "x" * 110 + "@example.test"
+        org_user = get_user_model().objects.create_user(email="publication-ui@example.test", password="fixture-password")
+        org_contact = DomainContact.objects.create(user=org_user, registrant_type="organisation", label="Organization registrant",
+            name="Jane Smith", company="Example Customer Ltd", email=org_user.email, address_line1="1 High Street",
+            city="London", state="London", postcode="SW1A 1AA", country="GB", phone_country_code="44", phone="07700900000", is_default=True)
+        org_client = Client()
+        org_client.force_login(org_user)
+        fixtures["/publication-registration"] = org_client.get(reverse("domains:register"), {"domain": "publication-ui.com"}).content
+        fixtures["/publication-empty"] = org_client.get(reverse("domains:publication_decisions")).content
+        fixtures["/publication-shop"] = org_client.get(reverse("portal:shop")).content
+        publication_item = add_domain_registration_item(user=org_user, domain_name="publication-ui.com",
+            domain_contact_id=org_contact.pk, publication_choice="publish")
+        fixtures["/publication-cart"] = org_client.get(reverse("portal:cart")).content
+        fixtures["/publication-active"] = org_client.get(reverse("domains:publication_decisions")).content
+        org_contact.company = "Changed Organization Ltd"
+        org_contact.save(update_fields=["company"])
+        fixtures["/publication-stale-cart"] = org_client.post(reverse("portal:cart_checkout_invoice"), follow=True).content
+        org_client.post(reverse("domains:publication_withdraw", args=[publication_item.publication_decision_id]))
+        fixtures["/publication-withdrawn"] = org_client.get(reverse("domains:publication_decisions")).content
+        from apps.domains.publication_consent import capture_decision
+        submitted_decision = capture_decision(customer=org_user, contact=org_contact, domain_name="submitted-publication-ui.com", choice="publish")
+        DomainOrder.objects.create(user=org_user, domain_name=submitted_decision.domain_name, tld="com", registrar_order_id="502",
+            status="processing", registration_contact=org_contact, admin_contact=org_contact, tech_contact=org_contact,
+            billing_contact=org_contact, publication_decision=submitted_decision)
+        org_client.post(reverse("domains:publication_withdraw", args=[submitted_decision.pk]))
+        fixtures["/publication-provider-pending"] = org_client.get(reverse("domains:publication_decisions")).content
+        for extension in ("me.uk", "uk"):
+            TLDPricing.objects.get_or_create(tld=extension, defaults={"registration_cost": "10", "renewal_cost": "10", "is_active": True})
+        fixtures["/registry-me-registration"] = org_client.get(reverse("domains:register"), {"domain": "personal-policy.me.uk"}).content
+        rejected_uk = org_client.post(reverse("domains:register"), {"domain_name": "organization-policy.me.uk",
+            "contact": org_contact.pk, "registration_years": "1", "dns_provider": "cpanel", "publication_choice": "redact"})
+        assert rejected_uk.status_code == 200 and b"personal namespace" in rejected_uk.content
+        fixtures["/registry-me-invalid"] = rejected_uk.content
+        uk_domain = Domain.objects.create(user=org_user, name="individual-policy.co.uk", tld="com", status="active", registrar_id="601", epp_code="PRIVATE-UK-EPP-CACHED")
+        with patch("apps.provisioning.whm_client.WHMClient") as uk_whm:
+            uk_whm.return_value.get_nameservers.return_value = []
+            fixtures["/registry-uk-domain"] = org_client.get(reverse("domains:detail", args=[uk_domain.pk])).content
+        denied_uk = org_client.post(reverse("domains:get_auth_code", args=[uk_domain.pk]))
+        assert denied_uk.status_code == 409
+        fixtures["/registry-uk-operation"] = denied_uk.content
+        me_domain = Domain.objects.create(user=org_user, name="review-policy.me.uk", tld="me.uk", status="active", registrar_id="602")
+        reviewed_me = org_client.get(reverse("domains:renew", args=[me_domain.pk]))
+        assert reviewed_me.status_code == 409
+        fixtures["/registry-me-renewal-review"] = reviewed_me.content
+        with patch("apps.provisioning.whm_client.WHMClient") as me_whm:
+            me_whm.return_value.get_nameservers.return_value = []
+            fixtures["/registry-me-held-domain"] = org_client.get(reverse("domains:detail", args=[me_domain.pk])).content
+        fixtures["/registry-me-domain-list"] = org_client.get(reverse("domains:my_domains")).content
         search_customer.save(update_fields=["email"])
         CustomerNote.objects.create(customer=search_customer, author=user, body="Staff service context.\n" + "long-note-" * 45 + "\n<script>Escaped note text</script>", submission_key=uuid.uuid4())
         workspace_url = reverse("admin_tools:customer_workspace", args=[search_customer.pk])
@@ -364,7 +411,7 @@ def main():
             page.on("pageerror", lambda error: errors.append(str(error)))
             for width in (1440, 390):
                 page.set_viewport_size({"width": width, "height": 960})
-                for name in ("admin-registrar-diagnostic", "admin-registrar-diagnostic-failed", "admin-transfer-preparing", "admin-transfer-submitting", "admin-transfer-unknown", "admin-transfer-accepted", "admin-transfer-aborted", "admin-transfer-historical", "admin-transfers", "admin-transfers-empty", "admin-transfers-invalid", "portal-transfer-review", "portal-historical-domain", "portal-historical-action-held", "portal-historical-review", "admin-historical-review", "admin-historical-list", "admin-historical-pending", "admin-historical-suspended", "admin-registration-preparing", "admin-registration-submitting", "admin-registration-unknown", "admin-registration-accepted", "admin-registration-aborted", "admin-customer-workspace", "admin-customer-workspace-loading", "admin-customer-workspace-invalid", "admin-customer-workspace-empty", "admin-customer-workspace-support", "admin-customer-workspace-billing", "admin-customer-note-redacted", "portal-cart-empty", "portal-cart", "public-cart-review", "registrant-verification-automatic", "registrant-verification-queued", "registrant-verification-error", "registrant-verification-review", "registrant-verification-verified", "registrant-verification-pending", "registrant-verification-suspended", "registrant-verification-unknown", "registrant-domain-uk", "registrant-domain-review", "admin-manual-domain", "admin-manual-domain-invalid", "registrant-contact", "registrant-contact-invalid", "mfa", "mfa-invalid", "reauthenticate", "reauth-required", "staff-roles", "staff-roles-invalid", "staff-workspace", "staff-customers", "branding", "branding-invalid", "configuration", "configuration-invalid", "deliveries", "deliveries-invalid", "public-contact", "public-contact-invalid", "public-error-413", "public-error-429", "public-error-503", "public-quote", "public-domain-error", "public-acceptance", "public-acceptance-unavailable", "public-acceptance-expired", "public-mail-reset", "public-mail-verification", "admin-customers", "admin-customers-empty", "admin-customers-loading", "admin-user-invalid", "admin-invoices", "admin-invoices-empty", "admin-search", "admin-search-start", "admin-search-suggestions-error", "admin-search-empty", "admin-search-invalid", "admin-search-pagination", "admin-search-support", "admin-search-record"):
+                for name in ("registry-me-registration", "registry-me-invalid", "registry-uk-domain", "registry-uk-operation", "registry-me-renewal-review", "registry-me-held-domain", "registry-me-domain-list", "publication-registration", "publication-empty", "publication-shop", "publication-cart", "publication-active", "publication-stale-cart", "publication-withdrawn", "publication-provider-pending", "admin-registrar-diagnostic", "admin-registrar-diagnostic-failed", "admin-transfer-preparing", "admin-transfer-submitting", "admin-transfer-unknown", "admin-transfer-accepted", "admin-transfer-aborted", "admin-transfer-historical", "admin-transfers", "admin-transfers-empty", "admin-transfers-invalid", "portal-transfer-review", "portal-historical-domain", "portal-historical-action-held", "portal-historical-review", "admin-historical-review", "admin-historical-list", "admin-historical-pending", "admin-historical-suspended", "admin-registration-preparing", "admin-registration-submitting", "admin-registration-unknown", "admin-registration-accepted", "admin-registration-aborted", "admin-customer-workspace", "admin-customer-workspace-loading", "admin-customer-workspace-invalid", "admin-customer-workspace-empty", "admin-customer-workspace-support", "admin-customer-workspace-billing", "admin-customer-note-redacted", "portal-cart-empty", "portal-cart", "public-cart-review", "registrant-verification-automatic", "registrant-verification-queued", "registrant-verification-error", "registrant-verification-review", "registrant-verification-verified", "registrant-verification-pending", "registrant-verification-suspended", "registrant-verification-unknown", "registrant-domain-uk", "registrant-domain-review", "admin-manual-domain", "admin-manual-domain-invalid", "registrant-contact", "registrant-contact-invalid", "mfa", "mfa-invalid", "reauthenticate", "reauth-required", "staff-roles", "staff-roles-invalid", "staff-workspace", "staff-customers", "branding", "branding-invalid", "configuration", "configuration-invalid", "deliveries", "deliveries-invalid", "public-contact", "public-contact-invalid", "public-error-413", "public-error-429", "public-error-503", "public-quote", "public-domain-error", "public-acceptance", "public-acceptance-unavailable", "public-acceptance-expired", "public-mail-reset", "public-mail-verification", "admin-customers", "admin-customers-empty", "admin-customers-loading", "admin-user-invalid", "admin-invoices", "admin-invoices-empty", "admin-search", "admin-search-start", "admin-search-suggestions-error", "admin-search-empty", "admin-search-invalid", "admin-search-pagination", "admin-search-support", "admin-search-record"):
                     if args.pages and name not in args.pages:
                         continue
                     pending_routes = []
@@ -429,10 +476,27 @@ def main():
                             assert page.get_by_role('status').filter(has_text='Automatic status check: Queued').count() == 1
                     if name.startswith("public-error"):
                         page.wait_for_function("getComputedStyle(document.querySelector('.request-error')).backgroundColor === 'rgb(255, 255, 255)'")
-                    elif name.startswith(("public-", "registrant-", "portal-")):
+                    elif name.startswith(("public-", "registrant-", "portal-", "publication-", "registry-")):
                         page.wait_for_function("typeof tailwind !== 'undefined'")
                     else:
                         page.wait_for_function("getComputedStyle(document.querySelector('.auth-card, .admin-header')).backgroundColor === 'rgb(255, 255, 255)'")
+                    if name == "publication-registration":
+                        assert page.locator('#id_publication_choice').input_value() == 'redact'
+                        assert page.locator('#id_publication_choice_helptext').count() == 1
+                        assert page.locator('form[data-no-field-hints]').count() == 1
+                    if name == "publication-shop":
+                        for choice_id in ('registration-publication', 'transfer-publication'):
+                            assert page.locator('#' + choice_id).input_value() == 'redact'
+                        assert page.locator('[name=publication_choice]').count() == 2
+                        assert page.evaluate("() => { const ids = [...document.querySelectorAll('[id]')].map(el => el.id); return ids.length === new Set(ids).size; }")
+                    if name == "publication-active":
+                        button = page.get_by_role('button', name='Withdraw publication consent for publication-ui.com', exact=True)
+                        assert button.locator('xpath=..').get_attribute('method') == 'post'
+                        assert button.locator('xpath=..').locator('[name=csrfmiddlewaretoken]').input_value()
+                    if name == "publication-withdrawn":
+                        assert page.get_by_role('button', name='Withdraw publication consent', exact=False).count() == 0
+                    if name == "publication-provider-pending":
+                        assert page.get_by_role('link', name='View redaction support request', exact=True).count() == 1
                     if name == "public-quote":
                         # Exercise the visible consent choice before controls
                         # behind the fixed banner, as a visitor would.

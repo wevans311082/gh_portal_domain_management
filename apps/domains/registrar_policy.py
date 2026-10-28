@@ -16,11 +16,17 @@ class ContactPolicy:
     contact_type: str
     roles: tuple[str, ...]
     privacy_supported: bool
+    max_nameservers: int = 13
+    lock_supported: bool = True
+    auth_code_supported: bool = True
 
 
 ALL_ROLES = ("registration_contact", "admin_contact", "tech_contact", "billing_contact")
+# Structural namespaces are separate from the enabled/reviewed policy catalogue.
+UK_NAMESPACES = frozenset({"co.uk", "org.uk", "me.uk", "ltd.uk", "plc.uk", "net.uk", "sch.uk", "nic.uk",
+    "ac.uk", "gov.uk", "mod.uk", "mil.uk", "nhs.uk", "parliament.uk", "police.uk"})
 GENERAL = ContactPolicy("Contact", ALL_ROLES, True)
-UK = ContactPolicy("UkContact", ("registration_contact",), False)
+UK = ContactPolicy("UkContact", ("registration_contact",), False, 10, False, False)
 POLICIES = {
     "com": GENERAL, "net": GENERAL, "org": GENERAL, "io": GENERAL,
     "uk": UK, "co.uk": UK, "org.uk": UK, "me.uk": UK,
@@ -40,7 +46,7 @@ def policy_for(tld):
 
 def tld_for_domain(domain_name):
     name = str(domain_name or "").strip().lower().rstrip(".")
-    for extension in sorted(POLICIES, key=len, reverse=True):
+    for extension in sorted(set(POLICIES) | UK_NAMESPACES, key=len, reverse=True):
         if name.endswith("." + extension):
             return extension
     # Preserve an unrecognised extension for a helpful review failure.

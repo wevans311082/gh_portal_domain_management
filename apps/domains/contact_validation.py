@@ -85,4 +85,6 @@ def resellerclub_contact_payload(contact, customer_id, tld=""):
     }
     if errors:
         raise ValidationError(errors)
+    from apps.domains.registry_requirements import validate_uk_registrant
+    validate_uk_registrant(contact, extension)
     return payload

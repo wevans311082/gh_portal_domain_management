@@ -254,7 +254,7 @@ def shop(request):
         "portal/shop.html",
         {
             "cart": cart,
-            "cart_items": cart.items.all(),
+            "cart_items": cart.items.select_related("publication_decision"),
             "cart_count": cart.items.count(),
             "packages": packages,
             "featured_tlds": featured_tlds,
@@ -273,7 +273,7 @@ def cart_detail(request):
         "portal/cart.html",
         {
             "cart": cart,
-            "cart_items": cart.items.all(),
+            "cart_items": cart.items.select_related("publication_decision"),
             "cart_count": cart.items.count(),
         },
     )
@@ -300,12 +300,14 @@ def cart_add_hosting(request):
 @require_POST
 def cart_add_domain(request):
     try:
+        from apps.domains.publication_consent import posted_choice
         add_domain_registration_item(
             user=request.user,
             domain_name=request.POST.get("domain_name") or "",
             registration_years=int(request.POST.get("registration_years") or 1),
             domain_contact_id=int(request.POST.get("domain_contact_id")) if request.POST.get("domain_contact_id") else None,
             privacy_enabled=request.POST.get("privacy_enabled") == "on",
+            publication_choice=posted_choice(request.POST),
             auto_renew=request.POST.get("auto_renew") == "on",
             dns_provider=(request.POST.get("dns_provider") or Domain.DNS_PROVIDER_CPANEL).strip(),
         )
@@ -336,10 +338,12 @@ def cart_add_renewal(request):
 @require_POST
 def cart_add_transfer(request):
     try:
+        from apps.domains.publication_consent import posted_choice
         add_domain_transfer_item(
             user=request.user,
             domain_name=request.POST.get("domain_name") or "",
             auth_code=request.POST.get("auth_code") or "",
+            publication_choice=posted_choice(request.POST),
             domain_contact_id=int(request.POST.get("domain_contact_id")) if request.POST.get("domain_contact_id") else None,
             auto_renew=request.POST.get("auto_renew") == "on",
             dns_provider=(request.POST.get("dns_provider") or Domain.DNS_PROVIDER_CPANEL).strip(),

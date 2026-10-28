@@ -1,0 +1,5 @@
+<div class="col-span-full">
+  <label for="{{ choice_id }}" class="mb-1 block text-sm font-semibold text-slate-800">Organization publication for this request</label>
+  <select id="{{ choice_id }}" name="publication_choice" class="w-full rounded-lg border border-slate-400 bg-white px-3 py-2 text-sm" aria-describedby="{{ choice_id }}-help"><option value="redact" selected>Keep organization redacted (default)</option><option value="publish">Publish organization for this request</option></select>
+  <p id="{{ choice_id }}-help" class="mt-2 text-sm text-slate-700">For an organization contact on .com, .net or .org only. Choose Publish only if authorized to consent to public disclosure of the organization's name in WHOIS/RDAP. An organization named as registrant is the legal domain holder. This is separate from privacy protection and verification. Later publication changes require support; this does not update other existing domains.</p>
+</div>

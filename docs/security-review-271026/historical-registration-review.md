@@ -1,6 +1,6 @@
 # Historical registration review and provider holds
 
-This increment extends roadmap item 3's paid registration safeguards to older records. It does not complete item 3, paid transfer safety, all registry adapters, contact replacement or the broader roadmap. Individuals remain valid registrants without a company number; identity, business checks, registrar email verification and TLD eligibility remain independent.
+This increment extends roadmap item 3's paid registration safeguards to older records. It does not complete item 3, all registry adapters, contact replacement or the broader roadmap. Initial paid-transfer safety is now covered by [paid-transfer-safety.md](paid-transfer-safety.md). Individuals remain valid registrants without a company number; identity, business checks, registrar email verification and TLD eligibility remain independent.
 
 ## Migration and retained state
 

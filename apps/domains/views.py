@@ -7,6 +7,7 @@ import requests
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db import transaction
 from django.core.cache import cache
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -193,7 +194,8 @@ def _fetch_live_debug_prices(client: ResellerClubClient, tlds: list) -> dict:
 
 def _split_domain_name(domain_name: str):
     normalized = domain_name.strip().lower()
-    known_tlds = sorted(set(get_active_tlds() + _FALLBACK_POPULAR_TLDS), key=len, reverse=True)
+    from apps.domains.registrar_policy import POLICIES, UK_NAMESPACES
+    known_tlds = sorted(set(get_active_tlds() + _FALLBACK_POPULAR_TLDS) | set(POLICIES) | UK_NAMESPACES, key=len, reverse=True)
     for tld in known_tlds:
         suffix = f".{tld}"
         if normalized.endswith(suffix):
@@ -468,8 +470,9 @@ def domain_whois(request):
 
 
 @login_required
+@transaction.atomic
 def domain_register(request):
-    domain_name = request.GET.get("domain") or request.POST.get("domain_name", "")
+    domain_name = (request.POST.get("domain_name", "") if request.method == "POST" else request.GET.get("domain", "")).strip().lower()
     if not domain_name:
         messages.error(request, "Choose a domain before starting checkout.")
         return redirect("domains:search")
@@ -516,6 +519,9 @@ def domain_register(request):
                 vat_rate=Decimal("0.00"),
                 due_date=timezone.now().date(),
             )
+            from apps.domains.publication_consent import capture_decision
+            decision = capture_decision(customer=request.user, contact=contact, domain_name=domain_name,
+                choice=form.cleaned_data["publication_choice"])
             order = DomainOrder.objects.create(
                 user=request.user,
                 invoice=invoice,
@@ -532,6 +538,7 @@ def domain_register(request):
                 admin_contact=contact,
                 tech_contact=contact,
                 billing_contact=contact,
+                publication_decision=decision,
             )
             messages.success(request, f"Order created for {order.domain_name}. Continue to payment.")
             return redirect("payments:stripe_checkout", invoice_id=invoice.id)
@@ -562,6 +569,9 @@ def my_domains(request):
     qs = Domain.objects.filter(user=request.user).select_related("order__registration_contact", "order__registration_attempt").order_by("name")
     paginator = Paginator(qs, 20)
     page_obj = paginator.get_page(request.GET.get("page"))
+    from apps.domains.registry_requirements import renewal_review_message
+    for domain in page_obj.object_list:
+        domain.registry_renewal_review = renewal_review_message(domain)
     reviews = list(DomainOrder.objects.filter(user=request.user, registration_attempt__legacy_review_required=True)
                    .order_by("-created_at", "-pk").values("domain_name")[:11])
     from apps.domains.models import DomainTransfer
@@ -593,7 +603,11 @@ def domain_detail(request, pk):
     )
     from apps.domains.registrar_review import registrar_review_required
     registrar_hold = registrar_review_required(domain)
-    if registrar_hold:
+    from apps.domains.registry_requirements import capabilities
+    registrar_capabilities = capabilities(domain.name)
+    from apps.domains.registry_requirements import renewal_review_message
+    registry_renewal_review = renewal_review_message(domain)
+    if registrar_hold or not registrar_capabilities["auth_code"]:
         domain.epp_code = ""  # Never render a cached code from an unconfirmed association.
     from apps.products.models import Package
     from apps.services.models import Service
@@ -621,6 +635,8 @@ def domain_detail(request, pk):
         {
             "domain": domain,
             "registrar_review_required": registrar_hold,
+            "registrar_capabilities": registrar_capabilities,
+            "registry_renewal_review": registry_renewal_review,
             "registrar_email": registrar_email_summary(domain),
             "verification_refresh_key": uuid.uuid4(),
             "verification_resend_key": uuid.uuid4(),
@@ -682,6 +698,11 @@ def domain_toggle_autorenew(request, pk):
     held = review_response(request, domain) if not domain.auto_renew else None
     if held is not None:
         return held
+    if not domain.auto_renew:
+        from apps.domains.registry_requirements import renewal_review_response
+        registry_review = renewal_review_response(request, domain)
+        if registry_review is not None:
+            return registry_review
     domain.auto_renew = not domain.auto_renew
     domain.save(update_fields=["auto_renew"])
     messages.success(request, f"Auto-renew {'enabled' if domain.auto_renew else 'disabled'} for {domain.name}.")
@@ -697,6 +718,10 @@ def domain_renew(request, pk):
     POST - create a DomainRenewal + Invoice, redirect to Stripe checkout.
     """
     domain = get_object_or_404(Domain, pk=pk, user=request.user)
+    from apps.domains.registry_requirements import renewal_review_response
+    registry_review = renewal_review_response(request, domain)
+    if registry_review is not None:
+        return registry_review
     from apps.domains.registrar_review import review_response
     held = review_response(request, domain)
     if held is not None:
@@ -869,6 +894,10 @@ def contact_set_default(request, pk):
 def domain_toggle_lock(request, pk):
     """Toggle the registrar transfer lock on/off for a domain."""
     domain = get_object_or_404(Domain, pk=pk, user=request.user)
+    from apps.domains.registry_requirements import operation_response
+    unsupported = operation_response(request, domain, "lock")
+    if unsupported is not None:
+        return unsupported
     from apps.domains.registrar_review import review_response
     held = review_response(request, domain)
     if held is not None:
@@ -908,6 +937,10 @@ def domain_get_auth_code(request, pk):
     Rate-limited: one request per domain per hour via Django cache.
     """
     domain = get_object_or_404(Domain, pk=pk, user=request.user)
+    from apps.domains.registry_requirements import operation_response
+    unsupported = operation_response(request, domain, "auth_code")
+    if unsupported is not None:
+        return unsupported
     from apps.domains.registrar_review import review_response
     held = review_response(request, domain)
     if held is not None:
@@ -965,11 +998,18 @@ def domain_update_nameservers(request, pk):
         return redirect("domains:detail", pk=pk)
 
     ns_list = []
+    from apps.domains.registry_requirements import validate_nameservers
+    from django.core.exceptions import ValidationError
     if request.POST.get("action") == "use_whm":
         from apps.provisioning.whm_client import WHMClient, WHMClientError
 
         try:
-            ns_list = [host.strip().lower() for host in WHMClient().get_nameservers() if host]
+            configured_nameservers = WHMClient().get_nameservers()
+            validate_nameservers(domain.name, configured_nameservers)
+            ns_list = [host.strip().lower() for host in configured_nameservers]
+        except ValidationError as exc:
+            messages.error(request, " ".join(exc.messages))
+            return redirect("domains:detail", pk=pk)
         except WHMClientError as exc:
             messages.error(request, f"Could not load WHM nameservers: {exc}")
             return redirect("domains:detail", pk=pk)
@@ -979,8 +1019,10 @@ def domain_update_nameservers(request, pk):
             if val:
                 ns_list.append(val)
 
-    if len(ns_list) < 2:
-        messages.error(request, "At least two nameservers are required.")
+    try:
+        validate_nameservers(domain.name, ns_list)
+    except ValidationError as exc:
+        messages.error(request, " ".join(exc.messages))
         return redirect("domains:detail", pk=pk)
 
     client = ResellerClubClient()

@@ -334,6 +334,8 @@ def manual_domain_register(request):
     from django.core.exceptions import ValidationError
     try:
         contact = _ensure_contact(user, request.POST, tld)
+        from apps.domains.registry_requirements import validate_registration
+        validate_registration(domain_name, contact, years)
     except ValidationError as exc:
         context["contact_errors"] = exc.messages
         return render(request, "admin_tools/manual_domain_register.html", context)

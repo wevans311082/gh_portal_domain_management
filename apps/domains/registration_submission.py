@@ -58,6 +58,10 @@ def _locked_subject(order_id, customer_id, *, allow_existing=False):
     for role in policy.roles:
         setattr(order, role, contacts[getattr(order, role + "_id")])
     validate_order_contacts(order, customer_id, order.tld)
+    from apps.domains.registry_requirements import validate_registration
+    validate_registration(order.domain_name, order.registration_contact, order.registration_years)
+    from apps.domains.publication_consent import publication_snapshot
+    publication = publication_snapshot(order, order.registration_contact)
     if not policy.privacy_supported and order.privacy_enabled:
         order.privacy_enabled = False
         order.save(update_fields=["privacy_enabled", "updated_at"])
@@ -69,6 +73,11 @@ def _locked_subject(order_id, customer_id, *, allow_existing=False):
     subject = {"order": {field: str(getattr(order, field)) if isinstance(getattr(order, field), Decimal) else getattr(order, field) for field in fields},
                "roles": {role: getattr(order, role + "_id") for role in policy.roles},
                "contacts": {str(pk): ContactVerification.digest_for(contact) for pk, contact in contacts.items()}}
+    subject["publication"] = publication
+    from apps.domains.registry_requirements import policy_snapshot
+    subject["registry_policy"] = policy_snapshot(order.domain_name)
+    if order.publication_decision_id:
+        subject["order"]["publication_decision_id"] = order.publication_decision_id
     if order.invoice_id:
         subject["invoice"] = {"pk": invoice.pk, "user_id": invoice.user_id, "total": str(invoice.total),
                               "amount_paid": str(invoice.amount_paid), "currency": invoice.currency}
@@ -114,10 +123,8 @@ def _claim(order_id, customer_id, nameservers, client):
             raise RegistrationReviewRequired("The registrar environment changed. Reconcile the existing contact snapshot before retrying.")
         order, contacts, subject = _locked_subject(order_id, customer_id, allow_existing=bool(order.registrar_order_id))
         subject["nameservers"] = list(nameservers)
-        if not 2 <= len(nameservers) <= 13:
-            raise ValidationError("Supply between two and thirteen nameservers before registration.")
-        if order.tld in {"uk", "co.uk", "org.uk", "me.uk"} and len(nameservers) > 10:
-            raise ValidationError("UK registrations support at most ten nameservers.")
+        from apps.domains.registry_requirements import validate_nameservers
+        validate_nameservers(order.domain_name, nameservers)
         if attempt is None:
             attempt = DomainRegistrationAttempt(order=order)
         attempt.token = uuid.uuid4()
@@ -192,6 +199,7 @@ def submit_registration(order_id, customer_id, nameservers, *, client):
                 reg_contact_id=role_ids["reg"], admin_contact_id=role_ids["admin"], tech_contact_id=role_ids["tech"],
                 billing_contact_id=role_ids["billing"], nameservers=list(nameservers),
                 purchase_privacy=current.privacy_enabled, auto_renew=current.auto_renew,
+                registrant_org_consent=subject["publication"]["consent"],
             )
             if isinstance(response, dict):
                 identifier = _identifier(response.get("entityid") or response.get("orderid") or response.get("order-id"))

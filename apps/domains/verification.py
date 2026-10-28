@@ -16,6 +16,12 @@ def registrar_email_summary(domain):
     """Return safe, domain-scoped display data without calling a provider."""
     result = {"status": "unknown", "label": "Not confirmed", "checked_at": None, "action_due_at": None,
               "can_refresh": False, "can_resend": False, "action_label": "", "needs_review": False}
+    from apps.domains.registrar_policy import tld_for_domain
+    from apps.domains.registry_requirements import UK_EXTENSIONS
+    extension = tld_for_domain(domain.name)
+    if extension in UK_EXTENSIONS or extension == "io":
+        result.update(status="not_applicable", label="ICANN RAA workflow not applicable")
+        return result
     order = DomainOrder.objects.filter(
         domain_id=domain.pk, user_id=domain.user_id, domain_name=domain.name,
     ).first()
@@ -29,7 +35,7 @@ def registrar_email_summary(domain):
     if registrar_review_required(domain):
         result.update(label="Registrar association review required", needs_review=True, review_message="The saved domain association does not match the current registrar account or record. Contact support before requesting another registrar check.")
         return result
-    result["can_refresh"] = bool(_identifier(order.registrar_order_id) and _identifier(order.remote_registrant_id))
+    result["can_refresh"] = bool(extension in {"com", "net", "org"} and _identifier(order.registrar_order_id) and _identifier(order.remote_registrant_id))
     review = order.verification_actions.filter(status="unknown").first()
     result["needs_review"] = bool(review)
     action = review or order.verification_actions.first()

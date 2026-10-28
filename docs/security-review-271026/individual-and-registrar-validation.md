@@ -174,3 +174,21 @@ Historical uncertain registrations now have migration quarantine, strict audited
 
 The final focused historical/verification run passed 131 tests; the whole suite passed 1,504 with the existing excluded nginx assertion, and 14 desktop/mobile review states passed browser checks. See [historical-registration-review.md](historical-registration-review.md) for precise migration boundaries, owner commands and external verification limits. This milestone does not close item 3: equivalent paid-transfer safety, remaining TLD eligibility adapters and contact replacement are still outstanding. Individual registrants continue to require accurate applicable contact data, without a company number or business validation requirement.
 
+
+### Paid transfer safety increment - 28 October 2026
+
+Paid transfers now use durable admission and immutable contact-version checks, refuse replay after uncertainty and preserve acknowledged IDs through local failures. Local handoff cannot reassign a foreign domain and keeps registry completion unconfirmed. Historical requests have migration quarantine and audited owner recovery. Customer and staff views display safe submission state. Registrar transport/debug paths exclude raw secrets and provider diagnostics.
+
+The final combined transfer/transport/authorization run passed 394 tests; the broad suite passed 1,576 with the unchanged excluded nginx assertion. Twenty-four final desktop/mobile states and a real isolated migration check passed. See [paid-transfer-safety.md](paid-transfer-safety.md). Earlier remaining-work references to initial paid-transfer admission are superseded by this increment. Item 3 still requires remaining eligibility adapters, organization consent handling and contact replacement. Complete registry progress/recovery and existing transfer authorization-code storage remain item 7 work.
+
+### Organization publication consent increment - 28 October 2026
+
+Publication is now a separate explicit per-request choice, defaulting to no consent. Individuals cannot opt in as organizations, and staff cannot infer customer authorization. Reviewed generic registration/transfer payloads carry an actual boolean consent attribute. Evidence is bound to active customer authority, the domain and reviewed contact version; checkout and paid workers reject mismatches. Customers can withdraw locally; already-submitted requests produce tracked support work for actual registrar redaction, without claiming provider completion.
+
+Verification: 37 focused publication tests, 1,613 final broad-suite passes with only the unchanged excluded nginx assertion, 16 desktop/mobile states and an isolated migration check proving no historical consent inference. See [organization-publication-consent.md](organization-publication-consent.md). Initial consent capture/default handling is implemented; automated provider redaction, eligibility adapters and contact replacement/IRTP remain incomplete. Item 3 and the complete roadmap remain active.
+
+### UK registry requirement increment - 28 October 2026
+
+The supported UK policies now apply actual holder-name and non-numeric street completeness, .me.uk natural-person requirements, reviewed naming/term rules, distinct nameserver limits and explicit lock/EPP capabilities. These are local requirements, not external identity or registry verification. Country-code pages no longer imply the generic ICANN RAA workflow is required. Individuals remain independent of company-number and Companies House checks. .me.uk renewals needing registrant review are stopped before new invoice/provider work and displayed as needs-review; auto-renew opt-out remains available.
+
+Structural parsing now recognizes .me.uk even outside the advertised catalogue and does not misclassify restricted UK namespaces as open .uk. Ten initial browser states and fourteen final states, 145 final focused tests and 1,667 broad-suite passes verify the increment; the only remaining broad failure is the unchanged excluded nginx assertion. A separate discovered process-test readiness race was fixed by atomic fixture publication without changing production cleanup behaviour. See [uk-registry-requirements.md](uk-registry-requirements.md). Full contact-change/IRTP, provider redaction automation and other registry workflows remain tracked work; item 3 is not marked complete.
