@@ -1,7 +1,9 @@
 from apps.admin_tools.search_keys import SearchKey
 from decimal import Decimal, ROUND_HALF_UP
+import uuid
 
 from django.db import models
+from django.utils import timezone
 from apps.core.models import TimeStampedModel
 from apps.accounts.models import User
 
@@ -58,6 +60,8 @@ class Domain(TimeStampedModel):
 
     class Meta:
         indexes = [
+            models.Index(fields=["user", "-created_at", "-id"], name="workspace_domain_created"),
+            models.Index(fields=["user", "-updated_at", "-id"], name="workspace_domain_updated"),
             models.Index(SearchKey("name"), name="search_domain_name"),
         ]
         ordering = ["name"]
@@ -78,6 +82,39 @@ class Domain(TimeStampedModel):
     @property
     def is_registrant_validated(self) -> bool:
         return self.registrant_validation_status == DomainContact.VALIDATION_VALIDATED
+
+
+class VerificationQueueState(models.Model):
+    """Singleton transaction lock for bounded registrar verification admission."""
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
+    scan_after = models.PositiveBigIntegerField(default=0)
+
+
+class VerificationAction(TimeStampedModel):
+    domain_order = models.ForeignKey("domains.DomainOrder", on_delete=models.CASCADE, related_name="verification_actions")
+    actor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    is_automatic = models.BooleanField(default=False)
+    available_at = models.DateTimeField(default=timezone.now)
+    key = models.UUIDField(unique=True)
+    kind = models.CharField(max_length=10, choices=[("refresh", "Refresh status"), ("resend", "Resend verification email")])
+    status = models.CharField(max_length=12, default="queued", choices=[
+        ("queued", "Queued"), ("running", "Running"), ("succeeded", "Completed"),
+        ("failed", "Failed"), ("unknown", "Needs provider review"), ("cancelled", "Cancelled"),
+    ])
+    subject_digest = models.CharField(max_length=64)
+    remote_contact_id = models.CharField(max_length=19, blank=True)
+    provider_scope = models.CharField(max_length=64, blank=True)
+    registrar_order_id = models.CharField(max_length=255)
+    lease_until = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at", "-pk"]
+        constraints = [models.UniqueConstraint(
+            fields=["domain_order", "kind"], condition=models.Q(status__in=["queued", "running", "unknown"]),
+            name="one_open_verification_action",
+        )]
+        indexes = [models.Index(fields=["status", "created_at"], name="verification_action_queue")]
 
 
 class DomainPricingSettings(TimeStampedModel):
@@ -161,6 +198,11 @@ class DomainContact(TimeStampedModel):
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="domain_contacts")
+    registrant_type = models.CharField(
+        max_length=20, default="unspecified",
+        choices=[("unspecified", "Not confirmed"), ("individual", "Individual"),
+                 ("organisation", "Organisation or sole trader")],
+    )
     label = models.CharField(max_length=100)
     name = models.CharField(max_length=255)
     company = models.CharField(max_length=255, blank=True)
@@ -212,45 +254,158 @@ class DomainContact(TimeStampedModel):
         return "Contact"
 
     def as_resellerclub_payload(self, customer_id: str, tld: str = "") -> dict:
-        """Build contacts/add payload with required LogicBoxes fields.
+        """Build a contact payload without inventing or truncating registrant data.
 
-        ResellerClub frequently returns HTTP 500 when ``type`` is missing or
-        ``company`` is empty — treat those as hard requirements.
+        This validates general API field constraints, not identity, email ownership,
+        or registry eligibility. TLD-specific policy checks remain separate.
         """
-        import re
+        from apps.domains.contact_validation import resellerclub_contact_payload
 
-        name = (self.name or "").strip() or "Registrant"
-        company = (self.company or "").strip() or "N/A"
-        email = (self.email or "").strip()
-        address1 = (self.address_line1 or "").strip() or "Address not provided"
-        city = (self.city or "").strip() or "London"
-        state = (self.state or "").strip() or city
-        zipcode = (self.postcode or "").strip() or "00000"
-        country = (self.country or "GB").strip().upper()[:2]
-        phone_cc = re.sub(r"\D", "", str(self.phone_country_code or "44")) or "44"
-        phone = re.sub(r"\D", "", str(self.phone or ""))
-        # LogicBoxes: phone 4–12 digits; strip leading 0 after UK country code
-        if phone_cc == "44" and phone.startswith("0"):
-            phone = phone[1:]
-        if len(phone) < 4:
-            phone = (phone + "0000")[:4]
-        phone = phone[:12]
+        return resellerclub_contact_payload(self, customer_id, tld)
 
-        return {
-            "customer-id": str(customer_id).strip(),
-            "type": self.contact_type_for_tld(tld),
-            "name": name[:255],
-            "company": company[:255],
-            "email": email,
-            "address-line-1": address1[:64],
-            "address-line-2": (self.address_line2 or "")[:64],
-            "city": city[:64],
-            "state": state[:64],
-            "zipcode": zipcode[:16],
-            "country": country,
-            "phone-cc": phone_cc[:3],
-            "phone": phone,
-        }
+
+
+class ContactVerification(TimeStampedModel):
+    """Evidence for one check against one immutable contact-data snapshot.
+
+    Existing local validation flags intentionally do not populate this table.
+    A changed contact makes prior evidence stale without deleting its history.
+    """
+
+    CHECK_CHOICES = [
+        ("identity", "Local identity review"),
+        ("business", "Business record check"),
+        ("registrar_email", "Registrar email verification"),
+        ("eligibility", "TLD eligibility"),
+    ]
+    STATUS_CHOICES = [
+        ("pending", "Pending"), ("verified", "Verified"),
+        ("rejected", "Rejected"), ("unknown", "Unknown"),
+        ("suspended", "Suspended by registrar"),
+    ]
+    contact = models.ForeignKey(
+        DomainContact, on_delete=models.CASCADE, related_name="verification_evidence"
+    )
+    check_kind = models.CharField(max_length=20, choices=CHECK_CHOICES)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="unknown")
+    subject_digest = models.CharField(max_length=64, editable=False)
+    remote_contact_id = models.CharField(max_length=19, blank=True)
+    provider_scope = models.CharField(max_length=64, blank=True)
+    source = models.CharField(max_length=100)
+    reference = models.CharField(max_length=255, blank=True)
+    tld = models.CharField(max_length=63, blank=True)
+    checked_at = models.DateTimeField()
+    expires_at = models.DateTimeField(null=True, blank=True)
+    provider_started_at = models.DateTimeField(null=True, blank=True)
+    action_due_at = models.DateTimeField(null=True, blank=True)
+    domain_order = models.ForeignKey(
+        "domains.DomainOrder", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="verification_evidence",
+    )
+    domain_name = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        ordering = ["-checked_at", "-pk"]
+        indexes = [models.Index(fields=["contact", "check_kind", "tld", "-checked_at"], name="contact_check_evidence")]
+
+    @staticmethod
+    def digest_for(contact):
+        import hashlib
+        import json
+
+        fields = (
+            "user_id", "registrant_type", "name", "company", "company_number", "email",
+            "phone_country_code", "phone", "address_line1", "address_line2",
+            "city", "state", "postcode", "country", "registrar_contact_id",
+        )
+        serialized = json.dumps(
+            {field: getattr(contact, field) for field in fields},
+            sort_keys=True, ensure_ascii=True, separators=(",", ":"),
+        )
+        return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+    @property
+    def is_current(self):
+        from django.utils import timezone
+
+        if self.pk is None:
+            return False
+        # Re-read persisted data: a cached related object cannot establish freshness.
+        current = DomainContact.objects.filter(pk=self.contact_id).first()
+        if current is None:
+            return False
+        now = timezone.now()
+        if self.source == "resellerclub" and self.check_kind == "registrar_email":
+            if not self.domain_order_id:
+                return False
+            linked_order = DomainOrder.objects.filter(
+                pk=self.domain_order_id, registrar_order_id=self.reference,
+                registration_contact_id=self.contact_id, user_id=current.user_id,
+                domain_name=self.domain_name, tld=self.tld,
+            ).first()
+            if linked_order is None:
+                return False
+            if self.remote_contact_id and linked_order.remote_registrant_id != self.remote_contact_id:
+                return False
+            if self.provider_scope != linked_order.registrar_contact_ids.get("_scope", ""):
+                return False
+        return (
+            self.subject_digest == self.digest_for(current)
+            and self.checked_at <= now
+            and (self.expires_at is None or self.expires_at > now)
+            and type(self).objects.filter(
+                contact_id=self.contact_id, check_kind=self.check_kind,
+                tld=self.tld, reference=self.reference,
+            ).values_list("pk", flat=True).first() == self.pk
+        )
+
+    @property
+    def is_verified(self):
+        return self.status == "verified" and self.is_current
+
+
+class RegistrarContactBinding(TimeStampedModel):
+    """Immutable provider contact creation reservation; never store raw contact data."""
+
+    contact = models.ForeignKey(DomainContact, on_delete=models.PROTECT, related_name="registrar_bindings")
+    customer_id = models.CharField(max_length=19)
+    provider_scope = models.CharField(max_length=64)
+    contact_type = models.CharField(max_length=32)
+    payload_digest = models.CharField(max_length=64)
+    remote_id = models.CharField(max_length=19, blank=True)
+    status = models.CharField(max_length=16, default="creating", choices=[
+        ("creating", "Creating"), ("ready", "Ready"), ("unknown", "Requires reconciliation"),
+    ])
+
+    class Meta:
+        constraints = [models.UniqueConstraint(
+            fields=["contact", "provider_scope", "customer_id", "contact_type", "payload_digest"],
+            name="unique_registrar_contact_payload",
+        )]
+
+
+class DomainRegistrationAttempt(TimeStampedModel):
+    """Durable paid-call admission. An uncertain request is never replayed."""
+
+    order = models.OneToOneField("DomainOrder", on_delete=models.PROTECT, related_name="registration_attempt")
+    token = models.UUIDField(default=uuid.uuid4, editable=False)
+    status = models.CharField(max_length=16, default="preparing", choices=[
+        ("preparing", "Preparing contacts"), ("submitting", "Submission started"),
+        ("accepted", "Registrar order acknowledged"), ("unknown", "Requires registrar review"),
+        ("aborted", "Stopped before paid submission"),
+    ])
+    provider_scope = models.CharField(max_length=64)
+    customer_id = models.CharField(max_length=19)
+    subject = models.JSONField(default=dict)
+    role_ids = models.JSONField(default=dict)
+    remote_order_id = models.CharField(max_length=19, blank=True)
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    legacy_review_required = models.BooleanField(default=False)
+    registry_status = models.CharField(max_length=16, blank=True)
+    registry_checked_at = models.DateTimeField(null=True, blank=True)
+    registry_registered_at = models.DateField(null=True, blank=True)
+    registry_expires_at = models.DateField(null=True, blank=True)
 
 
 class DomainOrder(TimeStampedModel):
@@ -301,6 +456,7 @@ class DomainOrder(TimeStampedModel):
     tech_contact = models.ForeignKey(DomainContact, on_delete=models.PROTECT, related_name="tech_orders")
     billing_contact = models.ForeignKey(DomainContact, on_delete=models.PROTECT, related_name="billing_orders")
     registrar_order_id = models.CharField(max_length=255, blank=True)
+    registrar_contact_ids = models.JSONField(default=dict, blank=True)
     last_error = models.TextField(blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
 
@@ -308,6 +464,14 @@ class DomainOrder(TimeStampedModel):
         ordering = ["-created_at"]
         verbose_name = "Domain order"
         verbose_name_plural = "Domain orders"
+        indexes = [models.Index(fields=["status", "tld", "id"], name="verification_scan_order")]
+
+    @property
+    def remote_registrant_id(self):
+        # Never fall back when a new order has a snapshot but its registrant is absent.
+        if self.registrar_contact_ids:
+            return self.registrar_contact_ids.get("reg", "")
+        return self.registration_contact.registrar_contact_id
 
     def __str__(self):
         return f"{self.domain_name} ({self.status})"
@@ -358,6 +522,26 @@ class DomainRenewal(TimeStampedModel):
         return f"Renewal: {self.domain.name} ({self.status})"
 
 
+class DomainTransferAttempt(TimeStampedModel):
+    """Retained paid transfer admission and worker fence; never stores auth codes."""
+
+    transfer = models.OneToOneField("DomainTransfer", on_delete=models.PROTECT, related_name="submission_attempt")
+    token = models.UUIDField(default=uuid.uuid4, editable=False)
+    status = models.CharField(max_length=16, default="preparing", choices=[
+        ("preparing", "Preparing contacts"), ("submitting", "Submission started"),
+        ("accepted", "Transfer order acknowledged"), ("unknown", "Requires registrar review"),
+        ("aborted", "Stopped before paid submission"),
+    ])
+    provider_scope = models.CharField(max_length=64, blank=True)
+    customer_id = models.CharField(max_length=19, blank=True)
+    subject = models.JSONField(default=dict)
+    role_ids = models.JSONField(default=dict)
+    remote_order_id = models.CharField(max_length=19, blank=True)
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    legacy_review_required = models.BooleanField(default=False)
+
+
 class DomainTransfer(TimeStampedModel):
     STATUS_PENDING_PAYMENT = "pending_payment"
     STATUS_PAID = "paid"
@@ -397,6 +581,7 @@ class DomainTransfer(TimeStampedModel):
     tech_contact = models.ForeignKey(DomainContact, on_delete=models.PROTECT, related_name="tech_transfers")
     billing_contact = models.ForeignKey(DomainContact, on_delete=models.PROTECT, related_name="billing_transfers")
     registrar_order_id = models.CharField(max_length=255, blank=True)
+    registrar_contact_ids = models.JSONField(default=dict, blank=True)
     last_error = models.TextField(blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
 

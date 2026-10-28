@@ -6,6 +6,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.views.decorators.http import require_POST
 
 from apps.domains.models import Domain
+from apps.domains.registrar_review import review_response, assert_registrar_review_complete
 from .forms import DNSRecordForm
 from .models import DNSZone, DNSRecord
 from .sync import ensure_zone, import_records, push_record
@@ -17,6 +18,7 @@ def _sync_record_to_cloudflare(zone, record, action="create"):
     """Push a single record to Cloudflare. Silently logs on failure."""
     if zone.provider != "cloudflare":
         return
+    assert_registrar_review_complete(zone.domain)
 
     try:
         from apps.cloudflare_integration.services import CloudflareService
@@ -56,6 +58,9 @@ def _sync_record_to_cloudflare(zone, record, action="create"):
 @login_required
 def zone_detail(request, domain_pk):
     domain = get_object_or_404(Domain, pk=domain_pk, user=request.user)
+    held = review_response(request, domain)
+    if held is not None:
+        return held
     if request.method == "POST" and request.POST.get("action") == "ensure_zone":
         zone = ensure_zone(domain)
         imported = import_records(zone)
@@ -78,6 +83,9 @@ def zone_detail(request, domain_pk):
 @login_required
 def record_add(request, domain_pk):
     domain = get_object_or_404(Domain, pk=domain_pk, user=request.user)
+    held = review_response(request, domain)
+    if held is not None:
+        return held
     zone = ensure_zone(domain)
 
     if request.method == "POST":
@@ -107,6 +115,9 @@ def record_add(request, domain_pk):
 @login_required
 def record_edit(request, domain_pk, record_pk):
     domain = get_object_or_404(Domain, pk=domain_pk, user=request.user)
+    held = review_response(request, domain)
+    if held is not None:
+        return held
     zone = get_object_or_404(DNSZone, domain=domain)
     record = get_object_or_404(DNSRecord, pk=record_pk, zone=zone)
 
@@ -137,6 +148,9 @@ def record_edit(request, domain_pk, record_pk):
 @require_POST
 def record_delete(request, domain_pk, record_pk):
     domain = get_object_or_404(Domain, pk=domain_pk, user=request.user)
+    held = review_response(request, domain)
+    if held is not None:
+        return held
     zone = get_object_or_404(DNSZone, domain=domain)
     record = get_object_or_404(DNSRecord, pk=record_pk, zone=zone)
 

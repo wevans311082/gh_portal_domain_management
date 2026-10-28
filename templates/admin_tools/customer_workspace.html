@@ -1,0 +1,90 @@
+{% extends "base_admin.html" %}
+{% block title %}Customer workspace - {{ customer.email }}{% endblock %}
+{% block page_title %}Customer workspace{% endblock %}
+{% block content %}
+<div class="admin-customer-workspace">
+{% include "admin_tools/components/page_header.html" with heading="Customer workspace" description=customer.email %}
+<nav class="admin-workspace-nav" aria-label="Customer workspace sections">
+  <a href="#account-health">Account health</a>
+  {% for panel in panels %}<a href="#panel-{{ panel.key }}">{{ panel.label }}s</a>{% endfor %}
+  {% if contact_checks is not None %}<a href="#contact-checks">Validation</a>{% endif %}
+  <a href="#activity">Activity</a><a href="#internal-notes">Internal notes</a>
+</nav>
+<section class="admin-card admin-record-details" id="account-health" aria-labelledby="account-health-heading">
+  <h2 id="account-health-heading">Account health</h2>
+  <dl>
+    <div><dt>Name</dt><dd>{{ customer.full_name }}</dd></div>
+    <div><dt>Customer type</dt><dd>{{ customer_kind }}</dd></div>
+    {% if business_profile %}<div><dt>Business name</dt><dd>{{ business_profile.company_name }}</dd></div><div><dt>Company number</dt><dd>{{ business_profile.company_number|default:"Not supplied" }}</dd></div>{% endif %}
+    <div><dt>Account access</dt><dd>{% if customer.is_active %}Active{% else %}Inactive{% endif %}</dd></div>
+    <div><dt>Portal email</dt><dd>{% if portal_email_verified %}Verified{% else %}Not confirmed{% endif %}</dd></div>
+    <div><dt>Joined</dt><dd>{{ customer.created_at|date:"d M Y H:i T" }}</dd></div>
+    {% if show_security %}<div><dt>Multi-factor authentication</dt><dd>{% if customer.mfa_enabled %}Enabled{% else %}Not enabled{% endif %}</dd></div>{% endif %}
+    {% if open_tickets is not None %}<div><dt>Open support tickets</dt><dd>{{ open_tickets }}</dd></div>{% endif %}
+  </dl>
+  {% if can_manage_customer %}<a class="admin-button admin-button-secondary" href="{% url 'admin_tools:user_edit' customer.pk %}">Manage customer account</a>{% endif %}
+</section>
+{% if balances is not None %}
+<section class="admin-card admin-record-details" aria-labelledby="customer-balance-heading">
+  <h2 id="customer-balance-heading">Outstanding balances</h2>
+  <p>Unpaid, overdue and partially paid invoices, after recorded payments. Draft, paid and void invoices are excluded. Currencies are shown separately.</p>
+  <dl>{% for balance in balances %}<div><dt>{{ balance.currency }}</dt><dd>{{ balance.outstanding|floatformat:2 }}</dd></div>{% empty %}<div><dt>Balance</dt><dd>No outstanding invoices</dd></div>{% endfor %}</dl>
+  {% if balances_truncated %}<p>Showing the first 20 currencies. Review individual invoices for other currencies.</p>{% endif %}
+</section>
+{% endif %}
+<div class="admin-workspace-grid">
+{% for panel in panels %}
+<section class="admin-card" id="panel-{{ panel.key }}" aria-labelledby="panel-{{ panel.key }}-heading">
+  <h2 id="panel-{{ panel.key }}-heading">{{ panel.label }}s <span class="admin-workspace-count">{{ panel.count }}</span></h2>
+  <ul class="admin-workspace-list">
+  {% for item in panel.items %}<li>
+    <a href="{{ item.url }}">{{ item.title }}</a><p>{{ item.status }}</p>
+    {% if item.description %}<p>{{ item.description }}</p>{% endif %}
+    {% if item.verification %}<dl class="admin-workspace-verification"><div><dt>Registrar email</dt><dd>{{ item.verification.label }}</dd></div>
+      {% if item.verification.checked_at %}<div><dt>Last checked</dt><dd>{{ item.verification.checked_at|date:"d M Y H:i T" }}</dd></div>{% endif %}
+      {% if item.verification.action_due_at %}<div><dt>Action due</dt><dd>{{ item.verification.action_due_at|date:"d M Y H:i T" }}</dd></div>{% endif %}
+      <div><dt>TLD eligibility</dt><dd>No independent eligibility result recorded</dd></div></dl>{% endif %}
+  </li>{% empty %}<li>No {{ panel.label|lower }} records for this customer.</li>{% endfor %}
+  </ul>
+  {% if panel.page %}<nav class="admin-pagination" aria-label="{{ panel.label }} pages"><p>Page {{ panel.page.number }} of {{ panel.page.paginator.num_pages }}</p><div>
+    {% if panel.page.has_previous %}<a href="?section={{ panel.key }}&amp;page={{ panel.page.previous_page_number }}#panel-{{ panel.key }}">Previous {{ panel.label|lower }} page</a>{% endif %}
+    {% if panel.page.has_next %}<a href="?section={{ panel.key }}&amp;page={{ panel.page.next_page_number }}#panel-{{ panel.key }}">Next {{ panel.label|lower }} page</a>{% endif %}
+  </div></nav>{% elif panel.count > 5 %}<a href="?section={{ panel.key }}#panel-{{ panel.key }}">View all {{ panel.label|lower }} records</a>{% endif %}
+</section>
+{% endfor %}
+</div>
+{% if contact_checks is not None %}
+<section class="admin-card" id="contact-checks" aria-labelledby="contact-checks-heading">
+  <h2 id="contact-checks-heading">Contact validation</h2>
+  <p>Individuals do not need company registration. Contact completeness, business checks, portal email, registrar email and TLD eligibility are separate checks. Saving details does not verify identity.</p>
+  <ul class="admin-workspace-list">{% for contact in contact_checks %}<li><h3>{{ contact.label }}</h3><dl class="admin-workspace-verification">
+    <div><dt>Registrant type</dt><dd>{{ contact.kind }}</dd></div><div><dt>Local contact data</dt><dd>{{ contact.data }}</dd></div><div><dt>Business check</dt><dd>{{ contact.business }}</dd></div>
+  </dl></li>{% empty %}<li>No saved domain contacts. Registrant type and contact details still need confirmation before ordering.</li>{% endfor %}</ul>
+  {% if contacts_truncated %}<p>Showing five recently updated contacts. This is not a compliance summary for every contact or domain.</p>{% endif %}
+</section>
+{% endif %}
+<section class="admin-card" id="activity" aria-labelledby="activity-heading">
+  <h2 id="activity-heading">Activity timeline</h2>
+  <p>Record creation and most recent updates, newest first. Intermediate changes and private event payloads are not copied here. Only records your role can view are included.</p>
+  {% if activity_error %}<p role="alert">{{ activity_error }}</p>{% endif %}
+  <ol class="admin-workspace-list">{% for event in activity %}<li><time datetime="{{ event.at|date:'c' }}">{{ event.at|date:"d M Y H:i T" }}</time><p>{{ event.action }}: <a href="{{ event.url }}">{{ event.title }}</a></p></li>{% empty %}<li>No activity on this page.</li>{% endfor %}</ol>
+  <nav class="admin-workspace-nav" aria-label="Activity pages"><a href="?{% if section %}section={{ section }}&amp;{% endif %}#activity">Latest activity</a>{% if next_cursor %}<a href="?cursor={{ next_cursor|urlencode }}{% if section %}&amp;section={{ section }}{% endif %}#activity" rel="next">Older activity</a>{% endif %}</nav>
+</section>
+<section class="admin-card" id="internal-notes" aria-labelledby="internal-notes-heading">
+  <h2 id="internal-notes-heading">Internal notes</h2>
+  <p>Visible only to staff with customer access and the selected billing or security permission where applicable. Notes are never shown in customer pages or customer notifications. Owner redaction permanently removes the note text from the application record.</p>
+  {% for note in notes %}{% include "admin_tools/partials/customer_note.html" %}{% empty %}<p>No internal notes yet.</p>{% endfor %}
+  {% if notes.has_other_pages %}<nav class="admin-workspace-nav" aria-label="Internal note pages"><p>Page {{ notes.number }} of {{ notes.paginator.num_pages }}</p>
+    {% if notes.has_previous %}<a href="?notes_page={{ notes.previous_page_number }}#internal-notes">Newer notes</a>{% endif %}
+    {% if notes.has_next %}<a href="?notes_page={{ notes.next_page_number }}#internal-notes">Older notes</a>{% endif %}
+  </nav>{% endif %}
+  {% if can_add_note %}<form method="post" action="{% url 'admin_tools:customer_note_add' customer.pk %}" class="admin-note-form" data-admin-submit="note-saving-status">
+    {% csrf_token %}{% include "admin_tools/components/error_summary.html" with form=note_form %}
+    {{ note_form.submission_key }}{% include "admin_tools/components/field.html" with field=note_form.audience %}
+    {% include "admin_tools/components/field.html" with field=note_form.body %}
+    <button class="admin-button admin-button-primary" type="submit">Add internal note</button>
+    <p id="note-saving-status" role="status" hidden>Saving internal note…</p>
+  </form>{% endif %}
+</section>
+</div>
+{% endblock %}

@@ -14,10 +14,17 @@
         <form method="post" class="mt-6 space-y-5">
             {% csrf_token %}
             {{ form.domain_name }}
+            {% if form.policy_review_message %}<p role="status" class="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">{{ form.policy_review_message }}</p>{% endif %}
+            {% if form.errors %}
+            <div role="alert" class="rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-800">
+                <p class="font-semibold">Please review the registration details.</p>
+                <ul class="list-disc pl-5">{% for field in form %}{% for error in field.errors %}<li>{{ error }}</li>{% endfor %}{% endfor %}{% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}</ul>
+            </div>
+            {% endif %}
             <div>
                 <label class="mb-2 block text-sm font-semibold text-slate-700" for="{{ form.contact.id_for_label }}">Registrant contact</label>
                 {{ form.contact }}
-                <p class="mt-2 text-xs text-slate-500">Only contacts with validated registrant details can be used for registration. <a href="{% url 'domains:contact_list' %}" class="text-sky-700 hover:underline">Manage contacts</a>.</p>
+                <p class="mt-2 text-sm text-slate-700">Confirm the registrant type and accurate contact details before ordering. Registrar email verification and any registry checks remain separate. <a href="{% url 'domains:contact_list' %}" class="text-sky-700 hover:underline">Manage contacts</a>.</p>
                 {% if form.contact.errors %}<p class="mt-2 text-sm text-rose-600">{{ form.contact.errors|join:", " }}</p>{% endif %}
             </div>
             <div class="grid gap-5 md:grid-cols-2">
@@ -35,12 +42,13 @@
                     {{ form.privacy_enabled }}
                     <span>Purchase privacy where supported</span>
                 </label>
+                {% if form.privacy_enabled.help_text %}<p class="text-sm text-slate-700">{{ form.privacy_enabled.help_text }}</p>{% endif %}
                 <label class="flex items-center gap-3 text-sm text-slate-700">
                     {{ form.auto_renew }}
                     <span>Enable auto-renewal after registration</span>
                 </label>
             </div>
-            <button type="submit" class="rounded-full bg-sky-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-700">
+            <button type="submit" {% if form.policy_review_message %}disabled{% endif %} class="rounded-full bg-sky-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-800 disabled:opacity-60">
                 Create order and continue to payment
             </button>
         </form>

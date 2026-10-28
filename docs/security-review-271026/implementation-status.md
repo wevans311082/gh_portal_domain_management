@@ -21,8 +21,8 @@ This document tracks the full scope of [application-roadmap.md](application-road
 | Item | Status | Evidence |
 |---|---|---|
 | 1 - Admin components and accessibility | Verified | Reusable page/action/card/table/form/status/loading/pagination components adopted in representative workflows; modal drawer focus and mobile scroll handling verified. Seven component tests, 1,071 whole-suite passes and 64 browser states. See admin-components.md and completion audit below. |
-| 2 — Permission-aware global search | Pending | |
-| 3 — Customer 360 workspace | Pending | |
+| 2 - Permission-aware global search | Verified | Six permission-filtered groups, bounded indexed prefix matching, private suggestions, read-only record links and role-aware manage actions. 33 search tests, 315 route-policy tests, 1,110 full-suite passes and 80 browser states; additional long-title detail checks pass. See global-search.md. |
+| 3 - Customer 360 workspace | In progress | Workspace panels, permission-filtered activity, classified internal notes and their acceptance checks are implemented; see customer-workspace.md. Remaining registrar/TLD workflows are tracked in individual-and-registrar-validation.md. |
 | 4 — Saved list views | Pending | |
 | 5 — Bulk domain operations | Pending | |
 | 6 — Renewal and payment-readiness centre | Pending | |
@@ -282,3 +282,59 @@ The drawer now manages modal focus and inert background content, wraps Tab/Shift
 Final verification: **1,071 application tests passed**; one unchanged failure is the excluded nginx default-port assertion (80 expected; existing 780 configured). **64 desktop/mobile browser states passed**, plus drawer/keyboard/resizing and pending-action interaction checks. Seven focused component tests pass. Django system checks and whitespace checks pass; the existing database-access-during-initialization warning remains. Representative customer, loading, invalid-form and drawer screenshots were inspected, and the final pending status is visible above the banner. Fixture scripts use isolated SQLite/local mail and intercept pending WHM POSTs; no live provider, customer database or deployment was changed. The browser fixtures do not replay production CSP headers or substitute for an assistive-technology audit.
 
 Item 1 meets the roadmap's representative-page acceptance criteria. Future bespoke workflows still need their own state checks and should adopt the shared components. Items 2-20 remain pending, with permission-aware global search next. The full goal remains active.
+
+
+## Product item 2 completion audit: permission-aware global search
+
+Search is available from the admin header/navigation for actors with at least one relevant read capability. It covers customer email/name, domains and hosting domains, invoice/quote identifiers and lead details, and numeric ticket references. The UI explicitly explains prefix matching. Database expression indexes back normalized lookups, with Unicode-aware SQLite connection functions and matching PostgreSQL SQL expressions. Source saves/updates/deletes are reflected without a separate stale projection.
+
+All result, capped-count and suggestion queries check the actor's group capability. Related customer-name/email lookup additionally requires customer permission, preventing customer-name probing through another group's counts. Direct result links recheck permissions and expose allowlisted fields in a read-only view; manage links retain their separate route permissions/MFA controls. Staff/owner accounts are not customer search records. No credential/internal-note fields are serialized. Results cap at 500 per group, previews at five, pages at 20 and suggestions at two per group. Search/suggestion aliases share early body/query/rate bounds and fail closed if counters are unavailable. Responses prohibit caching.
+
+Acceptance evidence: **33 search tests pass**, including exact/prefix/Unicode matching, numeric bounds, literal wildcard handling, stable capped pagination, role/field filtering, next-request revocation, safe details/manage links, source updates/deletes and rate/cache failure. SQLite EXPLAIN proves use of actual indexes, and PostgreSQL SQL compilation is tested without contacting a server. **315 authorization tests pass** with the new route inventory. The full regression has **1,110 passing tests**, with the same excluded nginx port-80/780 failure. **80 desktop/mobile browser states pass**, with additional focused checks of long record identifiers and the final detail heading. Suggestion loading/success/failure preserves input/focus; grouped/empty/error/paginated and limited-role states pass contrast/name/overflow checks. Representative mobile search/detail screenshots were inspected.
+
+Django checks and whitespace checks pass. Accounts/billing/services migration drift checks pass; the pre-existing DomainOrder status-choice drift remains unchanged. Only isolated test databases were migrated. PostgreSQL runtime/index plans, live Redis and deployment-scale index creation are not claimed verified. No provider/server/deployment action was performed. This meets item 2's application acceptance criteria; see global-search.md for matching semantics and operational limits. Items 3-20 remain in scope, starting with the customer workspace.
+
+
+### Item 3 prerequisite: immutable registrar contacts
+
+Registration and transfer now use durable, immutable contact bindings scoped to provider environment/reseller, customer and contact type. Deprecated contact modification is disabled. Orders snapshot the exact submitted role IDs; registrar verification evidence and queued actions are bound to the order-specific contact and provider scope. Uncertain creation blocks duplicate retries and has an audited, owner-attributed reconciliation command. Legacy IDs are preserved for historical orders. See individual-and-registrar-validation.md for operational constraints and the primary provider notice.
+
+This remains a prerequisite milestone, not completion of item 3: the unified staff workspace, permission-filtered timeline and internal notes are still outstanding. No later roadmap item is marked complete by these changes.
+
+
+Verification for this milestone: the full regression passed **1,355 tests**, with only the unchanged nginx port-80/780 baseline failure. After the final customer-ID length bound, **115 focused contact-binding/accuracy/verification/action tests passed**. Django system checks report no issues and `git diff --check` passes. The domains migration dry run reports only the pre-existing status-choice drift; feature fields are covered by migration 0014. No new UI was introduced in this binding milestone, and no production migration or provider request was run.
+
+
+### Item 3 workspace UI, activity and internal notes
+
+The customer workspace now combines account health, owned domain/service records, per-currency balances, invoices/quotes, open tickets and independently labelled validation states. Every panel and activity source checks its own capability. Staff/owner accounts cannot be customer targets. Source links retain their existing authorization. General, billing and security notes have distinct read/write boundaries, including counts, pagination, direct links and timeline references. Notes use CSRF, bounded requests, UUID replay protection, shared limits, transactional metadata-only audit and recent-MFA owner redaction. No provider or customer notification is invoked when viewing or writing this workspace.
+
+The focused workspace/search/authorization run passed **383 tests**. The full regression passed **1,391 tests**, with only the unchanged excluded nginx port mismatch. Desktop/mobile browser verification passed **14 workspace states** after the visibility categories and style corrections, including error-to-field focus, saving/double-submit behaviour, limited roles, redaction, long text, overflow and submit-button cookie clearance. Representative note/validation screenshots were inspected. Actual SQLite source queries use the new customer/timestamp indexes. Subsequent small refinements recheck current owner MFA inside the transaction, fail closed on shared-limit loss and accommodate 4,000-character Unicode notes in encoded requests; final focused results are recorded below.
+
+See customer-workspace.md for the permission matrix, pagination semantics, note integrity and implementation limits. Product item 3 remains in progress while the broader registrar/eligibility workflows remain incomplete. Live PostgreSQL runtime plans and production migration/provider verification are not claimed. Existing WizardProgress metadata, DomainOrder status choices and support attachment migration drift remain outside these feature migrations.
+
+Final workspace-focused verification after the owner-MFA and encoded Unicode request refinements: **29 tests passed**. Django checks report no issues and whitespace checks pass. No production database, provider account or deployment configuration was changed.
+
+
+### Item 3 prerequisite: assigned contact codes and mobile entry
+
+Shared serialization now enforces assigned ISO countries/territories and international calling codes using pinned offline datasets. Customer and staff country selectors preserve validation state; invalid codes cannot reach Companies House or registrar contact creation. Mobile fields stack, meaningful help is rendered, and error-summary keyboard focus is verified. Assignment is not described as identity, reachability or eligibility verification.
+
+Evidence: **101 focused tests**, **1,418 broad-suite passes** before the final UI refinements (same nginx baseline failure), and **8 final desktop/mobile form states**. Django/pip/whitespace checks pass. Complete production/development dependency audits cover 59/90 packages and retain only the known unpatched pdfkit exception, with no skipped packages. See individual-and-registrar-validation.md and the new contact-validation dependency reports. The complete item 3 requirements remain in progress.
+
+
+### Item 3 prerequisite: durable paid registration admission
+
+New registration attempts now reserve preparation, compare all current contact versions/bindings before payment submission, retain an irreversible paid-call marker, and block automatic replay after uncertain outcomes. Acknowledged registrar IDs survive later DNS failure; local completion cannot overwrite another customer's domain. Normal staff edits/actions cannot reset an in-progress or uncertain attempt. Audited owner commands release only stale preparation with a new worker fence, or strictly match a provider order before linking an uncertain purchase. The order interface shows five clear states and a local-only resume action.
+
+Verification: **96 focused domain/order tests**, an earlier **417-test combined authorization run**, **1,447 whole-suite passes** with the unchanged nginx baseline failure, and **10 final desktop/mobile browser states**. The final local-error guidance change passed **56 relevant tests**. Django/whitespace checks pass; feature migration 0016 does not absorb old status-choice drift. No production migration, provider purchase or live PostgreSQL process-loss test was run.
+
+This is an increment, not closure of item 3's paid-submission requirements. Historical uncertain orders are now covered by the increment below; paid transfers still need equivalent handling. Existing external DNS/provisioning retries and activation status are not certified by this registration guard. See paid-registration-safety.md for the precise transaction boundaries, recovery commands and remaining work.
+
+### Item 3 prerequisite: historical registration review and provider holds
+
+Migration 0017 quarantines uncertain historical orders and early unverified legacy-ID bootstraps, preserving consistently completed assets and modern attempts. Pasted IDs no longer bootstrap accepted registrations. Audited owner recovery either strictly adopts a provider-confirmed order or records explicit no-order investigation for an unlinked blank/invalid-ID request. Adoption retains actual status, dates, nameservers, role IDs and provider customer/scope; local resume rereads these facts and does not provision pending/suspended domains.
+
+Historical or inconsistent linked associations pause registrar/DNS operations, EPP disclosure, verification work and renewal. Checkout also rejects a recorded provider-account change after cart admission. Customer screens mask cached EPP/old diagnostics, explain the hold and suppress paused action links; local auto-renew opt-out remains possible.
+
+Evidence: **1,504 whole-suite passes**, with only the unchanged excluded nginx assertion; **131 final focused passes** after wording/action refinements; **14 desktop/mobile browser states**; real isolated `0016 -> 0017` migration verification; Django, dependency consistency and whitespace checks. No production migration or provider mutation was performed. See [historical registration review](historical-registration-review.md) for recovery commands, migration rules and external verification limits. Item 3 remains in progress: paid transfers, remaining registry adapters/eligibility and contact replacement still require implementation and checks.

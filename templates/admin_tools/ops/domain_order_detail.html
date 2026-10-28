@@ -3,18 +3,38 @@
 {% block page_title %}Domain order #{{ order.pk }}{% endblock %}
 
 {% block content %}
+{% include "admin_tools/components/page_header.html" with heading="Domain registration order" description=order.domain_name %}
+{% if registration_attempt %}
+<section class="admin-card admin-card-body mb-4" aria-labelledby="registration-attempt-heading">
+  <h2 id="registration-attempt-heading" class="text-lg font-semibold text-slate-900">Registrar submission</h2>
+  <p class="text-sm text-slate-700">{{ registration_attempt.get_status_display }} · Attempt #{{ registration_attempt.pk }}</p>
+  <p class="mt-1 text-sm text-slate-700">State updated <time datetime="{{ registration_attempt.updated_at|date:'c' }}">{{ registration_attempt.updated_at|date:"d M Y H:i T" }}</time></p>
+  {% if registration_attempt.legacy_review_required %}<p class="mt-2 text-sm text-slate-700">Historical submission not confirmed. Older records do not prove whether registration reached the provider. An owner must review provider history before linking an existing order or authorising a fresh submission.</p>
+  {% elif registration_attempt.status == 'unknown' or registration_attempt.status == 'submitting' %}<p class="mt-2 text-sm text-slate-700">The registrar may have received this paid request. Do not submit another registration. An owner must reconcile the provider order before processing can continue.</p>
+  {% elif registration_attempt.status == 'preparing' %}<p class="mt-2 text-sm text-slate-700">A worker is preparing the contacts. A second worker cannot submit this order. If the worker stopped, an owner must review and release preparation.</p>
+  {% elif registration_attempt.status == 'accepted' %}<p class="mt-2 text-sm text-slate-700">The registrar order identifier is retained. Processing resumes local completion without repeating the registration purchase. This acknowledgement does not verify registrant identity or email.</p>
+  {% else %}<p class="mt-2 text-sm text-slate-700">This attempt stopped before paid submission. Correct the details before retrying. An uncertain contact creation still needs its own reconciliation.</p>{% endif %}
+  {% if registration_attempt.registry_status %}<dl class="mt-3 text-sm text-slate-700 grid grid-cols-1 sm:grid-cols-2 gap-2">
+    <div><dt class="font-semibold">Last provider snapshot</dt><dd>{{ registration_attempt.registry_status|capfirst }}</dd></div>
+    <div><dt class="font-semibold">Provider checked</dt><dd>{{ registration_attempt.registry_checked_at|date:"d M Y H:i T"|default:"Not recorded" }}</dd></div>
+    <div><dt class="font-semibold">Registry registration date</dt><dd>{{ registration_attempt.registry_registered_at|date:"d M Y"|default:"Not reported" }}</dd></div>
+    <div><dt class="font-semibold">Registry expiry date</dt><dd>{{ registration_attempt.registry_expires_at|date:"d M Y"|default:"Not reported" }}</dd></div>
+  </dl>{% endif %}
+</section>
+{% endif %}
 <div class="mb-4 flex flex-wrap gap-2 items-center">
   <a href="{% url 'admin_tools:domain_orders_list' %}" class="text-sm text-sky-700 hover:underline">← All domain orders</a>
   <span class="text-slate-300">|</span>
-  <span class="text-sm text-slate-600">Platform record only — may not exist in ResellerClub yet.</span>
+  <span class="text-sm text-slate-600">{% if registration_attempt.status == 'accepted' %}Registrar order retained; local completion is tracked separately.{% else %}Platform record. Check the submission state before processing.{% endif %}</span>
 </div>
 
 {% if ADMIN_ACCESS.domain_order_action %}<div class="flex flex-wrap gap-2 mb-6">
-  {% if order.status != 'completed' and order.status != 'cancelled' and order.status != 'paused' %}
+  {% if not registration_attempt or registration_attempt.status == 'accepted' or registration_attempt.status == 'aborted' %}{% if order.status != 'completed' and order.status != 'cancelled' and order.status != 'paused' %}
   <form method="post" action="{% url 'admin_tools:domain_order_action' order.pk 'process' %}">{% csrf_token %}
-    <button class="px-3 py-1.5 rounded bg-emerald-700 text-white text-xs font-semibold" type="submit">Process / register</button>
+    <button class="px-3 py-1.5 rounded bg-emerald-700 text-white text-xs font-semibold" type="submit">{% if registration_attempt.status == 'accepted' %}Resume local completion{% else %}Process / register{% endif %}</button>
   </form>
   {% endif %}
+  {% if not registration_attempt or registration_attempt.status == 'aborted' %}
   {% if order.status == 'failed' and ADMIN_ACCESS.invoice_create %}
   <form method="post" action="{% url 'admin_tools:domain_order_action' order.pk 'retry_failed' %}">{% csrf_token %}
     <button class="px-3 py-1.5 rounded bg-emerald-700 text-white text-xs font-semibold" type="submit">Retry failed</button>
@@ -27,7 +47,7 @@
   {% endif %}{% endif %}
   {% if order.status != 'paused' and order.status != 'completed' and order.status != 'cancelled' %}
   <form method="post" action="{% url 'admin_tools:domain_order_action' order.pk 'pause' %}" class="inline-flex gap-1">{% csrf_token %}
-    <input type="text" name="reason" placeholder="Pause reason" class="border rounded px-2 py-1 text-xs w-40">
+    <input type="text" name="reason" aria-label="Pause reason" placeholder="Pause reason" class="border rounded px-2 py-1 text-xs w-40">
     <button class="px-3 py-1.5 rounded bg-violet-600 text-white text-xs font-semibold" type="submit">Pause</button>
   </form>
   {% endif %}
@@ -38,14 +58,16 @@
   {% endif %}
   {% if order.status != 'completed' and order.status != 'cancelled' %}
   <form method="post" action="{% url 'admin_tools:domain_order_action' order.pk 'cancel' %}" class="inline-flex gap-1" onsubmit="return confirm('Cancel this order?');">{% csrf_token %}
-    <input type="text" name="reason" placeholder="Cancel reason" class="border rounded px-2 py-1 text-xs w-40">
+    <input type="text" name="reason" aria-label="Cancellation reason" placeholder="Cancel reason" class="border rounded px-2 py-1 text-xs w-40">
     <button class="px-3 py-1.5 rounded bg-amber-700 text-white text-xs font-semibold" type="submit">Cancel</button>
   </form>
+  {% endif %}
+  {% endif %}
   {% endif %}
   <form method="post" action="{% url 'admin_tools:domain_order_action' order.pk 'clear_error' %}">{% csrf_token %}
     <button class="px-3 py-1.5 rounded border border-slate-300 text-slate-700 text-xs" type="submit">Clear error</button>
   </form>
-  {% if order.status != 'completed' %}
+  {% if order.status != 'completed' and not registration_attempt %}
   <form method="post" action="{% url 'admin_tools:domain_order_action' order.pk 'delete' %}" onsubmit="return confirm('Permanently delete platform order #{{ order.pk }}?');">{% csrf_token %}
     <button class="px-3 py-1.5 rounded bg-rose-600 text-white text-xs font-semibold" type="submit">Delete order</button>
   </form>
@@ -58,33 +80,34 @@
   {% endif %}
 </div>{% endif %}
 
-{% if order.last_error %}
+{% if registration_attempt.legacy_review_required %}<p class="mb-4 text-sm text-slate-700">Historical diagnostics and unconfirmed identifiers are withheld from this page. The owner review uses provider records rather than old error text.</p>
+{% elif order.last_error %}
 <div class="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900 whitespace-pre-wrap">{{ order.last_error }}</div>
 {% endif %}
 
 <div class="mb-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-  <span class="font-semibold text-slate-900">Nameservers that will be used on Process:</span>
+  <span class="font-semibold text-slate-900">{% if registration_attempt.subject.nameservers %}Nameservers retained for this attempt:{% else %}Nameserver preview:{% endif %}</span>
   {% if resolved_nameservers %}
     <span class="font-mono">{{ resolved_nameservers|join:", " }}</span>
   {% else %}
-    <span class="text-rose-700">None resolved — set <code>WHM_NAMESERVERS</code> in .env (e.g. ns1.example.com,ns2.example.com) or ensure WHM API is reachable.</span>
+    {% if registration_attempt.legacy_review_required %}<span class="text-slate-700">No confirmed historical delegation snapshot. Provider nameservers are read during adoption.</span>{% elif registration_attempt.registry_status %}<span class="text-slate-700">Delegation was not reported in the last provider snapshot.</span>{% else %}<span class="text-rose-700">None resolved — set <code>WHM_NAMESERVERS</code> in .env (e.g. ns1.example.com,ns2.example.com) or ensure WHM API is reachable.</span>{% endif %}
   {% endif %}
 </div>
 
 <form method="post" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
   {% csrf_token %}
-  <fieldset class="contents" {% if not ADMIN_ACCESS.domain_order_action %}disabled{% endif %}>
+  <fieldset class="contents" {% if not ADMIN_ACCESS.domain_order_action or registration_attempt and registration_attempt.status != 'aborted' %}disabled{% endif %}>
 
-  <div class="bg-white border border-slate-200 rounded-xl p-5 space-y-3 shadow-sm">
+  <div class="min-w-0 bg-white border border-slate-200 rounded-xl p-5 space-y-3 shadow-sm">
     <h3 class="font-semibold text-slate-900">Order details</h3>
     <div>
-      <label class="block text-xs font-semibold text-slate-500 mb-1">Domain name</label>
-      <input name="domain_name" value="{{ order.domain_name }}" class="w-full border rounded px-3 py-2 text-sm font-mono"
+      <label for="order-domain_name" class="block text-xs font-semibold text-slate-500 mb-1">Domain name</label>
+      <input id="order-domain_name" name="domain_name" value="{{ order.domain_name }}" class="w-full border rounded px-3 py-2 text-sm font-mono"
              {% if order.status == 'completed' %}readonly{% endif %}>
     </div>
     <div>
-      <label class="block text-xs font-semibold text-slate-500 mb-1">Client</label>
-      <select name="user_id" class="w-full border rounded px-3 py-2 text-sm" {% if order.status == 'completed' or not IS_PLATFORM_OWNER %}disabled{% endif %}>
+      <label for="order-user_id" class="block text-xs font-semibold text-slate-500 mb-1">Client</label>
+      <select id="order-user_id" name="user_id" class="w-full border rounded px-3 py-2 text-sm" {% if order.status == 'completed' or not IS_PLATFORM_OWNER %}disabled{% endif %}>
         {% for u in users %}
         <option value="{{ u.pk }}" {% if u.pk == order.user_id %}selected{% endif %}>{{ u.email }}</option>
         {% endfor %}
@@ -92,31 +115,31 @@
     </div>
     <div class="grid grid-cols-2 gap-3">
       <div>
-        <label class="block text-xs font-semibold text-slate-500 mb-1">Status</label>
-        <select name="status" class="w-full border rounded px-3 py-2 text-sm" {% if not IS_PLATFORM_OWNER %}disabled{% endif %}>
+        <label for="order-status" class="block text-xs font-semibold text-slate-500 mb-1">Status</label>
+      <select id="order-status" name="status" class="w-full border rounded px-3 py-2 text-sm" {% if not IS_PLATFORM_OWNER %}disabled{% endif %}>
           {% for value, label in status_choices %}
           <option value="{{ value }}" {% if order.status == value %}selected{% endif %}>{{ label }}</option>
           {% endfor %}
         </select>
       </div>
       <div>
-        <label class="block text-xs font-semibold text-slate-500 mb-1">Years</label>
-        <input type="number" min="1" max="10" name="registration_years" value="{{ order.registration_years }}" class="w-full border rounded px-3 py-2 text-sm">
+        <label for="order-registration_years" class="block text-xs font-semibold text-slate-500 mb-1">Years</label>
+      <input id="order-registration_years" type="number" min="1" max="10" name="registration_years" value="{{ order.registration_years }}" class="w-full border rounded px-3 py-2 text-sm">
       </div>
     </div>
     <div class="grid grid-cols-2 gap-3">
       <div>
-        <label class="block text-xs font-semibold text-slate-500 mb-1">Quoted £</label>
-        <input name="quoted_price" value="{{ order.quoted_price }}" class="w-full border rounded px-3 py-2 text-sm" {% if not IS_PLATFORM_OWNER %}disabled{% endif %}>
+        <label for="order-quoted_price" class="block text-xs font-semibold text-slate-500 mb-1">Quoted £</label>
+      <input id="order-quoted_price" name="quoted_price" value="{{ order.quoted_price }}" class="w-full border rounded px-3 py-2 text-sm" {% if not IS_PLATFORM_OWNER %}disabled{% endif %}>
       </div>
       <div>
-        <label class="block text-xs font-semibold text-slate-500 mb-1">Total £</label>
-        <input name="total_price" value="{{ order.total_price }}" class="w-full border rounded px-3 py-2 text-sm" {% if not IS_PLATFORM_OWNER %}disabled{% endif %}>
+        <label for="order-total_price" class="block text-xs font-semibold text-slate-500 mb-1">Total £</label>
+      <input id="order-total_price" name="total_price" value="{{ order.total_price }}" class="w-full border rounded px-3 py-2 text-sm" {% if not IS_PLATFORM_OWNER %}disabled{% endif %}>
       </div>
     </div>
     <div>
-      <label class="block text-xs font-semibold text-slate-500 mb-1">DNS provider</label>
-      <select name="dns_provider" class="w-full border rounded px-3 py-2 text-sm">
+      <label for="order-dns_provider" class="block text-xs font-semibold text-slate-500 mb-1">DNS provider</label>
+      <select id="order-dns_provider" name="dns_provider" class="w-full border rounded px-3 py-2 text-sm">
         {% for value, label in dns_choices %}
         <option value="{{ value }}" {% if order.dns_provider == value %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
@@ -128,11 +151,11 @@
     </div>
   </div>
 
-  <div class="bg-white border border-slate-200 rounded-xl p-5 space-y-3 shadow-sm">
+  <div class="min-w-0 bg-white border border-slate-200 rounded-xl p-5 space-y-3 shadow-sm">
     <h3 class="font-semibold text-slate-900">Contacts &amp; registrar</h3>
     <div>
-      <label class="block text-xs font-semibold text-slate-500 mb-1">Registration contact (also sets admin/tech/billing)</label>
-      <select name="registration_contact_id" class="w-full border rounded px-3 py-2 text-sm">
+      <label for="order-registration_contact_id" class="block text-xs font-semibold text-slate-500 mb-1">Registration contact (also sets admin/tech/billing)</label>
+      <select id="order-registration_contact_id" name="registration_contact_id" class="w-full border rounded px-3 py-2 text-sm">
         {% for c in contacts %}
         <option value="{{ c.pk }}" {% if c.pk == order.registration_contact_id %}selected{% endif %}>{{ c.label }} — {{ c.name }} ({{ c.email }})</option>
         {% empty %}
@@ -141,12 +164,12 @@
       </select>
     </div>
     <div>
-      <label class="block text-xs font-semibold text-slate-500 mb-1">Registrar order ID</label>
-      <input name="registrar_order_id" value="{{ order.registrar_order_id }}" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="Empty until registered at ResellerClub" {% if not IS_PLATFORM_OWNER %}disabled{% endif %}>
+      <label for="order-registrar_order_id" class="block text-xs font-semibold text-slate-500 mb-1">Registrar order ID</label>
+      <input id="order-registrar_order_id" name="registrar_order_id" value="{% if not registration_attempt.legacy_review_required %}{{ order.registrar_order_id }}{% endif %}" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="{% if registration_attempt.legacy_review_required %}Historical owner review required{% else %}Empty until registered at ResellerClub{% endif %}" {% if not IS_PLATFORM_OWNER %}disabled{% endif %}>
     </div>
     <div>
-      <label class="block text-xs font-semibold text-slate-500 mb-1">Last error / notes</label>
-      <textarea name="last_error" rows="5" class="w-full border rounded px-3 py-2 text-sm font-mono">{{ order.last_error }}</textarea>
+      <label for="order-last_error" class="block text-xs font-semibold text-slate-500 mb-1">Last error / notes</label>
+      <textarea id="order-last_error" name="last_error" rows="5" class="w-full border rounded px-3 py-2 text-sm font-mono">{% if not registration_attempt.legacy_review_required %}{{ order.last_error }}{% endif %}</textarea>
     </div>
     <dl class="text-xs text-slate-500 grid grid-cols-2 gap-2 pt-2 border-t">
       <div><dt>Created</dt><dd class="text-slate-800">{{ order.created_at }}</dd></div>

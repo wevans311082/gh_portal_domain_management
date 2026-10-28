@@ -44,7 +44,7 @@ def test_manual_register_creates_domain_without_invoice(client, django_user_mode
     customer = django_user_model.objects.create_user(email="buyer@example.com", password="x")
     login_owner(client, staff)
 
-    settings.RESELLERCLUB_CUSTOMER_ID = "cust-1"
+    settings.RESELLERCLUB_CUSTOMER_ID = "999"
     settings.WHM_NAMESERVERS = ["ns1.example.com", "ns2.example.com"]
     TLDPricing.objects.create(
         tld="com",
@@ -54,6 +54,7 @@ def test_manual_register_creates_domain_without_invoice(client, django_user_mode
         is_active=True,
     )
     DomainContact.objects.create(
+        registrant_type="individual",
         user=customer,
         label="Primary",
         name="Buyer",
@@ -105,6 +106,7 @@ def test_manual_generate_invoice_after_registration(client, django_user_model):
     customer = django_user_model.objects.create_user(email="buyer2@example.com", password="x")
     login_owner(client, staff)
     contact = DomainContact.objects.create(
+        registrant_type="individual",
         user=customer,
         label="P",
         name="B",
@@ -151,15 +153,16 @@ def test_manual_generate_invoice_after_registration(client, django_user_model):
 def test_register_domain_order_allows_manual_paid_without_invoice(settings, django_user_model, monkeypatch):
     from apps.domains.tasks import register_domain_order
 
-    settings.RESELLERCLUB_CUSTOMER_ID = "c1"
+    settings.RESELLERCLUB_CUSTOMER_ID = "999"
     settings.WHM_NAMESERVERS = ["ns1.example.com", "ns2.example.com"]
     user = django_user_model.objects.create_user(email="m@example.com", password="x")
     contact = DomainContact.objects.create(
+        registrant_type="individual",
         user=user,
         label="P",
         name="M",
         email=user.email,
-        phone="07",
+        phone="07123456789",
         address_line1="1",
         city="L",
         state="L",

@@ -1,0 +1,14 @@
+{% extends "base_admin.html" %}
+{% block title %}Domain transfers · {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Domain transfers{% endblock %}
+{% block content %}
+{% include "admin_tools/components/page_header.html" with heading="Domain transfer submissions" description="Review retained paid requests. Acknowledgement is separate from registry transfer completion." %}
+<a class="btn-secondary mb-4 inline-block" href="{% url 'admin_tools:domain_orders_list' %}">Registration orders</a>
+<form method="get" class="mb-5 flex flex-wrap items-end gap-3">
+  <div><label class="mb-1 block text-sm font-semibold" for="transfer-state">Submission state</label><select class="rounded border border-slate-400 bg-white px-3 py-2" id="transfer-state" name="state"><option value="all">All states</option><option value="historical" {% if state == 'historical' %}selected{% endif %}>Historical owner review</option>{% for value,label in states.items %}<option value="{{ value }}" {% if state == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+  <button class="btn-primary" type="submit">Apply filter</button>
+</form>
+{% if filter_error %}<p role="alert" class="mb-4 rounded border border-red-300 bg-red-50 p-4 text-red-900">{{ filter_error }}</p>{% endif %}
+<div class="overflow-x-auto rounded border border-slate-300 bg-white" role="region" aria-label="Transfer submissions" tabindex="0"><table class="w-full text-left text-sm"><thead class="bg-slate-100 text-slate-800"><tr><th scope="col" class="p-3">Domain</th><th scope="col" class="p-3">Submission</th><th scope="col" class="p-3">Local workflow</th><th scope="col" class="p-3">Updated</th></tr></thead><tbody>{% for transfer in transfers %}<tr class="border-t border-slate-200"><th scope="row" class="p-3"><a class="font-semibold text-blue-800 underline" href="{% url 'admin_tools:domain_transfer_detail' transfer.pk %}">{{ transfer.domain_name }}</a></th><td class="p-3">{% if transfer.historical_review %}Historical owner review{% else %}{{ transfer.attempt_label }}{% endif %}</td><td class="p-3">{{ transfer.status|capfirst }}</td><td class="p-3 whitespace-nowrap">{{ transfer.updated_at|date:"d M Y H:i" }}</td></tr>{% empty %}<tr><td class="p-5 text-slate-700" colspan="4">No transfers match this view.</td></tr>{% endfor %}</tbody></table></div>
+{% if page_obj.has_other_pages %}<nav aria-label="Transfer pages" class="mt-4 flex flex-wrap items-center gap-4">{% if page_obj.has_previous %}<a class="btn-secondary" href="?state={{ state|urlencode }}&amp;page={{ page_obj.previous_page_number }}">Previous</a>{% endif %}<p class="text-sm">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</p>{% if page_obj.has_next %}<a class="btn-secondary" href="?state={{ state|urlencode }}&amp;page={{ page_obj.next_page_number }}">Next</a>{% endif %}</nav>{% endif %}
+{% endblock %}

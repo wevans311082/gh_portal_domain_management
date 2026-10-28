@@ -66,6 +66,8 @@ class Service(TimeStampedModel):
 
     class Meta:
         indexes = [
+            models.Index(fields=["user", "-created_at", "-id"], name="workspace_service_created"),
+            models.Index(fields=["user", "-updated_at", "-id"], name="workspace_service_updated"),
             models.Index(SearchKey("domain_name"), name="search_service_domain_name"),
             models.Index(SearchKey("cpanel_domain"), name="search_service_cpanel_domain"),
         ]

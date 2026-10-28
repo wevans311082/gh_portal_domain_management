@@ -89,6 +89,10 @@ class SupportTicket(TimeStampedModel):
     )
 
     class Meta:
+        indexes = [
+            models.Index(fields=["user", "-created_at", "-id"], name="workspace_ticket_created"),
+            models.Index(fields=["user", "-updated_at", "-id"], name="workspace_ticket_updated"),
+        ]
         ordering = ["-created_at"]
 
     def __str__(self):

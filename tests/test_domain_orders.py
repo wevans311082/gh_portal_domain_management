@@ -75,7 +75,7 @@ def test_register_domain_order_creates_domain_and_cloudflare_records(settings, d
     from apps.domains.models import Domain, DomainOrder
     from apps.dns.models import DNSRecord, DNSZone
 
-    settings.RESELLERCLUB_CUSTOMER_ID = "customer-1"
+    settings.RESELLERCLUB_CUSTOMER_ID = "999"
     settings.PLATFORM_WWW_TARGET = "host.grumpyhosting.co.uk"
     settings.WHM_NAMESERVERS = ["ns1.grumpyhosting.co.uk", "ns2.grumpyhosting.co.uk"]
     pricing_settings = DomainPricingSettings.get_solo()
@@ -92,6 +92,7 @@ def test_register_domain_order_creates_domain_and_cloudflare_records(settings, d
         paid_at=timezone.now(),
     )
     contact = DomainContact.objects.create(
+        registrant_type="individual",
         user=user,
         label="Primary",
         name="Buyer Example",
@@ -164,6 +165,7 @@ def test_checkout_completed_queues_paid_domain_orders(django_user_model, monkeyp
     user = django_user_model.objects.create_user(email="queue@example.com", password="password123")
     invoice = Invoice.objects.create(user=user, number="INV-2000", status=Invoice.STATUS_UNPAID, total=Decimal("10.00"))
     contact = DomainContact.objects.create(
+        registrant_type="individual",
         user=user,
         label="Primary",
         name="Queue Example",

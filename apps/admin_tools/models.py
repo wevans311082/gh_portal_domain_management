@@ -6,6 +6,7 @@ editing environment files.
 from django.db import models, transaction
 from django.core.cache import cache
 from apps.core.models import TimeStampedModel
+from django.conf import settings
 
 
 class IntegrationSettingQuerySet(models.QuerySet):
@@ -38,6 +39,7 @@ class IntegrationSetting(TimeStampedModel):
         verbose_name_plural = "Integration settings"
         permissions = (
             ("view_customers", "View customer accounts"),
+            ("manage_customer_notes", "Add internal customer notes"),
             ("view_billing", "View invoices, quotes and payments"),
             ("manage_billing", "Manage invoices, quotes and payments"),
             ("view_domains", "View domains and orders"),
@@ -86,6 +88,22 @@ class IntegrationSetting(TimeStampedModel):
         AuditLog.objects.create(user=actor, action="integration.setting.updated", model_name="admin_tools.IntegrationSetting",
                                 object_id=str(obj[0].pk), data={"key": key, "is_secret": is_secret, "created": obj[1]})
         return obj
+
+
+class CustomerNote(TimeStampedModel):
+    """Staff-only append-only text. Body is erased on authorized redaction."""
+
+    customer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="internal_staff_notes")
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="authored_customer_notes")
+    body = models.TextField(max_length=4000)
+    audience = models.CharField(max_length=16, default="general", choices=[("general", "Customer staff"), ("billing", "Billing staff"), ("security", "Security auditors and owners")])
+    submission_key = models.UUIDField(unique=True, editable=False)
+    redacted_at = models.DateTimeField(null=True, blank=True)
+    redacted_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="redacted_customer_notes")
+
+    class Meta:
+        ordering = ["-created_at", "-pk"]
+        indexes = [models.Index(fields=["customer", "-created_at", "-id"], name="customer_note_history")]
 
 
 class WizardProgress(TimeStampedModel):

@@ -3,6 +3,7 @@ from datetime import timedelta
 
 from celery import shared_task
 from django.conf import settings
+from django.db import transaction
 from django.utils import timezone
 from django_celery_beat.models import IntervalSchedule, PeriodicTask
 
@@ -212,6 +213,10 @@ def register_domain_order(self, order_id):
         "domain",
     ).get(id=order_id)
 
+    if DomainOrder.objects.filter(pk=order.pk, registration_attempt__legacy_review_required=True).exists():
+        from apps.domains.registration_submission import RegistrationReviewRequired
+        raise RegistrationReviewRequired("Historical registration requires owner review before processing or local completion.")
+
     if order.status == DomainOrder.STATUS_COMPLETED and order.domain_id:
         return order.domain_id
 
@@ -235,8 +240,11 @@ def register_domain_order(self, order_id):
     from apps.core.runtime_settings import get_runtime_setting
     from apps.domains.resellerclub_client import ResellerClubError
 
+    acknowledgement = getattr(order, "registration_attempt", None)
+    already_acknowledged = acknowledgement is not None and acknowledgement.status == "accepted" and not acknowledgement.legacy_review_required
     customer_id = (
-        get_runtime_setting("RESELLERCLUB_CUSTOMER_ID", "")
+        (acknowledgement.customer_id if already_acknowledged else "")
+        or get_runtime_setting("RESELLERCLUB_CUSTOMER_ID", "")
         or getattr(settings, "RESELLERCLUB_CUSTOMER_ID", "")
         or ""
     ).strip()
@@ -247,10 +255,9 @@ def register_domain_order(self, order_id):
         raise ValueError(order.last_error)
 
     registrar_client = ResellerClubClient()
-    contact_service = DomainContactService(client=registrar_client)
-    nameservers = _build_nameservers(order)
+    nameservers = acknowledgement.subject.get("nameservers", []) if already_acknowledged else _build_nameservers(order)
 
-    if len(nameservers) < 2:
+    if not already_acknowledged and len(nameservers) < 2:
         order.status = DomainOrder.STATUS_FAILED
         order.last_error = (
             "At least two nameservers are required before registering domains. "
@@ -266,84 +273,75 @@ def register_domain_order(self, order_id):
     order.save(update_fields=["status", "last_error", "updated_at"])
 
     try:
-        # Same contact reused for all roles → sync once when IDs match.
-        contact_ids = {}
-        for role, contact in (
-            ("reg", order.registration_contact),
-            ("admin", order.admin_contact),
-            ("tech", order.tech_contact),
-            ("billing", order.billing_contact),
-        ):
-            key = contact.pk
-            if key not in contact_ids:
-                contact_ids[key] = contact_service.sync_remote_contact(
-                    contact, customer_id, tld=order.tld
+        from apps.domains.registration_submission import submit_registration
+        registrar_order_id = submit_registration(order.pk, customer_id, nameservers, client=registrar_client)
+        order.refresh_from_db()
+        from apps.domains.models import DomainRegistrationAttempt
+        from apps.domains.registration_submission import _same_order, RegistrationReviewRequired
+        retained = DomainRegistrationAttempt.objects.get(order=order)
+        registry_facts = None
+        if retained.registry_status:
+            from apps.domains.historical_registration import verified_existing_order
+            try:
+                registry_facts = verified_existing_order(
+                    registrar_client.get_registration_reconciliation_details(registrar_order_id),
+                    identifier=registrar_order_id, domain_name=order.domain_name, customer_id=retained.customer_id,
                 )
-            # bind role for clarity below
-            if role == "reg":
-                registration_contact_id = contact_ids[key]
-            elif role == "admin":
-                admin_contact_id = contact_ids[key]
-            elif role == "tech":
-                tech_contact_id = contact_ids[key]
-            else:
-                billing_contact_id = contact_ids[key]
+                if any(registry_facts["role_ids"][key] != retained.role_ids.get(key) for key in ("reg", "admin", "tech", "billing")):
+                    raise ValueError
+            except Exception:
+                raise RegistrationReviewRequired("The adopted provider order changed or could not be rechecked. Review its current state before local completion.") from None
+        with transaction.atomic():
+            order = DomainOrder.objects.select_for_update().get(pk=order.pk)
+            accepted = DomainRegistrationAttempt.objects.select_for_update().get(order=order)
+            if accepted.status != "accepted" or not _same_order(accepted, order) or order.registrar_order_id != accepted.remote_order_id:
+                raise RegistrationReviewRequired("The local order changed after registrar acknowledgement. Reconcile it before local completion.")
+            if order.status == "completed" and order.domain_id:
+                return order.domain_id
+            nameservers = registry_facts["nameservers"] if registry_facts else accepted.subject["nameservers"]
+            registered_at = registry_facts["registered_at"] if registry_facts else accepted.completed_at.date()
+            from dateutil.relativedelta import relativedelta
 
-        if order.registrar_order_id:
-            registrar_order_id = order.registrar_order_id
-            registration_response = {"entityid": registrar_order_id}
-        else:
-            registration_response = registrar_client.register_domain(
-                domain_name=order.domain_name,
-                years=order.registration_years,
-                customer_id=customer_id,
-                reg_contact_id=registration_contact_id,
-                admin_contact_id=admin_contact_id,
-                tech_contact_id=tech_contact_id,
-                billing_contact_id=billing_contact_id,
-                nameservers=nameservers,
-                purchase_privacy=order.privacy_enabled,
-                auto_renew=order.auto_renew,
-            )
-            if not isinstance(registration_response, dict):
-                registration_response = {"entityid": registration_response}
-            registrar_order_id = str(
-                registration_response.get("entityid")
-                or registration_response.get("orderid")
-                or registration_response.get("order-id")
-                or ""
-            )
+            expires_at = registry_facts["expires_at"] if registry_facts else registered_at + relativedelta(years=max(1, int(order.registration_years or 1)))
+            domain_defaults = {
+                    "user": order.user,
+                    "tld": order.tld,
+                    "status": registry_facts["status"] if registry_facts else Domain.STATUS_ACTIVE,
+                    "registrar_id": registrar_order_id,
+                    "registered_at": registered_at,
+                    "expires_at": expires_at,
+                    "auto_renew": order.auto_renew,
+                    "dns_provider": order.dns_provider,
+                    "nameserver1": nameservers[0] if nameservers else "",
+                    "nameserver2": nameservers[1] if len(nameservers) > 1 else "",
+                    "nameserver3": nameservers[2] if len(nameservers) > 2 else "",
+                    "nameserver4": nameservers[3] if len(nameservers) > 3 else "",
+                }
+            domain, created = Domain.objects.select_for_update().get_or_create(name=order.domain_name, defaults=domain_defaults)
+            if not created:
+                if domain.user_id != order.user_id or domain.registrar_id != registrar_order_id:
+                    raise RegistrationReviewRequired("The local domain record conflicts with the acknowledged registrar order. Reconciliation is required.")
+                if registry_facts:
+                    for field in ("status", "registered_at", "expires_at", "nameserver1", "nameserver2", "nameserver3", "nameserver4"):
+                        setattr(domain, field, domain_defaults[field])
+                    domain.save(update_fields=["status", "registered_at", "expires_at", "nameserver1", "nameserver2", "nameserver3", "nameserver4", "updated_at"])
+            if registry_facts:
+                accepted.registry_status = registry_facts["status"]
+                accepted.registry_checked_at = registry_facts["checked_at"]
+                accepted.registry_registered_at = registered_at
+                accepted.registry_expires_at = expires_at
+                accepted.subject = {**accepted.subject, "nameservers": nameservers}
+                accepted.save(update_fields=["registry_status", "registry_checked_at", "registry_registered_at", "registry_expires_at", "subject", "updated_at"])
+            order.domain = domain
             order.registrar_order_id = registrar_order_id
-            order.save(update_fields=["registrar_order_id", "updated_at"])
-        registered_at = timezone.now().date()
-        from dateutil.relativedelta import relativedelta
 
-        expires_at = registered_at + relativedelta(years=max(1, int(order.registration_years or 1)))
-        existing = Domain.objects.filter(name=order.domain_name).first()
-        if existing and existing.user_id != order.user_id:
-            order.status = DomainOrder.STATUS_FAILED
-            order.last_error = "This domain is already assigned to another account."
-            order.save(update_fields=["status", "last_error", "updated_at"])
-            raise ValueError(order.last_error)
-        domain, _ = Domain.objects.update_or_create(
-            name=order.domain_name,
-            defaults={
-                "user": order.user,
-                "tld": order.tld,
-                "status": Domain.STATUS_ACTIVE,
-                "registrar_id": registrar_order_id,
-                "registered_at": registered_at,
-                "expires_at": expires_at,
-                "auto_renew": order.auto_renew,
-                "dns_provider": order.dns_provider,
-                "nameserver1": nameservers[0] if nameservers else "",
-                "nameserver2": nameservers[1] if len(nameservers) > 1 else "",
-            },
-        )
-        order.domain = domain
-        order.registrar_order_id = registrar_order_id
+            order.save(update_fields=["domain", "updated_at"])
 
-        if order.dns_provider == Domain.DNS_PROVIDER_CLOUDFLARE and settings.PLATFORM_WWW_TARGET:
+        if registry_facts and registry_facts["status"] != "active":
+            DNSZone.objects.update_or_create(
+                domain=domain, defaults={"provider": order.dns_provider, "is_active": False, "last_synced": timezone.now()},
+            )
+        elif order.dns_provider == Domain.DNS_PROVIDER_CLOUDFLARE and settings.PLATFORM_WWW_TARGET:
             _ensure_cloudflare_zone(domain, order, registrar_client)
         else:
             DNSZone.objects.update_or_create(
@@ -351,18 +349,40 @@ def register_domain_order(self, order_id):
                 defaults={"provider": order.dns_provider, "is_active": True, "last_synced": timezone.now()},
             )
 
-        order.status = DomainOrder.STATUS_COMPLETED
-        order.completed_at = timezone.now()
-        order.save(update_fields=["domain", "registrar_order_id", "status", "completed_at", "updated_at"])
+        with transaction.atomic():
+            current = DomainOrder.objects.select_for_update().get(pk=order.pk)
+            current_domain = Domain.objects.select_for_update().get(pk=domain.pk)
+            if not _same_order(accepted, current) or current.registrar_order_id != registrar_order_id or current_domain.user_id != current.user_id or current_domain.registrar_id != registrar_order_id:
+                raise RegistrationReviewRequired("The local domain or order changed during completion. Reconciliation is required.")
+            current.status = DomainOrder.STATUS_COMPLETED
+            current.completed_at = timezone.now()
+            current.save(update_fields=["status", "completed_at", "updated_at"])
         logger.info("Registered domain order %s as domain %s", order.id, domain.name)
         return domain.id
+
     except Exception as exc:
+        from apps.domains.registration_submission import RegistrationInProgress, RegistrationReviewRequired
+        from django.core.exceptions import ValidationError
+        if isinstance(exc, RegistrationInProgress):
+            raise
+        order.refresh_from_db()
         order.status = DomainOrder.STATUS_FAILED
-        order.last_error = str(exc)
+        order.last_error = (
+            "Registration requires review. Check the registrar submission state before retrying."
+            if getattr(order, "registration_attempt", None) and order.registration_attempt.status in {"submitting", "unknown"}
+            else "Registration stopped. Review the contact details, payment and registrar configuration before retrying."
+        )
+        if isinstance(exc, ValidationError):
+            # These are local, authored validation messages, never a provider
+            # response body. Keep actionable field guidance for staff review.
+            order.last_error = " ".join(exc.messages)[:2000]
         order.save(update_fields=["status", "last_error", "updated_at"])
-        logger.exception("Domain order registration failed for order %s", order.id)
+        logger.error("Domain order registration failed for order %s (%s)", order.id, type(exc).__name__)
+        attempt = getattr(order, "registration_attempt", None)
+        if attempt and attempt.status in {"submitting", "unknown"}:
+            raise RegistrationReviewRequired("The registrar submission outcome requires reconciliation; no automatic retry was made.") from None
         # Do not Celery-retry permanent API / validation failures (HTTP 500 payload issues).
-        permanent = isinstance(exc, (ResellerClubError, ValueError))
+        permanent = isinstance(exc, (ResellerClubError, ValueError, ValidationError))
         msg = str(exc).lower()
         if permanent or "http 500" in msg or "too many 500" in msg or "invalid" in msg:
             raise
@@ -429,6 +449,13 @@ def execute_domain_renewal(renewal_id: int):
         return
 
     domain = renewal.domain
+    from apps.domains.registrar_review import registrar_review_required, REVIEW_MESSAGE
+    if registrar_review_required(domain):
+        renewal.status = DomainRenewal.STATUS_FAILED
+        renewal.last_error = REVIEW_MESSAGE
+        renewal.save(update_fields=["status", "last_error", "updated_at"])
+        return
+
 
     if not domain.registrar_id:
         logger.error("execute_domain_renewal: domain %s has no registrar_id", domain.name)
@@ -486,104 +513,69 @@ def execute_domain_renewal(renewal_id: int):
 
 @shared_task
 def execute_domain_transfer(transfer_id: int):
-    """Execute a paid domain transfer via the registrar."""
-    try:
-        transfer = DomainTransfer.objects.select_related(
-            "invoice",
-            "registration_contact",
-            "admin_contact",
-            "tech_contact",
-            "billing_contact",
-            "domain",
-        ).get(pk=transfer_id)
-    except DomainTransfer.DoesNotExist:
-        logger.error("execute_domain_transfer: DomainTransfer %s not found", transfer_id)
-        return
-
-    if transfer.status == DomainTransfer.STATUS_COMPLETED:
-        logger.info("execute_domain_transfer: transfer %s already completed, skipping", transfer_id)
-        return
-
-    if transfer.invoice_id and transfer.invoice.status != transfer.invoice.STATUS_PAID:
-        transfer.status = DomainTransfer.STATUS_FAILED
-        transfer.last_error = "Invoice is not paid."
-        transfer.save(update_fields=["status", "last_error"])
-        logger.error("execute_domain_transfer: transfer %s invoice is not paid", transfer_id)
-        return
-
-    if not settings.RESELLERCLUB_CUSTOMER_ID:
-        transfer.status = DomainTransfer.STATUS_FAILED
-        transfer.last_error = "RESELLERCLUB_CUSTOMER_ID is not configured."
-        transfer.save(update_fields=["status", "last_error"])
-        return
-
-    registrar_client = ResellerClubClient()
-    contact_service = DomainContactService(client=registrar_client)
-    nameservers = _build_nameservers(
-        type("NSOrder", (), {"dns_provider": Domain.DNS_PROVIDER_CPANEL})()
+    """Retain paid acknowledgement before local handoff; never repeat uncertainty."""
+    from django.core.exceptions import ValidationError
+    from apps.domains.models import DomainTransferAttempt
+    from apps.domains.transfer_submission import (
+        submit_transfer, TransferReviewRequired, TransferInProgress, _same_transfer,
     )
-    if len(nameservers) < 2:
-        transfer.status = DomainTransfer.STATUS_FAILED
-        transfer.last_error = (
-            "At least two nameservers are required before transferring domains. "
-            "Configure WHM_NAMESERVERS or ensure WHM API nameserver config is available."
-        )
-        transfer.save(update_fields=["status", "last_error"])
-        return
-
-    transfer.status = DomainTransfer.STATUS_PROCESSING
-    transfer.last_error = ""
-    transfer.save(update_fields=["status", "last_error"])
+    from apps.domains.contact_bindings import provider_scope
+    from apps.audit.models import AuditLog
 
     try:
-        registration_contact_id = contact_service.sync_remote_contact(transfer.registration_contact, settings.RESELLERCLUB_CUSTOMER_ID)
-        admin_contact_id = contact_service.sync_remote_contact(transfer.admin_contact, settings.RESELLERCLUB_CUSTOMER_ID)
-        tech_contact_id = contact_service.sync_remote_contact(transfer.tech_contact, settings.RESELLERCLUB_CUSTOMER_ID)
-        billing_contact_id = contact_service.sync_remote_contact(transfer.billing_contact, settings.RESELLERCLUB_CUSTOMER_ID)
-
-        transfer_response = registrar_client.transfer_domain(
-            domain_name=transfer.domain_name,
-            customer_id=settings.RESELLERCLUB_CUSTOMER_ID,
-            reg_contact_id=registration_contact_id,
-            admin_contact_id=admin_contact_id,
-            tech_contact_id=tech_contact_id,
-            billing_contact_id=billing_contact_id,
-            nameservers=nameservers,
-            auth_code=transfer.auth_code,
-            auto_renew=transfer.auto_renew,
-        )
-        registrar_order_id = str(
-            transfer_response.get("entityid")
-            or transfer_response.get("orderid")
-            or transfer_response.get("order-id")
-            or ""
-        )
-
-        domain, _ = Domain.objects.update_or_create(
-            name=transfer.domain_name,
-            defaults={
-                "user": transfer.user,
-                "tld": transfer.tld,
-                "status": Domain.STATUS_PENDING,
-                "registrar_id": registrar_order_id,
-                "auto_renew": transfer.auto_renew,
-                "dns_provider": transfer.dns_provider,
-                "nameserver1": nameservers[0] if nameservers else "",
-                "nameserver2": nameservers[1] if len(nameservers) > 1 else "",
-            },
-        )
-        transfer.domain = domain
-        transfer.registrar_order_id = registrar_order_id
-        transfer.status = DomainTransfer.STATUS_COMPLETED
-        transfer.completed_at = timezone.now()
-        transfer.save(update_fields=["domain", "registrar_order_id", "status", "completed_at", "updated_at"])
-        logger.info("Transferred domain %s into local account", transfer.domain_name)
-        return domain.id
+        transfer = DomainTransfer.objects.select_related("submission_attempt").get(pk=transfer_id)
+    except DomainTransfer.DoesNotExist:
+        logger.warning("Transfer record %s was not found", transfer_id)
+        return
+    attempt = getattr(transfer, "submission_attempt", None)
+    if transfer.status == "completed" and attempt is None:
+        # Migration separately quarantines inconsistent historical completions.
+        return transfer.domain_id
+    try:
+        if attempt and (attempt.legacy_review_required or attempt.status in {"unknown", "submitting"}):
+            raise TransferReviewRequired("An earlier transfer may have reached the registrar. Owner review is required before continuing.")
+        if attempt and attempt.status == "preparing":
+            raise TransferInProgress("Another worker is preparing this transfer. Do not submit it again.")
+        customer_id = attempt.customer_id if attempt and attempt.status == "accepted" else str(settings.RESELLERCLUB_CUSTOMER_ID or "").strip()
+        if not customer_id:
+            raise ValidationError("A registrar customer account must be configured before transfer.")
+        nameservers = attempt.subject["nameservers"] if attempt and attempt.status == "accepted" else _build_nameservers(
+            type("NSOrder", (), {"dns_provider": transfer.dns_provider})())
+        client = ResellerClubClient()
+        identifier = submit_transfer(transfer_id, customer_id, nameservers, client=client)
+        with transaction.atomic(durable=True):
+            current = DomainTransfer.objects.select_for_update().get(pk=transfer_id)
+            retained = DomainTransferAttempt.objects.select_for_update().get(transfer=current)
+            if (retained.status != "accepted" or not _same_transfer(retained, current)
+                    or retained.provider_scope != provider_scope(client)):
+                raise TransferReviewRequired("The acknowledged transfer association changed. Owner review is required.")
+            domain, created = Domain.objects.select_for_update().get_or_create(name=current.domain_name, defaults={
+                "user_id": current.user_id, "tld": current.tld, "status": Domain.STATUS_PENDING,
+                "registrar_id": identifier, "auto_renew": current.auto_renew, "dns_provider": current.dns_provider,
+                "nameserver1": nameservers[0] if nameservers else "", "nameserver2": nameservers[1] if len(nameservers) > 1 else "",
+                "nameserver3": nameservers[2] if len(nameservers) > 2 else "",
+                "nameserver4": nameservers[3] if len(nameservers) > 3 else "",
+            })
+            if domain.user_id != current.user_id or domain.registrar_id != identifier or (current.domain_id and current.domain_id != domain.pk):
+                raise TransferReviewRequired("The local domain conflicts with this acknowledged transfer. Owner review is required.")
+            if current.domain_id != domain.pk:
+                current.domain = domain
+                # A transfer order acknowledgement is not registry completion.
+                current.status = DomainTransfer.STATUS_PROCESSING
+                current.last_error = ""
+                current.save(update_fields=["domain", "status", "last_error", "updated_at"])
+                AuditLog.objects.create(action="domain.transfer.local_handoff", model_name="DomainTransfer",
+                                        object_id=str(current.pk), data={"transfer_attempt_id": retained.pk, "domain_id": domain.pk})
+            return domain.pk
+    except TransferInProgress:
+        return  # The active worker owns progress and its error/status fields.
     except Exception as exc:
-        transfer.status = DomainTransfer.STATUS_FAILED
-        transfer.last_error = str(exc)
-        transfer.save(update_fields=["status", "last_error", "updated_at"])
-        logger.exception("Domain transfer failed for %s", transfer.domain_name)
+        message = (" ".join(exc.messages) if isinstance(exc, ValidationError) else str(exc)
+                   if isinstance(exc, TransferReviewRequired) else
+                   "Transfer processing stopped. Review the retained submission state before continuing.")
+        DomainTransfer.objects.filter(pk=transfer_id).exclude(status=DomainTransfer.STATUS_COMPLETED).update(
+            last_error=message, status=DomainTransfer.STATUS_FAILED, updated_at=timezone.now())
+        logger.warning("Transfer %s stopped; inspect its retained submission state", transfer_id)
 
 
 @shared_task
@@ -612,7 +604,11 @@ def process_auto_renewals(days_ahead: int = 7):
     )
 
     queued = 0
+    domains = domains.exclude(order__registration_attempt__legacy_review_required=True)
     for domain in domains:
+        from apps.domains.registrar_review import registrar_review_required
+        if registrar_review_required(domain):
+            continue
         # Skip if a non-failed renewal already exists
         has_open_renewal = DomainRenewal.objects.filter(
             domain=domain,
@@ -744,3 +740,7 @@ def monitor_registrar_balance():
         )
 
     return {"balance": float(balance), "threshold": float(threshold), "alert_sent": balance < threshold}
+
+
+# Register the durable verification workers with Celery's standard task discovery.
+from apps.domains.verification_actions import dispatch_verification_actions, run_verification_action, schedule_verification_checks  # noqa: E402,F401

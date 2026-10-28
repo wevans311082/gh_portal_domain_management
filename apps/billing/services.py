@@ -380,6 +380,9 @@ def convert_quote_to_invoice(
     if not quote.user:
         raise ValueError("Cannot convert a quote without a linked user account")
 
+    from apps.portal.cart_service import preflight_quote_cart
+    preflight_quote_cart(quote)
+
     line_items = [
         LineItemSpec(
             description=item.description,
@@ -399,7 +402,7 @@ def convert_quote_to_invoice(
         notes=f"Converted from quote {quote.number}",
         source_quote=quote,
         created_by_staff=by_user if by_user and by_user.is_staff else None,
-        send_email=send_email,
+        send_email=False,
     )
 
     from apps.portal.cart_service import materialize_quote_cart_to_invoice
@@ -419,7 +422,18 @@ def convert_quote_to_invoice(
             "accepted_by_ip",
         ]
     )
+    if send_email:
+        email_invoice_after_commit(invoice)
     return invoice
+
+
+def email_invoice_after_commit(invoice):
+    """Do not send an invoice for a transaction that may still roll back."""
+    invoice_id = invoice.pk
+    transaction.on_commit(
+        lambda: email_document(Invoice.objects.get(pk=invoice_id), kind="invoice_issued"),
+        robust=True,
+    )
 
 
 # ---------------------------------------------------------------------------

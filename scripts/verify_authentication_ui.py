@@ -77,6 +77,77 @@ def main():
         client.post(reverse("account_login"), {"email": user.email, "password": "test-password"})
         client.post(reverse("accounts_custom:mfa_verify"), {"code": pyotp.TOTP(user.mfa_secret).now()})
         fixtures["/reauthenticate"] = client.get(reverse("accounts_custom:reauthenticate")).content
+        fixtures["/registrant-contact"] = client.get(reverse("domains:contact_create")).content
+        fixtures["/registrant-contact-invalid"] = client.post(
+            reverse("domains:contact_create"), {"registrant_type": "individual", "name": "Jane Smith"}
+        ).content
+        from apps.domains.models import TLDPricing
+        for extension in ("co.uk", "ca"):
+            TLDPricing.objects.get_or_create(tld=extension, defaults={"registration_cost": "10", "is_active": True})
+        fixtures["/registrant-domain-uk"] = client.get(reverse("domains:register"), {"domain": "fixture-domain.co.uk"}).content
+        fixtures["/registrant-domain-review"] = client.get(reverse("domains:register"), {"domain": "fixture-domain.ca"}).content
+        from apps.portal.cart_service import add_domain_registration_item, get_active_cart, create_quote_from_cart
+        TLDPricing.objects.get_or_create(tld="com", defaults={"registration_cost": "10", "is_active": True})
+        add_domain_registration_item(user=user, domain_name="cart-" + "x" * 58 + ".com")
+        fixtures["/portal-cart"] = client.get(reverse("portal:cart")).content
+        cart_quote = create_quote_from_cart(get_active_cart(user))
+        fixtures["/public-cart-review"] = client.post(reverse("billing_public:quote_public_accept", args=[cart_quote.public_token])).content
+        fixtures["/portal-cart-empty"] = client.get(reverse("portal:cart")).content
+        from apps.domains.models import ContactVerification, Domain, DomainOrder
+        from django.utils import timezone
+        from datetime import timedelta
+        verification_contact = user.domain_contacts.first()
+        verification_contact.registrar_contact_id = "12345"
+        verification_contact.save(update_fields=["registrar_contact_id"])
+        verification_domain = Domain.objects.create(user=user, name="verification-ui.com", tld="com", status="active", registrar_id="98765")
+        verification_order = DomainOrder.objects.create(
+            user=user, domain=verification_domain, domain_name=verification_domain.name, tld="com",
+            registrar_order_id="98765", registration_contact=verification_contact,
+            admin_contact=verification_contact, tech_contact=verification_contact, billing_contact=verification_contact,
+        )
+        with patch("apps.provisioning.whm_client.WHMClient") as whm:
+            whm.return_value.get_nameservers.return_value = []
+            for status in ("verified", "pending", "suspended", "unknown"):
+                ContactVerification.objects.create(
+                    contact=verification_contact, domain_order=verification_order, domain_name=verification_domain.name,
+                    check_kind="registrar_email", source="resellerclub", reference="98765", tld="com", status=status,
+                    subject_digest=ContactVerification.digest_for(verification_contact), checked_at=timezone.now(),
+                    expires_at=timezone.now() + timedelta(minutes=15),
+                    action_due_at=timezone.now() + timedelta(days=14) if status in {"pending", "suspended"} else None,
+                )
+                fixtures[f"/registrant-verification-{status}"] = client.get(reverse("domains:detail", kwargs={"pk": verification_domain.pk})).content
+            from apps.domains.verification_actions import request_verification_action
+            import uuid
+            fixture_refresh = request_verification_action(verification_domain, user, "refresh", uuid.uuid4())
+            fixtures["/registrant-verification-queued"] = client.get(reverse("domains:detail", kwargs={"pk": verification_domain.pk})).content
+            fixtures["/registrant-verification-error"] = client.post(
+                reverse("domains:verification_action", kwargs={"pk": verification_domain.pk}),
+                {"kind": "refresh", "key": str(uuid.uuid4())},
+            ).content
+            from apps.domains.models import VerificationAction
+            VerificationAction.objects.filter(pk=fixture_refresh.pk).update(
+                status="succeeded", created_at=timezone.now() - timedelta(minutes=16),
+            )
+            request_verification_action(verification_domain, None, "refresh", uuid.uuid4(), automatic=True)
+            fixtures["/registrant-verification-automatic"] = client.get(reverse("domains:detail", kwargs={"pk": verification_domain.pk})).content
+            VerificationAction.objects.create(
+                domain_order=verification_order, actor=user, key=uuid.uuid4(), kind="resend", status="unknown",
+                subject_digest=ContactVerification.digest_for(verification_contact), registrar_order_id="98765",
+            )
+            pending_evidence = ContactVerification.objects.filter(domain_order=verification_order, status="pending").first()
+            pending_evidence.pk = None
+            pending_evidence.checked_at = timezone.now()
+            pending_evidence.save()
+            fixtures["/registrant-verification-review"] = client.get(reverse("domains:detail", kwargs={"pk": verification_domain.pk})).content
+        with patch("apps.admin_tools.manual_order_views._load_whm_hosting_packages", return_value=([], "fixture")):
+            fixtures["/admin-manual-domain"] = client.get(reverse("admin_tools:manual_domain_register")).content
+            fixtures["/admin-manual-domain-invalid"] = client.post(
+                reverse("admin_tools:manual_domain_register"), {
+                    "domain_name": "manual-fixture.com", "user_id": user.pk,
+                    "contact_registrant_type": "individual", "contact_phone": "12",
+                    "contact_country": "ZZ",
+                }
+            ).content
         for index in range(32):
             get_user_model().objects.create_user(email=f"customer-{index:02d}@example.test", password="fixture-password")
         fixtures["/admin-customers"] = client.get(reverse("admin_tools:users")).content
@@ -106,6 +177,108 @@ def main():
         fixtures["/admin-search-empty"] = client.get(search_url, {"q": "no-record-for-this-key-zz"}).content
         fixtures["/admin-search-invalid"] = client.get(search_url, {"q": "x"}).content
         fixtures["/admin-search-pagination"] = client.get(search_url, {"q": "SEARCH-I", "group": "invoices", "page": "2"}).content
+        from apps.admin_tools.models import CustomerNote
+        from apps.accounts.models import ClientProfile
+        from apps.domains.models import DomainContact
+        ClientProfile.objects.create(user=search_customer, is_business=False)
+        search_contact = DomainContact.objects.create(
+            user=search_customer, registrant_type="individual", label="Individual registrant", name="Global Search",
+            email=search_customer.email, address_line1="1 High Street", city="London", state="London",
+            postcode="SW1A 1AA", country="GB", phone_country_code="44", phone="07700900000",
+        )
+        search_customer.email = "customer-" + "x" * 110 + "@example.test"
+        search_customer.save(update_fields=["email"])
+        CustomerNote.objects.create(customer=search_customer, author=user, body="Staff service context.\n" + "long-note-" * 45 + "\n<script>Escaped note text</script>", submission_key=uuid.uuid4())
+        workspace_url = reverse("admin_tools:customer_workspace", args=[search_customer.pk])
+        response = client.get(workspace_url)
+        assert response.status_code == 200
+        fixtures["/admin-customer-workspace"] = response.content
+        fixtures["/admin-customer-workspace-loading"] = response.content
+        fixtures["/admin-customer-workspace-invalid"] = client.post(reverse("admin_tools:customer_note_add", args=[search_customer.pk]), {"submission_key": str(uuid.uuid4()), "body": ""}).content
+        empty_customer = get_user_model().objects.create_user(email="workspace-empty@example.test", password="fixture-password")
+        fixtures["/admin-customer-workspace-empty"] = client.get(reverse("admin_tools:customer_workspace", args=[empty_customer.pk])).content
+        redacted_note = CustomerNote.objects.create(customer=search_customer, author=user, body="", submission_key=uuid.uuid4(), redacted_at=timezone.now(), redacted_by=user)
+        fixtures["/admin-customer-note-redacted"] = client.get(reverse("admin_tools:customer_note", args=[search_customer.pk, redacted_note.pk])).content
+        from apps.domains.registration_submission import _claim
+        from unittest.mock import Mock
+        submission_order = DomainOrder.objects.create(
+            user=search_customer, domain_name="submission-ui.com", tld="com", status="processing",
+            registration_contact=search_contact, admin_contact=search_contact, tech_contact=search_contact, billing_contact=search_contact,
+        )
+        submission_attempt, _ = _claim(submission_order.pk, "999", ["ns1.example.com", "ns2.example.com"], Mock())
+        from apps.domains.models import DomainTransfer, DomainTransferAttempt
+        transfer_fixture = DomainTransfer.objects.create(user=search_customer, domain_name="transfer-ui.com", tld="com", status="processing",
+            auth_code="PRIVATE-TRANSFER-AUTH", last_error="PRIVATE-TRANSFER-DIAGNOSTIC", registration_contact=search_contact,
+            admin_contact=search_contact, tech_contact=search_contact, billing_contact=search_contact)
+        transfer_attempt = DomainTransferAttempt.objects.create(transfer=transfer_fixture)
+        for transfer_state in ("preparing", "submitting", "unknown", "accepted", "aborted"):
+            transfer_attempt.status = transfer_state
+            transfer_attempt.save()
+            response = client.get(reverse("admin_tools:domain_transfer_detail", args=[transfer_fixture.pk]))
+            assert response.status_code == 200
+            assert b"PRIVATE-TRANSFER" not in response.content
+            fixtures[f"/admin-transfer-{transfer_state}"] = response.content
+        transfer_attempt.status, transfer_attempt.legacy_review_required = "unknown", True
+        transfer_attempt.save()
+        fixtures["/admin-transfer-historical"] = client.get(reverse("admin_tools:domain_transfer_detail", args=[transfer_fixture.pk])).content
+        fixtures["/admin-transfers"] = client.get(reverse("admin_tools:domain_transfers_list")).content
+        fixtures["/admin-transfers-empty"] = client.get(reverse("admin_tools:domain_transfers_list") + "?state=accepted").content
+        fixtures["/admin-transfers-invalid"] = client.get(reverse("admin_tools:domain_transfers_list") + "?state=invalid").content
+        diagnostic_session = Mock()
+        diagnostic_session.prepare_request.return_value.method = "GET"
+        diagnostic_session.send.return_value.status_code = 200
+        diagnostic_session.send.return_value.text = "PRIVATE-PROVIDER-DIAGNOSTIC"
+        with patch("apps.admin_tools.views.requests.Session", return_value=diagnostic_session):
+            fixtures["/admin-registrar-diagnostic"] = client.post(reverse("admin_tools:resellerclub_debug"), {}).content
+            diagnostic_session.send.side_effect = RuntimeError("PRIVATE-PROVIDER-DIAGNOSTIC")
+            fixtures["/admin-registrar-diagnostic-failed"] = client.post(reverse("admin_tools:resellerclub_debug"), {}).content
+        transfer_customer_client = Client()
+        transfer_customer_client.force_login(search_customer)
+        fixtures["/portal-transfer-review"] = transfer_customer_client.get(reverse("domains:my_domains")).content
+        with patch("apps.domains.tasks._build_nameservers", return_value=["ns1.example.com", "ns2.example.com"]):
+            for submission_state in ("preparing", "submitting", "unknown", "accepted", "aborted"):
+                submission_attempt.status = submission_state
+                submission_attempt.remote_order_id = "501" if submission_state == "accepted" else ""
+                submission_order.registrar_order_id = submission_attempt.remote_order_id
+                submission_order.save(update_fields=["registrar_order_id"])
+                submission_attempt.save(update_fields=["status", "remote_order_id", "updated_at"])
+                response = client.get(reverse("admin_tools:domain_order_detail", args=[submission_order.pk]))
+                assert response.status_code == 200
+                fixtures[f"/admin-registration-{submission_state}"] = response.content
+        from apps.domains.historical_registration import historical_subject
+        from datetime import date
+        submission_order.registrar_order_id = "PRIVATE-HISTORICAL-IDENTIFIER"
+        submission_order.last_error = "PRIVATE-HISTORICAL-DIAGNOSTIC"
+        submission_order.save(update_fields=["registrar_order_id", "last_error"])
+        submission_attempt.status = "unknown"
+        submission_attempt.legacy_review_required = True
+        submission_attempt.subject = historical_subject(submission_order)
+        submission_attempt.save()
+        fixtures["/admin-historical-review"] = client.get(reverse("admin_tools:domain_order_detail", args=[submission_order.pk])).content
+        fixtures["/admin-historical-list"] = client.get(reverse("admin_tools:domain_orders_list")).content
+        customer_client = Client()
+        customer_client.force_login(search_customer)
+        held_domain = Domain.objects.create(user=search_customer, name=submission_order.domain_name, tld="com", status="active", registrar_id="501", epp_code="PRIVATE-CACHED-HISTORICAL-EPP")
+        submission_order.domain = held_domain
+        submission_order.save(update_fields=["domain"])
+        fixtures["/portal-historical-review"] = customer_client.get(reverse("domains:my_domains")).content
+        fixtures["/portal-historical-domain"] = customer_client.get(reverse("domains:detail", args=[held_domain.pk])).content
+        held_response = customer_client.post(reverse("domains:get_auth_code", args=[held_domain.pk]))
+        assert held_response.status_code == 409
+        fixtures["/portal-historical-action-held"] = held_response.content
+        submission_order.registrar_order_id = "501"
+        submission_order.last_error = ""
+        submission_order.save(update_fields=["registrar_order_id", "last_error"])
+        for historical_state in ("pending", "suspended"):
+            submission_attempt.status = "accepted"
+            submission_attempt.legacy_review_required = False
+            submission_attempt.registry_status = historical_state
+            submission_attempt.registry_checked_at = timezone.now()
+            submission_attempt.registry_registered_at = date(2020, 1, 1) if historical_state == "suspended" else None
+            submission_attempt.registry_expires_at = date(2030, 1, 1) if historical_state == "suspended" else None
+            submission_attempt.subject = {**submission_attempt.subject, "nameservers": [] if historical_state == "pending" else ["ns1.example.com", "ns2.example.com"]}
+            submission_attempt.save()
+            fixtures[f"/admin-historical-{historical_state}"] = client.get(reverse("admin_tools:domain_order_detail", args=[submission_order.pk])).content
         suggestion_payload = client.get(reverse("admin_tools:search_suggestions"), {"q": "global"}).content
 
 
@@ -134,6 +307,12 @@ def main():
         fixtures["/reauth-required"] = client.post(reverse("admin_tools:settings_import"), {}).content
         agent = get_user_model().objects.create_user(email="support@example.test", password="test-password", is_staff=True)
         agent.groups.add(Group.objects.get(name="Portal Support"))
+        client.force_login(agent)
+        fixtures["/admin-customer-workspace-support"] = client.get(workspace_url).content
+        billing_agent = get_user_model().objects.create_user(email="billing-ui@example.test", password="test-password", is_staff=True)
+        billing_agent.groups.add(Group.objects.get(name="Portal Billing"))
+        client.force_login(billing_agent)
+        fixtures["/admin-customer-workspace-billing"] = client.get(workspace_url).content
         client.force_login(agent)
         fixtures["/staff-workspace"] = client.get(reverse("admin_tools:dashboard")).content
         fixtures["/staff-customers"] = client.get(reverse("admin_tools:users")).content
@@ -185,11 +364,21 @@ def main():
             page.on("pageerror", lambda error: errors.append(str(error)))
             for width in (1440, 390):
                 page.set_viewport_size({"width": width, "height": 960})
-                for name in ("mfa", "mfa-invalid", "reauthenticate", "reauth-required", "staff-roles", "staff-roles-invalid", "staff-workspace", "staff-customers", "branding", "branding-invalid", "configuration", "configuration-invalid", "deliveries", "deliveries-invalid", "public-contact", "public-contact-invalid", "public-error-413", "public-error-429", "public-error-503", "public-quote", "public-domain-error", "public-acceptance", "public-acceptance-unavailable", "public-acceptance-expired", "public-mail-reset", "public-mail-verification", "admin-customers", "admin-customers-empty", "admin-customers-loading", "admin-user-invalid", "admin-invoices", "admin-invoices-empty", "admin-search", "admin-search-start", "admin-search-suggestions-error", "admin-search-empty", "admin-search-invalid", "admin-search-pagination", "admin-search-support", "admin-search-record"):
+                for name in ("admin-registrar-diagnostic", "admin-registrar-diagnostic-failed", "admin-transfer-preparing", "admin-transfer-submitting", "admin-transfer-unknown", "admin-transfer-accepted", "admin-transfer-aborted", "admin-transfer-historical", "admin-transfers", "admin-transfers-empty", "admin-transfers-invalid", "portal-transfer-review", "portal-historical-domain", "portal-historical-action-held", "portal-historical-review", "admin-historical-review", "admin-historical-list", "admin-historical-pending", "admin-historical-suspended", "admin-registration-preparing", "admin-registration-submitting", "admin-registration-unknown", "admin-registration-accepted", "admin-registration-aborted", "admin-customer-workspace", "admin-customer-workspace-loading", "admin-customer-workspace-invalid", "admin-customer-workspace-empty", "admin-customer-workspace-support", "admin-customer-workspace-billing", "admin-customer-note-redacted", "portal-cart-empty", "portal-cart", "public-cart-review", "registrant-verification-automatic", "registrant-verification-queued", "registrant-verification-error", "registrant-verification-review", "registrant-verification-verified", "registrant-verification-pending", "registrant-verification-suspended", "registrant-verification-unknown", "registrant-domain-uk", "registrant-domain-review", "admin-manual-domain", "admin-manual-domain-invalid", "registrant-contact", "registrant-contact-invalid", "mfa", "mfa-invalid", "reauthenticate", "reauth-required", "staff-roles", "staff-roles-invalid", "staff-workspace", "staff-customers", "branding", "branding-invalid", "configuration", "configuration-invalid", "deliveries", "deliveries-invalid", "public-contact", "public-contact-invalid", "public-error-413", "public-error-429", "public-error-503", "public-quote", "public-domain-error", "public-acceptance", "public-acceptance-unavailable", "public-acceptance-expired", "public-mail-reset", "public-mail-verification", "admin-customers", "admin-customers-empty", "admin-customers-loading", "admin-user-invalid", "admin-invoices", "admin-invoices-empty", "admin-search", "admin-search-start", "admin-search-suggestions-error", "admin-search-empty", "admin-search-invalid", "admin-search-pagination", "admin-search-support", "admin-search-record"):
                     if args.pages and name not in args.pages:
                         continue
                     pending_routes = []
                     page.goto(f"http://127.0.0.1:{server.server_port}/{name}")
+                    if name == "admin-customer-workspace-loading":
+                        page.route("**/admin-tools/customers/*/notes/add/", lambda route: pending_routes.append(route))
+                        page.evaluate("() => { const target = document.createElement('iframe'); target.name = 'note-post-target'; target.hidden = true; document.body.appendChild(target); document.querySelector('.admin-note-form').target = target.name; }")
+                        page.locator('#id_body').fill('Preserve this internal note while saving.')
+                        page.locator('.admin-note-form').evaluate('form => form.requestSubmit()')
+                        page.locator('#note-saving-status').wait_for(state='visible')
+                        assert page.locator('.admin-note-form').get_attribute('aria-busy') == 'true'
+                        page.locator('.admin-note-form').evaluate('form => form.requestSubmit()')
+                        assert len(pending_routes) == 1
+                        assert page.locator('#id_body').input_value() == 'Preserve this internal note while saving.'
                     if name == "admin-customers-loading":
                         page.route("**/admin-customers-loading", lambda route: pending_routes.append(route))
                         # Keep the fixture document inspectable while a real
@@ -225,9 +414,22 @@ def main():
                     if name == "admin-search-record":
                         assert page.get_by_text('Manage this record', exact=True).count() == 0
                         assert 'NOT-FOR-SEARCH' not in page.locator('.admin-content').inner_text()
+                    if name.startswith("registrant-verification-") and name != "registrant-verification-error":
+                        refresh = page.get_by_role('button', name='Queue status check', exact=True)
+                        assert refresh.count() == 1
+                        assert refresh.locator('xpath=..').get_attribute('method') == 'post'
+                        assert refresh.locator('xpath=..').locator('input[name=csrfmiddlewaretoken]').input_value()
+                        if name in {"registrant-verification-pending", "registrant-verification-suspended"}:
+                            assert page.get_by_role('button', name='Request verification email', exact=True).count() == 1
+                        if name in {"registrant-verification-verified", "registrant-verification-review"}:
+                            assert page.get_by_role('button', name='Request verification email', exact=True).count() == 0
+                        if name == "registrant-verification-review":
+                            assert page.get_by_text('An earlier email request has an uncertain outcome.', exact=False).count() == 1
+                        if name == "registrant-verification-automatic":
+                            assert page.get_by_role('status').filter(has_text='Automatic status check: Queued').count() == 1
                     if name.startswith("public-error"):
                         page.wait_for_function("getComputedStyle(document.querySelector('.request-error')).backgroundColor === 'rgb(255, 255, 255)'")
-                    elif name.startswith("public-"):
+                    elif name.startswith(("public-", "registrant-", "portal-")):
                         page.wait_for_function("typeof tailwind !== 'undefined'")
                     else:
                         page.wait_for_function("getComputedStyle(document.querySelector('.auth-card, .admin-header')).backgroundColor === 'rgb(255, 255, 255)'")
@@ -267,6 +469,20 @@ def main():
                     })""")
                     violations = [{"rule": item["id"], "nodes": [n["html"] for n in item["nodes"]]} for item in result["violations"]]
                     assert not violations, (name, width, violations)
+                    if name == "portal-cart":
+                        assert page.get_by_role('heading', name='Your cart', level=1).count() == 1
+                        assert page.get_by_text('Remove', exact=True).get_attribute('aria-label').startswith('Remove Domain registration:')
+                        invoice_button = page.get_by_role('button', name='Create invoice', exact=True)
+                        invoice_button.evaluate("el => el.scrollIntoView({block: 'end'})")
+                        page.wait_for_function("() => { const button = Array.from(document.querySelectorAll('button')).find(el => el.textContent.trim() === 'Create invoice'); const banner = document.querySelector('#cookie-banner'); return !banner || !banner.getBoundingClientRect().height || button.getBoundingClientRect().bottom <= banner.getBoundingClientRect().top; }")
+                    if name == "public-cart-review":
+                        page.get_by_role('link', name='Manage domain contacts', exact=True).focus()
+                        page.keyboard.press('Tab')
+                        assert page.get_by_role('link', name='Return to quote', exact=False).evaluate('el => el === document.activeElement')
+                    if name.startswith("registrant-") and not name.startswith("registrant-verification-"):
+                        submit = page.locator('main button[type="submit"]').first
+                        submit.evaluate("el => el.scrollIntoView({block: 'end'})")
+                        page.wait_for_function("() => { const submit = document.querySelector('main button[type=submit]'); const banner = document.querySelector('#cookie-banner'); return !banner || !banner.getBoundingClientRect().height || submit.getBoundingClientRect().bottom <= banner.getBoundingClientRect().top; }")
                     assert page.evaluate("document.documentElement.scrollWidth <= innerWidth"), (name, width, page.evaluate("Array.from(document.querySelectorAll('.admin-main, .admin-content, .admin-table-scroll')).map(el => ({element: el.className, scroll: el.scrollWidth, client: el.clientWidth, overflow: getComputedStyle(el).overflow, position: getComputedStyle(el).position})).concat(Array.from(document.body.querySelectorAll('*')).filter(el => el.getBoundingClientRect().right > innerWidth && !el.closest('.admin-table-scroll')).slice(0,10).map(el => ({element: el.outerHTML.slice(0,150), right: el.getBoundingClientRect().right})))"))
                     if name.startswith("public-mail-"):
                         assert "queued for delivery" in page.locator('.auth-card').inner_text()
@@ -293,10 +509,78 @@ def main():
                         page.locator('#id_q').focus()
                         page.keyboard.press('Tab')
                         assert page.get_by_role('button', name='Search', exact=True).evaluate('el => el === document.activeElement')
+                    if name == "admin-customer-workspace-invalid":
+                        assert page.locator('[data-admin-error-summary]').evaluate('el => el === document.activeElement')
+                        page.locator('[data-admin-error-summary] a').first.click()
+                        assert page.locator('#id_body').evaluate('el => el === document.activeElement')
+                    if name.startswith("admin-customer-workspace"):
+                        assert page.get_by_role('heading', name='Customer workspace', level=1).count() == 1
+                        if name.endswith("-billing"):
+                            assert page.get_by_role('heading', name='Contact validation', exact=True).count() == 0
+                            assert page.get_by_role('button', name='Add internal note', exact=True).count() == 0
+                        if name.endswith("-support"):
+                            assert page.get_by_role('heading', name='Outstanding balances', exact=True).count() == 0
+                            assert page.get_by_text('Multi-factor authentication', exact=True).count() == 0
                     if name == "admin-user-invalid":
                         assert page.locator('[data-admin-error-summary]').evaluate('el => el === document.activeElement')
                         page.locator('[data-admin-error-summary] a').first.click()
                         assert page.locator('#id_email').evaluate('el => el === document.activeElement')
+                    if name in {"registrant-contact", "registrant-contact-invalid"}:
+                        country = page.locator('#id_country')
+                        assert country.locator('option').count() == 250
+                        assert country.locator('option[value="GB"]').count() == 1
+                        assert country.locator('option[value="UK"]').count() == 0
+                        assert page.locator('[data-no-field-hints] .field-example-hint').count() == 0
+                        if name.endswith('-invalid'):
+                            assert page.locator('[data-contact-error-summary]').evaluate('el => el === document.activeElement')
+                            page.locator('[data-contact-error-summary] a[href="#id_country"]').click()
+                            assert country.evaluate('el => el === document.activeElement')
+                        country.focus()
+                        page.keyboard.press('End')
+                        assert country.input_value() == 'ZW'
+                        if width == 390:
+                            assert country.bounding_box()['width'] >= 200
+                        page.screenshot(path=str(args.output_dir / f"{name}-country-{width}.png"), full_page=True)
+                    if name == "admin-manual-domain-invalid":
+                        assert page.locator('#contact_country').input_value() == 'ZZ'
+                        assert page.locator('#contact_country option:checked').text_content().startswith('Unsupported code')
+                    if name.startswith('admin-registration-'):
+                        assert page.get_by_role('heading', name='Domain registration order', level=1).count() == 1
+                        assert page.get_by_role('heading', name='Registrar submission', level=2).count() == 1
+                        assert page.get_by_role('button', name='Delete order', exact=True).count() == 0
+                        if name.endswith(('preparing', 'submitting', 'unknown')):
+                            assert page.get_by_role('button', name='Process / register', exact=True).count() == 0
+                            assert page.locator('#order-domain_name').is_disabled()
+                        if name.endswith('accepted'):
+                            assert page.get_by_role('button', name='Resume local completion', exact=True).count() == 1
+                        if name.endswith('aborted'):
+                            assert page.locator('#order-domain_name').is_enabled()
+                    if name.startswith('admin-historical-'):
+                        assert 'PRIVATE-HISTORICAL' not in page.locator('body').text_content()
+                        if name.endswith('review'):
+                            assert page.get_by_text('Historical submission not confirmed.', exact=False).count() == 1
+                            assert page.locator('#order-domain_name').is_disabled()
+                            assert page.get_by_role('button', name='Process / register', exact=True).count() == 0
+                        if name.endswith('pending'):
+                            assert page.get_by_text('Not reported', exact=True).count() == 2
+                            assert page.get_by_text('Delegation was not reported in the last provider snapshot.', exact=True).count() == 1
+                        if name.endswith('suspended'):
+                            assert page.get_by_text('Suspended', exact=True).count() == 1
+                            assert page.get_by_text('01 Jan 2020', exact=True).count() == 1
+                    if name == 'portal-historical-review':
+                        assert page.get_by_role('heading', name='Registration awaiting review', level=2).count() == 1
+                        assert 'PRIVATE-HISTORICAL' not in page.locator('body').text_content()
+                        assert page.get_by_role('link', name='Contact support about registration status', exact=True).count() == 1
+                        if width == 390:
+                            region = page.get_by_role('region', name='Domain records', exact=True)
+                            region.focus()
+                            page.keyboard.press('ArrowRight')
+                            page.wait_for_function("document.querySelector('[aria-label=\"Domain records\"]').scrollLeft > 0")
+                    if name == 'portal-historical-domain':
+                        assert page.get_by_role('heading', name='Registrar association awaiting review', level=2).count() == 1
+                        assert 'PRIVATE-CACHED-HISTORICAL-EPP' not in page.locator('body').text_content()
+                    if name == 'portal-historical-action-held':
+                        assert page.get_by_role('heading', name='Registrar review required', level=1).count() == 1
                     if name.startswith('admin-'):
                         page.screenshot(path=str(args.output_dir / f"{name}-overview-{width}.png"), full_page=True)
                     if name in {"admin-customers", "admin-invoices"} and width == 390:
@@ -306,6 +590,14 @@ def main():
                         page.keyboard.press('ArrowRight')
                         page.wait_for_function("document.querySelector('.admin-table-scroll').scrollLeft > 0")
                     page.screenshot(path=str(args.output_dir / f"{name}-{width}.png"), full_page=True)
+                    if name == "admin-customer-workspace":
+                        page.locator('#contact-checks').scroll_into_view_if_needed()
+                        page.screenshot(path=str(args.output_dir / f"{name}-validation-{width}.png"), full_page=True)
+                        page.locator('#internal-notes').scroll_into_view_if_needed()
+                        page.screenshot(path=str(args.output_dir / f"{name}-notes-{width}.png"), full_page=True)
+                        button = page.get_by_role('button', name='Add internal note', exact=True)
+                        button.scroll_into_view_if_needed()
+                        assert button.evaluate("el => { const banner = document.getElementById('cookie-banner'); return !banner || !banner.getClientRects().length || el.getBoundingClientRect().bottom <= banner.getBoundingClientRect().top; }")
                     if name == "admin-customers" and width == 390:
                         opener = page.get_by_role('button', name='Open menu', exact=True)
                         opener.click()
@@ -348,6 +640,9 @@ def main():
     finally:
         server.shutdown()
         server.server_close()
+    assert reports, "No browser checks ran; check the requested fixture names."
+    if args.pages:
+        assert set(args.pages) <= {report["page"] for report in reports}, "Some requested fixture pages were not checked."
     (args.output_dir / "results.json").write_text(json.dumps(reports, indent=2), encoding="utf-8")
     print(json.dumps({"checks": len(reports), "output": str(args.output_dir)}, indent=2))
 

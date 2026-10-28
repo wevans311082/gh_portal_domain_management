@@ -1,0 +1,7 @@
+<article id="note-{{ note.pk }}" class="admin-customer-note" aria-label="Internal note {{ note.pk }}">
+  <h3><a href="{% url 'admin_tools:customer_note' customer.pk note.pk %}">Note #{{ note.pk }}</a></h3>
+  <p>{{ note.created_at|date:"d M Y H:i T" }} · {% if note.author %}{{ note.author.full_name }}{% else %}Former staff member{% endif %}</p>
+  <p>Visibility: {{ note.get_audience_display }}</p>
+  {% if note.redacted_at %}<p>Text redacted by an owner on {{ note.redacted_at|date:"d M Y H:i T" }}.</p>{% else %}<div class="admin-note-text">{{ note.body }}</div>
+  {% if can_redact %}<form method="post" action="{% url 'admin_tools:customer_note_redact' customer.pk note.pk %}">{% csrf_token %}<button class="admin-button admin-button-secondary" type="submit" aria-label="Permanently redact note {{ note.pk }}">Permanently redact note</button></form>{% endif %}{% endif %}
+</article>

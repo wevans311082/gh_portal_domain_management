@@ -6,13 +6,14 @@ from decimal import Decimal, InvalidOperation
 
 from django.contrib import messages
 from django.core.paginator import Paginator
+from django.db import transaction
 from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from apps.accounts.models import User
 from apps.admin_tools.decorators import staff_member_required
-from apps.domains.models import Domain, DomainContact, DomainOrder
+from apps.domains.models import Domain, DomainContact, DomainOrder, DomainRegistrationAttempt
 from apps.domains.tasks import register_domain_order
 
 logger = logging.getLogger(__name__)
@@ -24,6 +25,7 @@ def _orders_qs():
         "invoice",
         "domain",
         "registration_contact",
+        "registration_attempt",
     ).order_by("-created_at")
 
 
@@ -42,11 +44,11 @@ def domain_orders_list(request):
         qs = qs.filter(status=status)
 
     if q:
+        safe_diagnostics = Q(registration_attempt__isnull=True) | Q(registration_attempt__legacy_review_required=False)
         qs = qs.filter(
             Q(domain_name__icontains=q)
             | Q(user__email__icontains=q)
-            | Q(registrar_order_id__icontains=q)
-            | Q(last_error__icontains=q)
+            | (safe_diagnostics & (Q(registrar_order_id__icontains=q) | Q(last_error__icontains=q)))
             | Q(invoice__number__icontains=q)
         )
 
@@ -85,11 +87,14 @@ def domain_order_detail(request, pk):
     if request.method == "POST":
         return _save_order_details(request, order)
 
+    registration_attempt = DomainRegistrationAttempt.objects.filter(order=order).first()
     resolved_ns = []
     try:
         from apps.domains.tasks import _build_nameservers
 
-        resolved_ns = _build_nameservers(order)
+        resolved_ns = registration_attempt.subject.get("nameservers") if registration_attempt else None
+        if not resolved_ns and not (registration_attempt and (registration_attempt.legacy_review_required or registration_attempt.registry_status)):
+            resolved_ns = _build_nameservers(order)
     except Exception:
         resolved_ns = []
 
@@ -98,6 +103,7 @@ def domain_order_detail(request, pk):
         "admin_tools/ops/domain_order_detail.html",
         {
             "order": order,
+            "registration_attempt": registration_attempt,
             "contacts": contacts,
             "users": users,
             "status_choices": DomainOrder.STATUS_CHOICES,
@@ -107,7 +113,13 @@ def domain_order_detail(request, pk):
     )
 
 
+@transaction.atomic
 def _save_order_details(request, order: DomainOrder):
+    order = DomainOrder.objects.select_for_update().get(pk=order.pk)
+    attempt = DomainRegistrationAttempt.objects.select_for_update().filter(order=order).first()
+    if attempt and attempt.status != "aborted" and order.status != "completed":
+        messages.error(request, "Registration details are protected while an attempt is preparing, uncertain or acknowledged. Reconcile the attempt before changing them.")
+        return redirect("admin_tools:domain_order_detail", pk=order.pk)
     if order.status == DomainOrder.STATUS_COMPLETED and order.domain_id:
         # Allow limited notes/error clear only
         order.last_error = (request.POST.get("last_error") or "").strip()
@@ -187,37 +199,44 @@ def _save_order_details(request, order: DomainOrder):
 @staff_member_required
 @require_POST
 def domain_order_action(request, pk, action):
-    order = get_object_or_404(DomainOrder, pk=pk)
     action = (action or "").strip().lower()
-
-    if action == "process":
+    if action in {"process", "retry_failed"}:
+        with transaction.atomic():
+            order = get_object_or_404(DomainOrder.objects.select_for_update(), pk=pk)
+            attempt = DomainRegistrationAttempt.objects.select_for_update().filter(order=order).first()
+            if attempt and attempt.status not in {"aborted", "accepted"}:
+                messages.error(request, "An existing registrar attempt is in progress or requires reconciliation. No new submission was made.")
+                return redirect("admin_tools:domain_order_detail", pk=pk)
+            if action == "retry_failed":
+                if order.status != DomainOrder.STATUS_FAILED:
+                    messages.error(request, "Only failed orders can be retried this way.")
+                    return redirect("admin_tools:domain_order_detail", pk=pk)
+                order.status = DomainOrder.STATUS_PAID
+                order.last_error = ""
+                order.save(update_fields=["status", "last_error", "updated_at"])
+        # A durable provider reservation must not be nested in this HTTP write.
         return _action_process(request, order)
-    if action == "pause":
-        return _action_pause(request, order)
-    if action == "resume":
-        return _action_resume(request, order)
-    if action == "cancel":
-        return _action_cancel(request, order)
-    if action == "delete":
-        return _action_delete(request, order)
-    if action == "mark_paid":
-        return _action_mark_paid(request, order)
+    return _mutate_order_action(request, pk, action)
+
+
+@transaction.atomic
+def _mutate_order_action(request, pk, action):
+    order = get_object_or_404(DomainOrder.objects.select_for_update(), pk=pk)
+    attempt = DomainRegistrationAttempt.objects.select_for_update().filter(order=order).first()
+    if attempt and (action == "delete" or attempt.status != "aborted" and action != "clear_error"):
+        messages.error(request, "Registrar attempt history protects this order. Reconcile it before making this change; retained attempt records cannot be deleted here.")
+        return redirect("admin_tools:domain_order_detail", pk=pk)
+    handlers = {"pause": _action_pause, "resume": _action_resume, "cancel": _action_cancel,
+                "delete": _action_delete, "mark_paid": _action_mark_paid}
+    if action in handlers:
+        return handlers[action](request, order)
     if action == "clear_error":
         order.last_error = ""
         order.save(update_fields=["last_error", "updated_at"])
-        messages.success(request, "Error cleared.")
-        return redirect("admin_tools:domain_order_detail", pk=order.pk)
-    if action == "retry_failed":
-        if order.status != DomainOrder.STATUS_FAILED:
-            messages.error(request, "Only failed orders can be retried this way.")
-            return redirect("admin_tools:domain_order_detail", pk=order.pk)
-        order.status = DomainOrder.STATUS_PAID
-        order.last_error = ""
-        order.save(update_fields=["status", "last_error", "updated_at"])
-        return _action_process(request, order)
-
-    messages.error(request, f"Unknown action: {action}")
-    return redirect("admin_tools:domain_order_detail", pk=order.pk)
+        messages.success(request, "Error cleared. Registrar attempt state is unchanged.")
+    else:
+        messages.error(request, "Unknown order action.")
+    return redirect("admin_tools:domain_order_detail", pk=pk)
 
 
 def _action_process(request, order: DomainOrder):
@@ -310,7 +329,7 @@ def _action_cancel(request, order: DomainOrder):
     order.save(update_fields=["status", "last_error", "updated_at"])
     messages.success(
         request,
-        f"Order {order.domain_name} cancelled. Domain name is free for a new platform order.",
+        f"Platform order {order.domain_name} cancelled. Its order and submission history is retained.",
     )
     return redirect("admin_tools:domain_orders_list")
 

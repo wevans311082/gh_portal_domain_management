@@ -147,7 +147,7 @@
             </div>
         </header>
 
-        <div class="flex-1 p-4 md:p-6 overflow-auto text-slate-900">
+        <div data-portal-content class="flex-1 p-4 md:p-6 overflow-auto text-slate-900" style="padding-bottom: calc(1.5rem + var(--portal-bottom-obstruction, 0px)); scroll-padding-bottom: var(--portal-bottom-obstruction, 0px)">
             {% block content %}{% endblock %}
         </div>
     </main>

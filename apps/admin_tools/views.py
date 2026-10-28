@@ -1015,7 +1015,7 @@ def integration_detail(request, service):
 
 @staff_member_required
 def resellerclub_debug(request):
-    """Low-level debug page to inspect full ResellerClub HTTP request/response details."""
+    """Owner diagnostics retain transport metadata, never provider payloads."""
     base_url = get_runtime_setting("RESELLERCLUB_API_URL", "https://httpapi.com/api").rstrip("/")
     reseller_id = get_runtime_setting("RESELLERCLUB_RESELLER_ID", "")
     api_key = get_runtime_setting("RESELLERCLUB_API_KEY", "")
@@ -1069,7 +1069,7 @@ def resellerclub_debug(request):
                         "endpoint": endpoint,
                         "domain_label": domain_label,
                         "tlds": tlds_raw,
-                        "raw_params": raw_params,
+                        "raw_params": "",
                     }
                 )
                 return render(request, "admin_tools/resellerclub_debug.html", context)
@@ -1096,12 +1096,10 @@ def resellerclub_debug(request):
         debug = {
             "request": {
                 "method": prepared.method,
-                "url": prepared.url,
-                "headers": dict(prepared.headers),
-                "body": prepared.body.decode("utf-8", errors="replace")
-                if isinstance(prepared.body, bytes)
-                else (prepared.body or ""),
-                "params": params,
+                "url": "Request URL excluded",
+                "headers": {},
+                "body": "Request body excluded",
+                "params": {},
             },
             "response": None,
             "error": None,
@@ -1109,32 +1107,25 @@ def resellerclub_debug(request):
 
         try:
             started = time.monotonic()
-            response = session.send(prepared, timeout=(10, 30))
+            response = session.send(prepared, timeout=(10, 30), allow_redirects=False)
             elapsed_ms = round((time.monotonic() - started) * 1000)
-            body_text = response.text
-            body_json = None
-            try:
-                body_json = response.json()
-            except Exception:
-                body_json = None
-
             debug["response"] = {
                 "elapsed_ms": elapsed_ms,
                 "status_code": response.status_code,
-                "reason": response.reason,
-                "headers": dict(response.headers),
-                "text": body_text,
-                "json": body_json,
+                "reason": "",
+                "headers": {},
+                "text": "Provider response payload excluded",
+                "json": None,
             }
-        except Exception as exc:
-            debug["error"] = str(exc)
+        except Exception:
+            debug["error"] = "The diagnostic request failed. Check the configured provider endpoint and account."
 
         context.update(
             {
                 "endpoint": endpoint,
                 "domain_label": domain_label,
                 "tlds": tlds_raw,
-                "raw_params": raw_params,
+                "raw_params": "",
                 "debug": debug,
             }
         )

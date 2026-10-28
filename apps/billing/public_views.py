@@ -193,8 +193,14 @@ def _finalize_quote_acceptance(request, token):
     from django import forms
     from apps.core.public_submissions import SubmissionUnavailable
     from .acceptance import accept_public_quote
+    from apps.portal.cart_service import CartPreflightError
     try:
         invoice = accept_public_quote(request, token)
+    except CartPreflightError as exc:
+        return render(request, "public/quote_cart_review.html", {
+            "quote": _get_quote_by_token(token), "message": str(exc),
+            "contact_id": exc.contact_id, "issues": exc.issues,
+        }, status=400)
     except forms.ValidationError:
         messages.error(request, "This quote can no longer be accepted.")
         return redirect("billing_public:quote_public", token=token)

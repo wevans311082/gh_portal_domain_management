@@ -7,11 +7,13 @@ from django.utils import timezone
 
 from apps.dns.models import DNSRecord, DNSZone
 from apps.domains.models import Domain
+from apps.domains.registrar_review import assert_registrar_review_complete
 
 logger = logging.getLogger(__name__)
 
 
 def ensure_zone(domain: Domain) -> DNSZone:
+    assert_registrar_review_complete(domain)
     zone = getattr(domain, "dns_zone", None)
     if zone:
         return zone
@@ -20,6 +22,7 @@ def ensure_zone(domain: Domain) -> DNSZone:
 
 
 def import_records(zone: DNSZone) -> int:
+    assert_registrar_review_complete(zone.domain)
     provider = (zone.provider or zone.domain.dns_provider or "").lower()
     created = 0
     try:
@@ -37,6 +40,7 @@ def import_records(zone: DNSZone) -> int:
 
 
 def push_record(zone: DNSZone, record: DNSRecord, action: str = "create"):
+    assert_registrar_review_complete(zone.domain)
     provider = (zone.provider or zone.domain.dns_provider or "").lower()
     try:
         if provider in {"cpanel", "whm"}:

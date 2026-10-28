@@ -9,10 +9,14 @@ from . import domain_order_views
 from . import resellerclub_views
 from . import role_views
 from . import search_views
+from . import customer_workspace
+from . import transfer_views
 
 app_name = "admin_tools"
 
 urlpatterns = [
+    path("domains/transfers/", transfer_views.domain_transfers_list, name="domain_transfers_list"),
+    path("domains/transfers/<int:pk>/", transfer_views.domain_transfer_detail, name="domain_transfer_detail"),
     # Overview
     path("", views.dashboard, name="dashboard"),
     path("search/", search_views.search, name="search"),
@@ -21,6 +25,10 @@ urlpatterns = [
     path("stats/", views.stats, name="stats"),
     # People
     path("users/", views.users, name="users"),
+    path("customers/<int:pk>/", customer_workspace.customer_workspace, name="customer_workspace"),
+    path("customers/<int:pk>/notes/add/", customer_workspace.customer_note_add, name="customer_note_add"),
+    path("customers/<int:pk>/notes/<int:note_pk>/", customer_workspace.customer_note, name="customer_note"),
+    path("customers/<int:pk>/notes/<int:note_pk>/redact/", customer_workspace.customer_note_redact, name="customer_note_redact"),
     path("users/new/", content_views.user_create, name="user_create"),
     path("users/<int:pk>/", content_views.user_edit, name="user_edit"),
     path("users/<int:pk>/mfa/", content_views.user_mfa_manage, name="user_mfa_manage"),

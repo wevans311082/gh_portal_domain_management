@@ -1,0 +1,73 @@
+from datetime import timedelta
+
+import pytest
+from django.utils import timezone
+
+from apps.domains.models import ContactVerification, DomainContact
+
+
+@pytest.fixture
+def saved_contact(db, django_user_model):
+    user = django_user_model.objects.create_user(email="evidence@example.com", password="testpass")
+    return DomainContact.objects.create(
+        user=user, label="Individual", name="Jane Smith", email=user.email,
+        phone="7700900000", address_line1="1 High Street", city="London",
+        state="London", postcode="SW1A 1AA", country="GB",
+        registrant_validation_status="validated",
+    )
+
+
+def evidence(contact, **overrides):
+    values = dict(
+        contact=contact, check_kind="registrar_email", status="verified",
+        subject_digest=ContactVerification.digest_for(contact),
+        source="provider-test-fixture", checked_at=timezone.now(),
+    )
+    values.update(overrides)
+    return ContactVerification.objects.create(**values)
+
+
+def test_legacy_local_validation_creates_no_registrar_evidence(saved_contact):
+    assert not saved_contact.verification_evidence.exists()
+
+
+@pytest.mark.parametrize("attribute,value", [
+    ("name", "Changed Name"), ("company", "New Company"),
+    ("company_number", "12345678"), ("email", "changed@example.com"),
+    ("phone_country_code", "1"), ("phone", "1234567890"),
+    ("address_line1", "2 High Street"), ("address_line2", "Suite 2"),
+    ("city", "Manchester"), ("state", "Lancashire"),
+    ("postcode", "M1 1AA"), ("country", "US"),
+    ("registrar_contact_id", "123"),
+])
+def test_persisted_change_invalidates_even_cached_evidence(saved_contact, attribute, value):
+    result = evidence(saved_contact)
+    assert result.is_verified
+    DomainContact.objects.filter(pk=saved_contact.pk).update(**{attribute: value})
+    assert not result.is_current
+    assert not result.is_verified
+    result.refresh_from_db()
+    assert result.status == "verified"  # Historical evidence is retained.
+
+
+def test_cosmetic_label_change_keeps_evidence_current(saved_contact):
+    result = evidence(saved_contact)
+    DomainContact.objects.filter(pk=saved_contact.pk).update(label="Home", is_default=True)
+    assert result.is_verified
+
+
+@pytest.mark.parametrize("changes", [
+    {"expires_at": timezone.now() - timedelta(seconds=1)},
+    {"checked_at": timezone.now() + timedelta(days=1)},
+    {"status": "pending"}, {"status": "rejected"}, {"status": "unknown"},
+])
+def test_noncurrent_or_incomplete_checks_are_not_verified(saved_contact, changes):
+    assert not evidence(saved_contact, **changes).is_verified
+
+
+def test_business_check_does_not_create_email_or_eligibility_evidence(saved_contact):
+    result = evidence(saved_contact, check_kind="business")
+    assert result.is_verified
+    assert not saved_contact.verification_evidence.filter(
+        check_kind__in=["registrar_email", "eligibility"]
+    ).exists()

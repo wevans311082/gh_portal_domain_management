@@ -13,6 +13,7 @@ def make_user(django_user_model, email="contact@example.com"):
 
 
 VALID_PAYLOAD = {
+    "registrant_type": "individual",
     "label": "Primary",
     "name": "Jane Smith",
     "company": "",
@@ -32,6 +33,7 @@ VALID_PAYLOAD = {
 def make_contact(user, label="Primary", is_default=True):
     return DomainContact.objects.create(
         user=user,
+        registrant_type="individual",
         label=label,
         name="Jane Smith",
         email="jane@example.com",
@@ -280,26 +282,28 @@ def test_contact_set_default_requires_post(client, django_user_model):
 
 
 @pytest.mark.django_db
-def test_contact_create_individual_auto_validates_registrant(client, django_user_model):
+def test_contact_create_individual_does_not_claim_registrar_verification(client, django_user_model):
     user = make_user(django_user_model)
     client.force_login(user)
     payload = dict(VALID_PAYLOAD, company="", company_number="")
     client.post(reverse("domains:contact_create"), payload)
 
     contact = DomainContact.objects.get(user=user, label="Primary")
-    assert contact.registrant_validation_status == DomainContact.VALIDATION_VALIDATED
+    assert contact.registrant_validation_status == DomainContact.VALIDATION_UNVALIDATED
+    assert contact.registrant_type == "individual"
+    assert not contact.verification_evidence.exists()
 
 
 @pytest.mark.django_db
-def test_contact_create_company_without_number_rejected(client, django_user_model):
+def test_contact_create_organisation_without_uk_number_is_allowed(client, django_user_model):
     user = make_user(django_user_model)
     client.force_login(user)
-    payload = dict(VALID_PAYLOAD, company="Example Ltd", company_number="")
+    payload = dict(VALID_PAYLOAD, registrant_type="organisation", company="Example Trading", company_number="")
     response = client.post(reverse("domains:contact_create"), payload)
 
     assert response.status_code == 302
     contact = DomainContact.objects.get(user=user, label="Primary")
-    assert contact.registrant_validation_status == DomainContact.VALIDATION_REJECTED
+    assert contact.registrant_validation_status == DomainContact.VALIDATION_UNVALIDATED
 
 
 @pytest.mark.django_db

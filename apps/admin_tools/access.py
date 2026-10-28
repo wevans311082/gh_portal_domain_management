@@ -15,6 +15,7 @@ from apps.accounts.mfa import credential_fingerprint
 
 CAPABILITIES = (
     ("view_customers", "View customer accounts"),
+    ("manage_customer_notes", "Add internal customer notes"),
     ("view_billing", "View invoices, quotes and payments"),
     ("manage_billing", "Manage invoices, quotes and payments"),
     ("view_domains", "View domains and orders"),
@@ -29,7 +30,7 @@ CAPABILITIES = (
 )
 
 ROLE_CAPABILITIES = {
-    "Portal Support": {"view_customers", "view_domains", "view_services", "view_support", "manage_support"},
+    "Portal Support": {"view_customers", "manage_customer_notes", "view_domains", "view_services", "view_support", "manage_support"},
     "Portal Billing": {"view_customers", "view_billing", "manage_billing"},
     "Portal Content": {"view_content", "manage_content"},
     "Portal Domain Operations": {"view_customers", "view_domains", "manage_domains"},
@@ -83,6 +84,9 @@ _routes("search search_suggestions search_record", RoutePolicy(read_any=(
 
 
 _routes("users company_lookup", RoutePolicy("view_customers"))
+_routes("customer_workspace customer_note", RoutePolicy("view_customers"))
+_routes("customer_note_add", RoutePolicy(write="manage_customer_notes"))
+_routes("customer_note_redact", OWNER)
 _routes("invoices invoice_list invoice_pdf quote_list quote_pdf payments_list", RoutePolicy("view_billing"))
 _routes("invoice_create invoice_edit invoice_action quote_create quote_edit quote_action "
         "payments_create payments_edit payments_delete cart_builder cart_builder_add_hosting "
@@ -91,6 +95,7 @@ _routes("invoice_create invoice_edit invoice_action quote_create quote_edit quot
         RoutePolicy("manage_billing", "manage_billing"))
 _routes("domains_list domain_orders_list", RoutePolicy("view_domains"))
 _routes("domain_order_detail", RoutePolicy("view_domains", "manage_domains"))
+_routes("domain_transfers_list domain_transfer_detail", RoutePolicy(read="view_domains"))
 _routes("domains_create domains_edit domains_delete domain_order_action manual_domain_register manual_domain_result "
         "manual_domain_generate_invoice manual_domain_add_hosting tld_pricing", RoutePolicy("manage_domains", "manage_domains", recent_mfa=True))
 _routes("services_list", RoutePolicy("view_services"))

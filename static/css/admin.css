@@ -232,3 +232,30 @@
 
 .admin-page-header > div { min-width: 0; max-width: 100%; }
 .admin-page-header :is(h1, p) { overflow-wrap: anywhere; }
+
+
+/* Permission-scoped customer workspace, including untrusted long text. */
+.admin-workspace-nav { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem 1.25rem; margin: 1rem 0 1.5rem; }
+.admin-workspace-nav a, .admin-workspace-list a, .admin-customer-note a, .admin-customer-workspace .admin-card > a:not(.admin-button), .admin-customer-workspace .admin-pagination a { color: #075985; text-decoration: underline; text-underline-offset: .18em; overflow-wrap: anywhere; }
+.admin-workspace-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 23rem), 1fr)); gap: 1.25rem; }
+.admin-workspace-grid > *, .admin-workspace-list li, .admin-customer-note { min-width: 0; overflow-wrap: anywhere; }
+.admin-workspace-list { list-style: none; padding: 0; margin: 1rem 0; }
+.admin-workspace-list > li { padding: .875rem 0; border-bottom: 1px solid #cbd5e1; }
+.admin-workspace-list > li:last-child { border-bottom: 0; }
+.admin-workspace-list p, .admin-workspace-list time, .admin-customer-note > p { color: #475569; margin-top: .25rem; }
+.admin-workspace-count { font-size: .875rem; font-weight: 600; color: #475569; }
+.admin-workspace-verification { margin: .75rem 0 0; font-size: .875rem; }
+.admin-workspace-verification > div { display: flex; flex-wrap: wrap; gap: .25rem .75rem; margin: .35rem 0; }
+.admin-workspace-verification dt { color: #334155; font-weight: 600; }
+.admin-workspace-verification dd { color: #334155; margin: 0; overflow-wrap: anywhere; }
+.admin-customer-note { border: 1px solid #cbd5e1; border-radius: .5rem; padding: 1rem; margin: 1rem 0; }
+.admin-note-text { color: #1e293b; white-space: pre-wrap; overflow-wrap: anywhere; margin: .875rem 0; }
+.admin-note-form { margin-top: 1.5rem; max-width: 48rem; }
+.admin-note-form textarea { width: 100%; box-sizing: border-box; }
+#account-health, #contact-checks, #activity, #internal-notes, [id^="panel-"] { scroll-margin-top: 6rem; }
+
+.admin-customer-workspace > .admin-card, .admin-customer-workspace .admin-workspace-grid > .admin-card { padding: 1.25rem; margin-bottom: 1.25rem; }
+.admin-customer-workspace .admin-card h2 { font-size: 1.125rem; font-weight: 650; color: #0f172a; margin-bottom: .75rem; }
+.admin-customer-workspace .admin-card h3, .admin-customer-note h3 { font-size: 1rem; font-weight: 650; }
+.admin-customer-workspace .admin-card > p { color: #475569; }
+.admin-customer-workspace .admin-record-details dl { margin: .875rem 0; }

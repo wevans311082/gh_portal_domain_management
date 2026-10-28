@@ -38,6 +38,7 @@ def test_register_view_creates_invoice_and_domain_order(client, django_user_mode
     contact = DomainContact.objects.create(
         user=user,
         label="Primary",
+        registrant_type="individual",
         name="Buyer Example",
         email=user.email,
         phone_country_code="44",

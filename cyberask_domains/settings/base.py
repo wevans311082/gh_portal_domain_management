@@ -213,6 +213,8 @@ CELERY_RESULT_EXTENDED = True
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 CELERY_BEAT_SCHEDULE = {
     "public-delivery-dispatch": {"task": "core.dispatch_public_deliveries", "schedule": 60.0},
+    "registrar-verification-dispatch": {"task": "domains.dispatch_verification_actions", "schedule": 60.0},
+    "registrar-verification-scan": {"task": "domains.schedule_verification_checks", "schedule": 60.0},
 }
 CELERY_TASK_DEFAULT_QUEUE = "default"
 CELERY_IMPORTS = ("apps.provisioning.tasks",)

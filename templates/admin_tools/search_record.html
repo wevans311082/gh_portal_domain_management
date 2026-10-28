@@ -7,6 +7,7 @@
   <dl>{% for label,value in details %}<div><dt>{{ label }}</dt><dd>{{ value|default:"Not recorded" }}</dd></div>{% endfor %}</dl>
 </section>
 <div class="admin-search-actions">
+  {% if workspace_url %}<a href="{{ workspace_url }}" class="admin-button-primary admin-button">Customer workspace</a>{% endif %}
   <a href="{% url 'admin_tools:search' %}" class="admin-button-secondary admin-button">Back to search</a>
   {% if manage_route %}{% with route="admin_tools:"|add:manage_route %}<a href="{% url route record_pk %}" class="admin-button-primary admin-button">Manage this record</a>{% endwith %}{% endif %}
 </div>

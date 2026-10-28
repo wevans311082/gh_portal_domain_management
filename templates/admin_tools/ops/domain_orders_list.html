@@ -3,6 +3,7 @@
 {% block page_title %}Domain orders{% endblock %}
 
 {% block content %}
+{% include "admin_tools/components/page_header.html" with heading="Domain registration orders" description="Review platform orders and retained registrar submission state." %}
 <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
   <div>
     <p class="text-sm text-slate-600">
@@ -11,20 +12,21 @@
     </p>
   </div>
   <div class="flex flex-wrap gap-2">
-    <a href="{% url 'admin_tools:manual_domain_register' %}" class="px-3 py-1.5 rounded bg-emerald-700 text-white text-xs font-semibold">Manual register</a>
+    <a href="{% url 'admin_tools:domain_transfers_list' %}" class="btn-secondary text-xs">Transfer submissions</a>
+    {% if ADMIN_ACCESS.manual_domain_register %}<a href="{% url 'admin_tools:manual_domain_register' %}" class="px-3 py-1.5 rounded bg-emerald-700 text-white text-xs font-semibold">Manual register</a>{% endif %}
     <a href="{% url 'admin_tools:domains_list' %}" class="px-3 py-1.5 rounded border border-slate-300 text-slate-700 text-xs">Domains</a>
   </div>
 </div>
 
 <form method="get" class="flex flex-wrap gap-2 mb-4 items-end">
   <div>
-    <label class="block text-xs font-semibold text-slate-500 mb-1">Search</label>
-    <input name="q" value="{{ search_q }}" placeholder="Domain, email, error…"
+    <label for="order-search" class="block text-xs font-semibold text-slate-500 mb-1">Search</label>
+    <input id="order-search" name="q" value="{{ search_q }}" placeholder="Domain, email, error…"
            class="border border-slate-300 rounded px-3 py-2 text-sm w-64">
   </div>
   <div>
-    <label class="block text-xs font-semibold text-slate-500 mb-1">Status</label>
-    <select name="status" class="border border-slate-300 rounded px-3 py-2 text-sm">
+    <label for="order-status-filter" class="block text-xs font-semibold text-slate-500 mb-1">Status</label>
+    <select id="order-status-filter" name="status" class="border border-slate-300 rounded px-3 py-2 text-sm">
       <option value="open" {% if status_filter == 'open' %}selected{% endif %}>Open (default)</option>
       <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All</option>
       {% for value, label in status_choices %}
@@ -46,19 +48,19 @@
 </div>
 
 <div class="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-  <div class="overflow-x-auto">
+  <div class="overflow-x-auto" role="region" tabindex="0" aria-label="Domain registration orders table">
     <table class="w-full text-sm">
       <thead class="bg-slate-50 text-slate-600">
         <tr>
-          <th class="px-3 py-2 text-left">#</th>
-          <th class="px-3 py-2 text-left">Domain</th>
-          <th class="px-3 py-2 text-left">Client</th>
-          <th class="px-3 py-2 text-left">Status</th>
-          <th class="px-3 py-2 text-left">Invoice</th>
-          <th class="px-3 py-2 text-left">Yrs</th>
-          <th class="px-3 py-2 text-left">Created</th>
-          <th class="px-3 py-2 text-left">Error / note</th>
-          <th class="px-3 py-2 text-right">Actions</th>
+          <th scope="col" class="px-3 py-2 text-left">#</th>
+          <th scope="col" class="px-3 py-2 text-left">Domain</th>
+          <th scope="col" class="px-3 py-2 text-left">Client</th>
+          <th scope="col" class="px-3 py-2 text-left">Status</th>
+          <th scope="col" class="px-3 py-2 text-left">Invoice</th>
+          <th scope="col" class="px-3 py-2 text-left">Yrs</th>
+          <th scope="col" class="px-3 py-2 text-left">Created</th>
+          <th scope="col" class="px-3 py-2 text-left">Error / note</th>
+          <th scope="col" class="px-3 py-2 text-right">Actions</th>
         </tr>
       </thead>
       <tbody class="divide-y divide-slate-100">
@@ -92,21 +94,26 @@
           </td>
           <td class="px-3 py-2">{{ o.registration_years }}</td>
           <td class="px-3 py-2 text-xs text-slate-500 whitespace-nowrap">{{ o.created_at|date:"Y-m-d H:i" }}</td>
-          <td class="px-3 py-2 text-xs text-rose-700 max-w-xs truncate" title="{{ o.last_error }}">{{ o.last_error|default:"—"|truncatechars:80 }}</td>
+          <td class="px-3 py-2 text-xs text-rose-700 max-w-xs truncate"{% if not o.registration_attempt.legacy_review_required %} title="{{ o.last_error }}"{% endif %}>{% if o.registration_attempt.legacy_review_required %}Historical owner review required{% else %}{{ o.last_error|default:"—"|truncatechars:80 }}{% endif %}</td>
           <td class="px-3 py-2 text-right whitespace-nowrap">
             <a href="{% url 'admin_tools:domain_order_detail' o.pk %}" class="text-xs text-sky-700 hover:underline mr-2">Open</a>
-            {% if o.status != 'completed' and o.status != 'cancelled' %}
+            {% if ADMIN_ACCESS.domain_order_action %}
+            {% if not o.registration_attempt or o.registration_attempt.status == 'aborted' or o.registration_attempt.status == 'accepted' %}
+            {% if o.status != 'completed' and o.status != 'cancelled' and o.status != 'paused' %}
             <form method="post" action="{% url 'admin_tools:domain_order_action' o.pk 'process' %}" class="inline">{% csrf_token %}
-              <button class="text-xs text-emerald-700 hover:underline mr-1" type="submit">Process</button>
+              <button class="text-xs text-emerald-700 hover:underline mr-1" type="submit">{% if o.registration_attempt.status == 'accepted' %}Resume local{% else %}Process{% endif %}</button>
             </form>
+            {% if not o.registration_attempt or o.registration_attempt.status == 'aborted' %}
             <form method="post" action="{% url 'admin_tools:domain_order_action' o.pk 'cancel' %}" class="inline" onsubmit="return confirm('Cancel order {{ o.domain_name }}?');">{% csrf_token %}
               <button class="text-xs text-amber-700 hover:underline mr-1" type="submit">Cancel</button>
             </form>
             {% endif %}
-            {% if o.status != 'completed' %}
+            {% endif %}{% endif %}
+            {% if o.status != 'completed' and not o.registration_attempt %}
             <form method="post" action="{% url 'admin_tools:domain_order_action' o.pk 'delete' %}" class="inline" onsubmit="return confirm('Delete platform order #{{ o.pk }}?');">{% csrf_token %}
               <button class="text-xs text-rose-600 hover:underline" type="submit">Delete</button>
             </form>
+            {% endif %}
             {% endif %}
           </td>
         </tr>

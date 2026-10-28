@@ -38,6 +38,7 @@
                 </td>
                 <td class="px-4 py-3">
                     <div class="flex flex-wrap items-center gap-2">
+                        {% if not u.is_staff and not u.is_superuser %}<a href="{% url 'admin_tools:customer_workspace' u.pk %}" class="text-xs text-sky-700 hover:underline">Customer workspace</a>{% endif %}
                         {% if IS_PLATFORM_OWNER %}<a href="{% url 'admin_tools:user_edit' u.pk %}" class="text-xs text-indigo-600 hover:underline">Edit user</a>
                         <a href="{% url 'admin_tools:user_mfa_manage' u.pk %}" class="text-xs text-sky-700 hover:underline">Manage MFA</a>{% endif %}
                         {% if not u.is_staff and ADMIN_ACCESS.cart_builder %}

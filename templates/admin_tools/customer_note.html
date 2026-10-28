@@ -1,0 +1,8 @@
+{% extends "base_admin.html" %}
+{% block title %}Internal customer note - {{ customer.email }}{% endblock %}
+{% block page_title %}Internal customer note{% endblock %}
+{% block content %}
+{% include "admin_tools/components/page_header.html" with heading="Internal customer note" description=customer.email %}
+<section class="admin-card" aria-label="Staff-only customer note">{% include "admin_tools/partials/customer_note.html" %}</section>
+<a class="admin-button admin-button-secondary" href="{% url 'admin_tools:customer_workspace' customer.pk %}#internal-notes">Return to customer workspace</a>
+{% endblock %}

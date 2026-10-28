@@ -154,6 +154,8 @@ class Invoice(TimeStampedModel):
 
     class Meta:
         indexes = [
+            models.Index(fields=["user", "-created_at", "-id"], name="workspace_invoice_created"),
+            models.Index(fields=["user", "-updated_at", "-id"], name="workspace_invoice_updated"),
             models.Index(SearchKey("number"), name="search_invoice_number"),
         ]
         ordering = ["-created_at"]
@@ -272,6 +274,8 @@ class Quote(TimeStampedModel):
 
     class Meta:
         indexes = [
+            models.Index(fields=["user", "-created_at", "-id"], name="workspace_quote_created"),
+            models.Index(fields=["user", "-updated_at", "-id"], name="workspace_quote_updated"),
             models.Index(SearchKey("number"), name="search_quote_number"),
             models.Index(SearchKey("lead_email"), name="search_quote_lead_email"),
             models.Index(SearchKey("lead_name"), name="search_quote_lead_name"),

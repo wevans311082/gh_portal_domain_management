@@ -35,6 +35,7 @@ def contact(user):
     return DomainContact.objects.create(
         user=user,
         label="Primary",
+        registrant_type="individual",
         name="Cart User",
         email=user.email,
         phone_country_code="44",

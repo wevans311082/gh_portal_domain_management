@@ -77,10 +77,12 @@ def search_record(request, kind, pk):
         }
         queryset = queryset.select_related('user').only('pk', 'status', 'user__email', *display_fields[kind])
     record = get_object_or_404(queryset, pk=pk)
+    from django.urls import reverse
     item = result_item(group, record, request.user)
     return render(request, 'admin_tools/search_record.html', {
         'item': item, 'details': record_details(group, record),
         'record_heading': {'customers': 'Customer account', 'domains': 'Domain details', 'services': 'Hosting service',
                            'invoices': 'Invoice details', 'quotes': 'Quote details', 'tickets': 'Support ticket'}[kind],
+        'workspace_url': reverse('admin_tools:customer_workspace', args=[record.pk]) if kind == 'customers' else '',
         'manage_route': group.manage_route if has_route_access(request.user, group.manage_route) else '', 'record_pk': record.pk,
     })

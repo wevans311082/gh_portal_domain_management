@@ -559,10 +559,28 @@ def domain_register(request):
 def my_domains(request):
     """Client portal: list user's domains, paginated."""
     from django.core.paginator import Paginator
-    qs = Domain.objects.filter(user=request.user).select_related("order__registration_contact").order_by("name")
+    qs = Domain.objects.filter(user=request.user).select_related("order__registration_contact", "order__registration_attempt").order_by("name")
     paginator = Paginator(qs, 20)
     page_obj = paginator.get_page(request.GET.get("page"))
-    return render(request, "domains/my_domains.html", {"domains": page_obj.object_list, "page_obj": page_obj})
+    reviews = list(DomainOrder.objects.filter(user=request.user, registration_attempt__legacy_review_required=True)
+                   .order_by("-created_at", "-pk").values("domain_name")[:11])
+    from apps.domains.models import DomainTransfer
+    from django.db.models import Q
+    transfer_rows = list(DomainTransfer.objects.filter(user=request.user).filter(
+        ~Q(status__in=["completed", "cancelled"]) | Q(submission_attempt__legacy_review_required=True)
+    ).order_by("-created_at", "-pk").values("domain_name", "status", "submission_attempt__status")[:11])
+    transfer_labels = {"preparing": "Preparing contacts", "submitting": "Submission started; support can check its outcome",
+        "unknown": "Support review required", "accepted": "Order acknowledged; registry completion not yet confirmed",
+        "aborted": "Stopped before paid submission"}
+    transfer_notices = [{"domain_name": row["domain_name"], "label": transfer_labels.get(row["submission_attempt__status"],
+        dict(DomainTransfer.STATUS_CHOICES).get(row["status"], "Support review required"))} for row in transfer_rows[:10]]
+    response = render(request, "domains/my_domains.html", {
+        "domains": page_obj.object_list, "page_obj": page_obj, "historical_reviews": reviews[:10],
+        "historical_reviews_truncated": len(reviews) > 10,
+        "transfer_submissions": transfer_notices, "transfer_submissions_truncated": len(transfer_rows) > 10,
+    })
+    response["Cache-Control"] = "no-store"
+    return response
 
 
 @login_required
@@ -573,9 +591,15 @@ def domain_detail(request, pk):
         pk=pk,
         user=request.user,
     )
+    from apps.domains.registrar_review import registrar_review_required
+    registrar_hold = registrar_review_required(domain)
+    if registrar_hold:
+        domain.epp_code = ""  # Never render a cached code from an unconfirmed association.
     from apps.products.models import Package
     from apps.services.models import Service
     from apps.domains.models import TLDPricing
+    from apps.domains.verification import registrar_email_summary
+    import uuid
 
     hosting = (
         Service.objects.filter(user=request.user, domain_name__iexact=domain.name)
@@ -587,7 +611,8 @@ def domain_detail(request, pk):
     try:
         from apps.provisioning.whm_client import WHMClient
 
-        whm_nameservers = WHMClient().get_nameservers()
+        if not registrar_hold:
+            whm_nameservers = WHMClient().get_nameservers()
     except Exception:
         whm_nameservers = []
     return render(
@@ -595,6 +620,10 @@ def domain_detail(request, pk):
         "domains/domain_detail.html",
         {
             "domain": domain,
+            "registrar_review_required": registrar_hold,
+            "registrar_email": registrar_email_summary(domain),
+            "verification_refresh_key": uuid.uuid4(),
+            "verification_resend_key": uuid.uuid4(),
             "hosting": hosting,
             "pricing": pricing,
             "whm_nameservers": whm_nameservers,
@@ -605,9 +634,54 @@ def domain_detail(request, pk):
 
 @login_required
 @require_POST
+def domain_verification_action(request, pk):
+    from django.core.exceptions import ValidationError
+    from django.db import DatabaseError
+    from apps.core.abuse import consume_limit, AbuseLimitExceeded, AbuseStoreUnavailable
+    from apps.domains.forms import VerificationActionForm
+    from apps.domains.verification_actions import request_verification_action, VerificationBusy, VerificationReviewRequired
+
+    domain = get_object_or_404(Domain, pk=pk, user=request.user)
+    from apps.domains.registrar_review import review_response
+    held = review_response(request, domain)
+    if held is not None:
+        return held
+    form = VerificationActionForm(request.POST)
+    status, retry, message = 400, None, "The verification request is invalid. Open the domain page and try again."
+    if form.is_valid():
+        try:
+            consume_limit("registrar-verification-account", request.user.pk, 10, 600)
+            request_verification_action(domain, request.user, form.cleaned_data["kind"], form.cleaned_data["key"])
+        except (AbuseLimitExceeded, VerificationBusy) as exc:
+            status, retry = 429, exc.retry_after
+            message = f"A verification request is already pending or was recently submitted. Wait {retry} seconds before trying again."
+        except VerificationReviewRequired:
+            status, message = 409, "The previous email request needs provider review. Contact support before requesting another email."
+        except AbuseStoreUnavailable:
+            status, message = 503, "Verification requests are temporarily unavailable. Please try again later."
+        except ValidationError:
+            message = "This verification action is unavailable. Check the domain and registrant details or contact support."
+        except DatabaseError:
+            status, message = 503, "Verification requests are temporarily unavailable. Please try again later."
+        else:
+            messages.success(request, "The verification request is queued. Return to this domain page to see its progress.")
+            return redirect("domains:detail", pk=domain.pk)
+    response = render(request, "domains/verification_action_error.html", {"domain": domain, "message": message}, status=status)
+    response["Cache-Control"] = "no-store"
+    if retry:
+        response["Retry-After"] = str(retry)
+    return response
+
+
+@login_required
+@require_POST
 def domain_toggle_autorenew(request, pk):
     """Toggle auto-renew for a domain."""
     domain = get_object_or_404(Domain, pk=pk, user=request.user)
+    from apps.domains.registrar_review import review_response
+    held = review_response(request, domain) if not domain.auto_renew else None
+    if held is not None:
+        return held
     domain.auto_renew = not domain.auto_renew
     domain.save(update_fields=["auto_renew"])
     messages.success(request, f"Auto-renew {'enabled' if domain.auto_renew else 'disabled'} for {domain.name}.")
@@ -623,6 +697,10 @@ def domain_renew(request, pk):
     POST - create a DomainRenewal + Invoice, redirect to Stripe checkout.
     """
     domain = get_object_or_404(Domain, pk=pk, user=request.user)
+    from apps.domains.registrar_review import review_response
+    held = review_response(request, domain)
+    if held is not None:
+        return held
 
     if domain.status not in (Domain.STATUS_ACTIVE, Domain.STATUS_EXPIRED):
         messages.error(request, "This domain cannot be renewed at this time.")
@@ -697,10 +775,12 @@ def contact_create(request):
         if form.is_valid():
             contact = form.save(commit=False)
             contact.user = request.user
-            if contact.is_default:
-                # Demote any existing default first
-                DomainContact.objects.filter(user=request.user, is_default=True).update(is_default=False)
-            contact.save()
+            from django.db import transaction
+            with transaction.atomic():
+                if contact.is_default:
+                    DomainContact.objects.filter(user=request.user, is_default=True).update(is_default=False)
+                contact.save()
+                form.save_business_evidence(contact)
             messages.success(request, f'Contact "{contact.label}" created.')
             return redirect("domains:contact_list")
     else:
@@ -751,9 +831,14 @@ def contact_delete(request, pk):
         or contact.admin_orders.exists()
         or contact.tech_orders.exists()
         or contact.billing_orders.exists()
+        or contact.registration_transfers.exists()
+        or contact.admin_transfers.exists()
+        or contact.tech_transfers.exists()
+        or contact.billing_transfers.exists()
+        or contact.registrar_bindings.exists()
     )
     if in_use:
-        messages.error(request, f'"{contact.label}" is attached to a domain order and cannot be deleted.')
+        messages.error(request, f'"{contact.label}" has domain or registrar history and cannot be deleted.')
         return redirect("domains:contact_list")
 
     label = contact.label
@@ -784,6 +869,10 @@ def contact_set_default(request, pk):
 def domain_toggle_lock(request, pk):
     """Toggle the registrar transfer lock on/off for a domain."""
     domain = get_object_or_404(Domain, pk=pk, user=request.user)
+    from apps.domains.registrar_review import review_response
+    held = review_response(request, domain)
+    if held is not None:
+        return held
 
     if domain.status != Domain.STATUS_ACTIVE:
         messages.error(request, "Only active domains can have their lock changed.")
@@ -819,6 +908,10 @@ def domain_get_auth_code(request, pk):
     Rate-limited: one request per domain per hour via Django cache.
     """
     domain = get_object_or_404(Domain, pk=pk, user=request.user)
+    from apps.domains.registrar_review import review_response
+    held = review_response(request, domain)
+    if held is not None:
+        return held
 
     if domain.status not in (Domain.STATUS_ACTIVE,):
         messages.error(request, "Auth codes are only available for active domains.")
@@ -858,6 +951,10 @@ def domain_get_auth_code(request, pk):
 def domain_update_nameservers(request, pk):
     """Update nameservers for a domain via the registrar API."""
     domain = get_object_or_404(Domain, pk=pk, user=request.user)
+    from apps.domains.registrar_review import review_response
+    held = review_response(request, domain)
+    if held is not None:
+        return held
 
     if domain.status != Domain.STATUS_ACTIVE:
         messages.error(request, "Nameservers can only be changed for active domains.")

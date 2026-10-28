@@ -5,11 +5,13 @@
 
 {% block header_actions %}
 <a href="{% url 'domains:my_domains' %}" class="btn-secondary text-xs">Back to domains</a>
-<a href="{% url 'domains:renew' pk=domain.pk %}" class="btn-primary text-xs">Renew</a>
+{% if not registrar_review_required %}<a href="{% url 'domains:renew' pk=domain.pk %}" class="btn-primary text-xs">Renew</a>{% endif %}
 {% endblock %}
 
 {% block content %}
+{% if registrar_review_required %}<section class="mb-5 rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-950" aria-labelledby="registrar-hold-heading"><h2 id="registrar-hold-heading" class="font-semibold">Registrar association awaiting review</h2><p class="mt-2">Provider operations, transfer codes and renewal are paused until an owner confirms the earlier registrar record.</p><a class="mt-2 inline-block font-semibold underline text-amber-950" href="{% url 'support:create' %}">Contact support about this review</a></section>{% endif %}
 <div class="space-y-4">
+    {% include "domains/partials/registrar_verification.html" %}
     <div class="fluent-card p-5">
         <div class="flex flex-wrap items-start justify-between gap-4">
             <div>
@@ -20,7 +22,7 @@
                         {{ domain.get_status_display }}
                     </span>
                     <span class="chip {% if domain.registrant_validation_status == 'validated' %}chip-success{% elif domain.registrant_validation_status == 'pending' %}chip-warning{% elif domain.registrant_validation_status == 'rejected' %}chip-danger{% else %}chip-neutral{% endif %}">
-                        Registrant: {{ domain.registrant_validation_status|title }}
+                        Local review: {{ domain.registrant_validation_status|title }}
                     </span>
                     {% if domain.is_locked %}
                     <span class="chip chip-success">Transfer locked</span>
@@ -33,8 +35,8 @@
                 </div>
             </div>
             <div class="flex flex-wrap gap-2">
-                <a href="{% url 'dns:zone_detail' domain.pk %}" class="btn-secondary text-xs">DNS editor</a>
-                <a href="{% url 'domains:renew' pk=domain.pk %}" class="btn-primary text-xs">Renew wizard</a>
+                {% if not registrar_review_required %}<a href="{% url 'dns:zone_detail' domain.pk %}" class="btn-secondary text-xs">DNS editor</a>{% endif %}
+                {% if not registrar_review_required %}<a href="{% url 'domains:renew' pk=domain.pk %}" class="btn-primary text-xs">Renew wizard</a>{% endif %}
             </div>
         </div>
 
@@ -63,7 +65,7 @@
             <h3 class="font-semibold mb-3">Nameservers</h3>
             <p class="text-sm text-fluent-muted mb-3">Updates the registrar (ResellerClub) and WHM when this domain is hosted.</p>
             {% if domain.status == 'active' %}
-            <form method="post" action="{% url 'domains:update_nameservers' pk=domain.pk %}" class="space-y-3">
+            <form method="post" action="{% url 'domains:update_nameservers' pk=domain.pk %}" class="space-y-3"><fieldset class="contents" {% if registrar_review_required %}disabled{% endif %}>
                 {% csrf_token %}
                 <div>
                     <label>Nameserver 1</label>
@@ -82,10 +84,10 @@
                     <input type="text" name="nameserver4" value="{{ domain.nameserver4 }}" placeholder="ns4.example.com" class="font-mono">
                 </div>
                 <div class="flex flex-wrap gap-2">
-                    <button type="submit" class="btn-primary text-xs">Save nameservers</button>
-                    <button type="submit" name="action" value="use_whm" class="btn-secondary text-xs">Use WHM nameservers</button>
+                    <button {% if registrar_review_required %}disabled{% endif %} type="submit" class="btn-primary text-xs">Save nameservers</button>
+                    <button {% if registrar_review_required %}disabled{% endif %} type="submit" name="action" value="use_whm" class="btn-secondary text-xs">Use WHM nameservers</button>
                 </div>
-            </form>
+            </fieldset></form>
             {% if whm_nameservers %}
             <p class="text-xs text-fluent-muted mt-3">WHM nameservers: {{ whm_nameservers|join:", " }}</p>
             {% endif %}
@@ -101,10 +103,10 @@
                     <p class="text-sm font-medium">Auto-renew</p>
                     <p class="text-xs text-fluent-muted">Renew before expiry when possible</p>
                 </div>
-                <form method="post" action="{% url 'domains:toggle_autorenew' pk=domain.pk %}">
+                <form method="post" action="{% url 'domains:toggle_autorenew' pk=domain.pk %}"><fieldset class="contents" {% if registrar_review_required and not domain.auto_renew %}disabled{% endif %}>
                     {% csrf_token %}
-                    <button type="submit" class="btn-secondary text-xs">{% if domain.auto_renew %}Turn off{% else %}Turn on{% endif %}</button>
-                </form>
+                    <button {% if registrar_review_required and not domain.auto_renew %}disabled{% endif %} type="submit" class="btn-secondary text-xs">{% if domain.auto_renew %}Turn off{% else %}Turn on{% endif %}</button>
+                </fieldset></form>
             </div>
             <div class="flex items-center justify-between p-3 border border-fluent-border rounded">
                 <div>
@@ -112,10 +114,10 @@
                     <p class="text-xs text-fluent-muted">Prevent unauthorised transfers</p>
                 </div>
                 {% if domain.status == 'active' and domain.registrar_id %}
-                <form method="post" action="{% url 'domains:toggle_lock' pk=domain.pk %}">
+                <form method="post" action="{% url 'domains:toggle_lock' pk=domain.pk %}"><fieldset class="contents" {% if registrar_review_required %}disabled{% endif %}>
                     {% csrf_token %}
-                    <button type="submit" class="btn-secondary text-xs">{% if domain.is_locked %}Unlock{% else %}Lock{% endif %}</button>
-                </form>
+                    <button {% if registrar_review_required %}disabled{% endif %} type="submit" class="btn-secondary text-xs">{% if domain.is_locked %}Unlock{% else %}Lock{% endif %}</button>
+                </fieldset></form>
                 {% else %}
                 <span class="text-sm text-fluent-muted">{% if domain.is_locked %}Locked{% else %}Unlocked{% endif %}</span>
                 {% endif %}
@@ -128,10 +130,10 @@
                 <code class="block bg-fluent-subtle border border-fluent-border px-3 py-2 rounded text-sm font-mono break-all mb-3">{{ domain.epp_code }}</code>
                 {% endif %}
                 {% if domain.status == 'active' %}
-                <form method="post" action="{% url 'domains:get_auth_code' pk=domain.pk %}">
+                <form method="post" action="{% url 'domains:get_auth_code' pk=domain.pk %}"><fieldset class="contents" {% if registrar_review_required %}disabled{% endif %}>
                     {% csrf_token %}
-                    <button type="submit" class="btn-primary text-xs">{% if domain.epp_code %}Refresh auth code{% else %}Get auth code{% endif %}</button>
-                </form>
+                    <button {% if registrar_review_required %}disabled{% endif %} type="submit" class="btn-primary text-xs">{% if domain.epp_code %}Refresh auth code{% else %}Get auth code{% endif %}</button>
+                </fieldset></form>
                 {% endif %}
             </div>
         </div>
@@ -148,21 +150,21 @@
                 {% endif %}
             </dl>
             <div class="flex flex-wrap gap-2">
-                <a href="{% url 'domains:renew' pk=domain.pk %}" class="btn-primary text-xs">Open renew wizard</a>
-                <form method="post" action="{% url 'portal:cart_add_renewal' %}">
+                {% if not registrar_review_required %}<a href="{% url 'domains:renew' pk=domain.pk %}" class="btn-primary text-xs">Open renew wizard</a>{% endif %}
+                <form method="post" action="{% url 'portal:cart_add_renewal' %}"><fieldset class="contents" {% if registrar_review_required %}disabled{% endif %}>
                     {% csrf_token %}
                     <input type="hidden" name="domain_id" value="{{ domain.id }}">
                     <input type="hidden" name="renewal_years" value="1">
                     <input type="hidden" name="next" value="{% url 'portal:cart' %}">
-                    <button class="btn-secondary text-xs">Add 1 year to cart</button>
-                </form>
+                    <button {% if registrar_review_required %}disabled{% endif %} class="btn-secondary text-xs">Add 1 year to cart</button>
+                </fieldset></form>
             </div>
         </div>
 
         <div class="fluent-card p-5">
             <h3 class="font-semibold mb-3">DNS zone</h3>
             <p class="text-sm text-fluent-muted mb-4">Create, edit, and delete records. Changes sync to WHM, ResellerClub, or Cloudflare depending on the DNS provider.</p>
-            <a href="{% url 'dns:zone_detail' domain.pk %}" class="btn-primary text-xs">Open DNS editor</a>
+            {% if not registrar_review_required %}<a href="{% url 'dns:zone_detail' domain.pk %}" class="btn-primary text-xs">Open DNS editor</a>{% endif %}
             {% if hosting %}
             <p class="text-xs text-fluent-muted mt-4">Hosted as {{ hosting.package.get_display_name }} ({{ hosting.cpanel_username|default:"pending" }})</p>
             {% endif %}

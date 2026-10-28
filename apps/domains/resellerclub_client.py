@@ -122,18 +122,10 @@ class ResellerClubClient:
         return normalized
 
     def _check_response(self, data: dict, endpoint: str) -> dict:
-        """Raise ResellerClubError when the API returns a business-level error."""
-        if isinstance(data, dict) and data.get("status") == "ERROR":
-            error = data.get("message") or data.get("error") or "Unknown error"
-            # Detect auth errors explicitly so callers get a clear message
-            error_lower = str(error).lower()
-            if any(kw in error_lower for kw in ("jwt", "token", "auth", "invalid key", "unauthorized")):
-                logger.error(f"ResellerClub auth failure at {endpoint}: {error}")
-                raise ResellerClubError(
-                    f"ResellerClub authentication failed — check Reseller ID and API key: {error}"
-                )
-            logger.error(f"ResellerClub API error at {endpoint}: {error}")
-            raise ResellerClubError(f"ResellerClub error: {error}")
+        """Provider error messages are untrusted and can contain secrets."""
+        if isinstance(data, dict) and str(data.get("status", "")).upper() == "ERROR":
+            logger.warning("ResellerClub %s rejected the request", endpoint)
+            raise ResellerClubError("The registrar rejected the request. Review its retained operation and provider case before continuing.")
         return data
 
     @staticmethod
@@ -165,236 +157,52 @@ class ResellerClubClient:
         )
         if not debug_mode:
             return
-        safe_request = dict(request_data or {})
-        safe_request["params"] = self._redact_secrets(safe_request.get("params") or {})
-        url = str(safe_request.get("url") or "")
-        if self.api_key:
-            url = url.replace(self.api_key, "[redacted]")
-        if self.reseller_id:
-            url = url.replace(str(self.reseller_id), "[redacted]")
-        safe_request["url"] = url
-        add_entry(
-            {
-                "request": safe_request,
-                "response": response_data,
-                "error": error,
-            }
-        )
+        # Provider bodies can echo arbitrary credentials, EPP codes and PII.
+        # Keep only transport metadata; key-name redaction cannot sanitize them.
+        add_entry({"request": {"method": request_data.get("method"), "endpoint": request_data.get("endpoint")},
+                   "response": {"status_code": response_data.get("status_code")} if response_data else None,
+                   "error": "Transport failed" if error else ""})
 
-    def _get(self, endpoint: str, params: dict = None) -> dict:
-        """Make an authenticated GET request to the ResellerClub API."""
+    def _request(self, method, endpoint, values):
         self.ensure_configured()
-        normalized_endpoint = self._normalize_endpoint(endpoint)
-        url = f"{self.base_url}/{normalized_endpoint}"
-        merged_params = {**self._auth_params, **(params or {})}
+        normalized = self._normalize_endpoint(endpoint)
+        merged = {**self._auth_params, **(values or {})}
+        options = {"timeout": (_CONNECT_TIMEOUT, _READ_TIMEOUT), "allow_redirects": False}
+        if method == "POST":
+            options["data"] = {key: "true" if value is True else "false" if value is False else value
+                               for key, value in merged.items() if value is not None}
+        else:
+            options["params"] = merged
+        metadata = {"method": method, "endpoint": normalized}
         try:
-            response = self.session.get(
-                url,
-                params=merged_params,
-                timeout=(_CONNECT_TIMEOUT, _READ_TIMEOUT),
-            )
-            self._capture_debug(
-                request_data={
-                    "method": "GET",
-                    "url": response.request.url,
-                    "headers": dict(response.request.headers),
-                    "body": response.request.body.decode("utf-8", errors="replace")
-                    if isinstance(response.request.body, bytes)
-                    else (response.request.body or ""),
-                    "params": merged_params,
-                    "endpoint": normalized_endpoint,
-                },
-                response_data={
-                    "status_code": response.status_code,
-                    "reason": response.reason,
-                    "headers": dict(response.headers),
-                    "text": response.text,
-                },
-            )
+            response = getattr(self.session, method.lower())(f"{self.base_url}/{normalized}", **options)
+            self._capture_debug(metadata, {"status_code": response.status_code})
+            if 300 <= response.status_code < 400:
+                raise ResellerClubError("The registrar redirected the request. Review its configured endpoint before continuing.")
             response.raise_for_status()
-            data = response.json()
-        except requests.HTTPError as e:
-            status_code = getattr(getattr(e, "response", None), "status_code", None)
-            body = (getattr(getattr(e, "response", None), "text", "") or "")[:300]
-            resp = getattr(e, "response", None)
-            req = getattr(resp, "request", None)
-            self._capture_debug(
-                request_data={
-                    "method": getattr(req, "method", "GET"),
-                    "url": getattr(req, "url", url),
-                    "headers": dict(getattr(req, "headers", {}) or {}),
-                    "body": (
-                        getattr(req, "body", b"").decode("utf-8", errors="replace")
-                        if isinstance(getattr(req, "body", None), bytes)
-                        else (getattr(req, "body", "") or "")
-                    ),
-                    "params": merged_params,
-                    "endpoint": normalized_endpoint,
-                },
-                response_data={
-                    "status_code": getattr(resp, "status_code", None),
-                    "reason": getattr(resp, "reason", ""),
-                    "headers": dict(getattr(resp, "headers", {}) or {}),
-                    "text": getattr(resp, "text", ""),
-                },
-                error=str(e),
-            )
-            if status_code and status_code >= 500:
-                logger.error("ResellerClub GET %s server error %s: %s", normalized_endpoint, status_code, body)
-                raise ResellerClubError(
-                    "ResellerClub returned a server error. This commonly happens when request parameters "
-                    "are malformed (for example domain-name should be label only)."
-                ) from e
-            logger.error(f"ResellerClub GET {normalized_endpoint} failed: {e}")
-            raise ResellerClubError(f"API request failed: {e}") from e
-        except requests.RequestException as e:
-            self._capture_debug(
-                request_data={
-                    "method": "GET",
-                    "url": url,
-                    "headers": {},
-                    "body": "",
-                    "params": merged_params,
-                    "endpoint": normalized_endpoint,
-                },
-                response_data=None,
-                error=str(e),
-            )
-            logger.error(f"ResellerClub GET {normalized_endpoint} failed: {e}")
-            raise ResellerClubError(f"API request failed: {e}") from e
-        return self._check_response(data, normalized_endpoint)
-
-    def _post(self, endpoint: str, data: dict = None) -> dict:
-        """Make an authenticated POST request to the ResellerClub API."""
-        self.ensure_configured()
-        normalized_endpoint = self._normalize_endpoint(endpoint)
-        url = f"{self.base_url}/{normalized_endpoint}"
-        merged_data = {**self._auth_params, **(data or {})}
-        # Ensure all values are strings/ints suitable for form encoding
-        safe_data = {}
-        for key, value in merged_data.items():
-            if value is None:
-                continue
-            if isinstance(value, bool):
-                safe_data[key] = "true" if value else "false"
-            elif isinstance(value, (list, tuple)):
-                # LogicBoxes often wants repeated keys; requests handles list values
-                safe_data[key] = list(value)
-            else:
-                safe_data[key] = value
-        try:
-            response = self.session.post(
-                url,
-                data=safe_data,
-                timeout=(_CONNECT_TIMEOUT, _READ_TIMEOUT),
-            )
-            body_text = response.text or ""
-            self._capture_debug(
-                request_data={
-                    "method": "POST",
-                    "url": response.request.url,
-                    "headers": dict(response.request.headers),
-                    "body": response.request.body.decode("utf-8", errors="replace")
-                    if isinstance(response.request.body, bytes)
-                    else (response.request.body or ""),
-                    "data": {k: ("***" if k == "api-key" else v) for k, v in safe_data.items()},
-                    "endpoint": normalized_endpoint,
-                },
-                response_data={
-                    "status_code": response.status_code,
-                    "reason": response.reason,
-                    "headers": dict(response.headers),
-                    "text": body_text[:4000],
-                },
-            )
-            if response.status_code >= 500:
-                snippet = body_text[:400].replace("\n", " ")
-                logger.error(
-                    "ResellerClub POST %s HTTP %s: %s",
-                    normalized_endpoint,
-                    response.status_code,
-                    snippet,
-                )
-                raise ResellerClubError(
-                    f"ResellerClub HTTP {response.status_code} on {normalized_endpoint}: "
-                    f"{snippet or response.reason}. "
-                    "This is often a bad/missing contact field (type, company, phone) "
-                    "or wrong API environment (live vs test.httpapi.com)."
-                )
-            response.raise_for_status()
-            # Contact add returns a bare integer ID in many LogicBoxes versions.
             try:
                 result = response.json()
             except ValueError:
-                result = body_text.strip()
-            if isinstance(result, (int, float)) or (isinstance(result, str) and result.isdigit()):
-                result = {"contact_id": str(result), "id": str(result)}
-            if isinstance(result, str):
-                # Sometimes a bare quoted number
-                stripped = result.strip().strip('"')
-                if stripped.isdigit():
-                    result = {"contact_id": stripped, "id": stripped}
-                else:
-                    raise ResellerClubError(f"Unexpected non-JSON response from {normalized_endpoint}: {stripped[:200]}")
-        except ResellerClubError:
-            raise
-        except requests.HTTPError as e:
-            status_code = getattr(getattr(e, "response", None), "status_code", None)
-            body = (getattr(getattr(e, "response", None), "text", "") or "")[:300]
-            resp = getattr(e, "response", None)
-            req = getattr(resp, "request", None)
-            self._capture_debug(
-                request_data={
-                    "method": getattr(req, "method", "POST"),
-                    "url": getattr(req, "url", url),
-                    "headers": dict(getattr(req, "headers", {}) or {}),
-                    "body": (
-                        getattr(req, "body", b"").decode("utf-8", errors="replace")
-                        if isinstance(getattr(req, "body", None), bytes)
-                        else (getattr(req, "body", "") or "")
-                    ),
-                    "data": {k: ("***" if k == "api-key" else v) for k, v in safe_data.items()},
-                    "endpoint": normalized_endpoint,
-                },
-                response_data={
-                    "status_code": getattr(resp, "status_code", None),
-                    "reason": getattr(resp, "reason", ""),
-                    "headers": dict(getattr(resp, "headers", {}) or {}),
-                    "text": getattr(resp, "text", ""),
-                },
-                error=str(e),
-            )
-            if status_code and status_code >= 500:
-                logger.error("ResellerClub POST %s server error %s: %s", normalized_endpoint, status_code, body)
-                raise ResellerClubError(
-                    f"ResellerClub HTTP {status_code} on {normalized_endpoint}: {body or e}"
-                ) from e
-            logger.error(f"ResellerClub POST {normalized_endpoint} failed: {e}")
-            raise ResellerClubError(f"API POST failed: {e}") from e
-        except requests.RequestException as e:
-            self._capture_debug(
-                request_data={
-                    "method": "POST",
-                    "url": url,
-                    "headers": {},
-                    "body": "",
-                    "data": {k: ("***" if k == "api-key" else v) for k, v in safe_data.items()},
-                    "endpoint": normalized_endpoint,
-                },
-                response_data=None,
-                error=str(e),
-            )
-            logger.error(f"ResellerClub POST {normalized_endpoint} failed: {e}")
-            # Unwrap RetryError messaging for operators
-            msg = str(e)
-            if "too many 500" in msg or "RetryError" in type(e).__name__:
-                raise ResellerClubError(
-                    f"ResellerClub POST {normalized_endpoint} failed after retries: {msg}. "
-                    "HTTP 500 usually means invalid contact payload or API/credentials issue — "
-                    "not a transient network blip."
-                ) from e
-            raise ResellerClubError(f"API POST failed: {e}") from e
-        return self._check_response(result, normalized_endpoint)
+                if method != "POST":
+                    raise ResellerClubError("The registrar returned an invalid response. Review the retained operation before retrying.") from None
+                result = (response.text or "").strip()
+            if method == "POST":
+                if type(result) in (int, float) or isinstance(result, str) and result.strip().strip('"').isdigit():
+                    identifier = str(result).strip().strip('"')
+                    result = {"contact_id": identifier, "id": identifier}
+                elif isinstance(result, str):
+                    raise ResellerClubError("The registrar returned an unexpected response. Review the retained operation before retrying.")
+            return self._check_response(result, normalized)
+        except requests.RequestException:
+            self._capture_debug(metadata, error="transport")
+            logger.warning("ResellerClub %s %s transport failed", method, normalized)
+            raise ResellerClubError("The registrar request failed. Review the retained operation before retrying.") from None
+
+    def _get(self, endpoint: str, params: dict = None) -> dict:
+        return self._request("GET", endpoint, params)
+
+    def _post(self, endpoint: str, data: dict = None) -> dict:
+        return self._request("POST", endpoint, data)
 
     # ResellerClub permits many TLDs per availability call but URLs grow long;
     # chunk to keep query strings under typical 8KB limits.
@@ -666,6 +474,11 @@ class ResellerClubClient:
         auto_renew: bool = True,
     ) -> dict:
         """Register a domain name."""
+        from apps.domains.registrar_policy import policy_for, registration_contact_ids, tld_for_domain
+        policy = policy_for(tld_for_domain(domain_name))
+        reg_contact_id, admin_contact_id, tech_contact_id, billing_contact_id = registration_contact_ids(
+            domain_name, reg_contact_id, admin_contact_id, tech_contact_id, billing_contact_id
+        )
         data = {
             "domain-name": domain_name,
             "years": years,
@@ -675,7 +488,8 @@ class ResellerClubClient:
             "admin-contact-id": admin_contact_id,
             "tech-contact-id": tech_contact_id,
             "billing-contact-id": billing_contact_id,
-            "purchase-privacy": purchase_privacy,
+            "invoice-option": "NoInvoice",
+            "purchase-privacy": bool(purchase_privacy and policy.privacy_supported),
             "auto-renew": auto_renew,
         }
         return self._post("domains/register", data)
@@ -703,6 +517,10 @@ class ResellerClubClient:
         auto_renew: bool = True,
     ) -> dict:
         """Transfer a domain name into the registrar account."""
+        from django.core.exceptions import ValidationError
+        from apps.domains.registrar_policy import ALL_ROLES, policy_for, tld_for_domain
+        if policy_for(tld_for_domain(domain_name)).roles != ALL_ROLES:
+            raise ValidationError("This extension requires a registrar-specific transfer workflow. Contact support before submitting a transfer.")
         data = {
             "domain-name": domain_name,
             "customer-id": customer_id,
@@ -712,6 +530,7 @@ class ResellerClubClient:
             "billing-contact-id": billing_contact_id,
             "ns": nameservers,
             "auto-renew": auto_renew,
+            "invoice-option": "NoInvoice",
         }
         if auth_code:
             data["auth-code"] = auth_code
@@ -721,6 +540,29 @@ class ResellerClubClient:
         """Get details for a domain order."""
         payload = self._get("domains/details", {"order-id": order_id, "options": "All"})
         return self._flatten_logicboxes_record(payload) if isinstance(payload, dict) else payload
+
+    def get_registrant_verification_details(self, order_id: str) -> dict:
+        """Fetch the identity-binding and RAA fields required for reconciliation."""
+        payload = self._get("domains/details", {
+            "order-id": order_id,
+            "options": ["OrderDetails", "ContactIds", "RegistrantContactDetails", "DomainStatus"],
+        })
+        return self._flatten_logicboxes_record(payload) if isinstance(payload, dict) else payload
+
+    def get_registration_reconciliation_details(self, order_id: str) -> dict:
+        """Read existing-order identity, delegation, dates and current status."""
+        payload = self._get("domains/details", {
+            "order-id": order_id,
+            "options": ["OrderDetails", "ContactIds", "NsDetails", "StatusDetails"],
+        })
+        return self._flatten_logicboxes_record(payload) if isinstance(payload, dict) else payload
+
+    def resend_registrant_verification(self, order_id: str) -> bool:
+        """Request one RAA email; only literal JSON true confirms acceptance."""
+        result = self._post("domains/raa/resend-verification", {"order-id": order_id})
+        if type(result) is not bool:
+            raise ResellerClubError("The registrar returned an uncertain verification-email result.")
+        return result
 
     def get_order_details_by_name(self, domain_name: str) -> dict:
         """Get details for a domain order by its full domain name."""
@@ -1192,9 +1034,8 @@ class ResellerClubClient:
         return self._post("contacts/add", payload)
 
     def update_contact(self, contact_id: str, payload: dict) -> dict:
-        """Update an existing domain contact in ResellerClub."""
-        data = {"contact-id": contact_id, **payload}
-        return self._post("contacts/modify", data)
+        """The registrar deprecated contacts/modify; never mutate shared contacts."""
+        raise ValueError("Registrar contacts are immutable. Create and associate a new contact binding.")
 
     def get_contact(self, contact_id: str) -> dict:
         """Fetch a single domain contact from ResellerClub."""

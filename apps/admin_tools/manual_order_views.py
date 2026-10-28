@@ -52,51 +52,64 @@ def _split_domain(domain_name: str) -> tuple[str, str]:
     return name, tld
 
 
-def _ensure_contact(user: User, post) -> DomainContact:
-    """Use selected contact, existing default, or create a simple staff-entered contact."""
-    contact_id = (post.get("contact_id") or "").strip()
-    if contact_id:
-        contact = DomainContact.objects.filter(pk=contact_id, user=user).first()
-        if contact:
-            return contact
+def _ensure_contact(user: User, post, tld="") -> DomainContact:
+    """Reuse an owned, complete contact or validate real staff-entered details."""
+    from django.core.exceptions import ValidationError
+    from apps.domains.forms import DomainContactForm
+    from apps.domains.registrar_policy import policy_for
+    policy_for(tld)
 
-    existing = (
-        DomainContact.objects.filter(user=user, is_default=True).first()
-        or DomainContact.objects.filter(user=user).order_by("id").first()
-    )
-    if existing and not (post.get("contact_name") or "").strip():
+    selected = str(post.get("contact_id") or "").strip()
+    existing = None
+    if selected:
+        if len(selected) > 19 or not selected.isascii() or not selected.isdigit() or int(selected) > 2**63 - 1:
+            raise ValidationError("Select a valid contact belonging to this client.")
+        existing = DomainContact.objects.filter(pk=selected, user=user).first()
+        if existing is None:
+            raise ValidationError("Select a valid contact belonging to this client.")
+    else:
+        existing = (
+            DomainContact.objects.filter(user=user, is_default=True).first()
+            or DomainContact.objects.filter(user=user).order_by("id").first()
+        )
+
+    aliases = {
+        "name": "contact_name", "email": "contact_email", "phone": "contact_phone",
+        "phone_country_code": "contact_phone_country_code",
+        "address_line1": "contact_address", "address_line2": "contact_address_line2",
+        "city": "contact_city", "state": "contact_state", "postcode": "contact_postcode",
+        "country": "contact_country", "registrant_type": "contact_registrant_type",
+        "company": "contact_company", "company_number": "contact_company_number",
+    }
+    supplied = {field: str(post.get(alias) or "").strip() for field, alias in aliases.items()}
+    if existing and not any(supplied.values()):
+        existing.as_resellerclub_payload("1", tld)
         return existing
 
-    name = (post.get("contact_name") or "").strip() or user.full_name or user.email
-    email = (post.get("contact_email") or "").strip() or user.email
-    phone = (post.get("contact_phone") or "").strip() or (user.phone or "07000000000")
-    phone = re.sub(r"\D", "", phone) or "7000000000"
-    address = (post.get("contact_address") or "").strip() or "Address on file"
-    city = (post.get("contact_city") or "").strip() or "London"
-    postcode = (post.get("contact_postcode") or "").strip() or "SW1A 1AA"
-    state = (post.get("contact_state") or "").strip() or city
-
     profile = getattr(user, "client_profile", None)
-    if profile:
-        address = address if post.get("contact_address") else (profile.address_line1 or address)
-        city = city if post.get("contact_city") else (profile.city or city)
-        postcode = postcode if post.get("contact_postcode") else (profile.postcode or postcode)
-        state = state if post.get("contact_state") else (profile.county or state)
-
-    contact = DomainContact.objects.create(
-        user=user,
-        label="Staff registration",
-        name=name,
-        email=email,
-        phone_country_code="44",
-        phone=phone[-15:],
-        address_line1=address[:255],
-        city=city[:100],
-        state=state[:100],
-        postcode=postcode[:20],
-        country="GB",
-        is_default=not DomainContact.objects.filter(user=user).exists(),
-    )
+    values = {field: getattr(existing, field) for field in aliases} if existing else {
+        "name": " ".join(filter(None, [user.first_name, user.last_name])),
+        "email": user.email, "phone": user.phone or "",
+        "phone_country_code": "44", "country": profile.country if profile else "GB",
+        "address_line1": profile.address_line1 if profile else "",
+        "address_line2": profile.address_line2 if profile else "",
+        "city": profile.city if profile else "", "state": profile.county if profile else "",
+        "postcode": profile.postcode if profile else "",
+        "company": "", "company_number": "", "registrant_type": "",
+    }
+    values.update({field: value for field, value in supplied.items() if value})
+    values["label"] = "Staff registration"
+    form = DomainContactForm(values)
+    if not form.is_valid():
+        raise ValidationError([
+            f"{form.fields[field].label or field.replace('_', ' ').title()}: {message}"
+            for field, errors in form.errors.items() for message in errors
+        ])
+    contact = form.save(commit=False)
+    contact.user = user
+    contact.is_default = not DomainContact.objects.filter(user=user).exists()
+    contact.as_resellerclub_payload("1", tld)
+    contact.save()
     return contact
 
 
@@ -225,7 +238,9 @@ def manual_domain_register(request):
     for c in DomainContact.objects.select_related("user").order_by("user__email", "label")[:1000]:
         contacts_by_user.setdefault(c.user_id, []).append(c)
 
+    from apps.domains.contact_codes import COUNTRY_CHOICES, COUNTRY_CODES
     context = {
+        "country_choices": COUNTRY_CHOICES,
         "users": users,
         "whm_packages": whm_packages,
         "whm_packages_source": whm_packages_source,
@@ -256,14 +271,25 @@ def manual_domain_register(request):
         "contact_city": (request.POST.get("contact_city") or "").strip(),
         "contact_postcode": (request.POST.get("contact_postcode") or "").strip(),
     }
+    for field in ("registrant_type", "company", "company_number", "phone_country_code",
+                  "address_line2", "state", "country"):
+        form[f"contact_{field}"] = str(request.POST.get(f"contact_{field}") or "").strip()
     context["form"] = form
+    form["contact_country"] = form["contact_country"].upper()
+    context["invalid_contact_country"] = bool(form["contact_country"] and form["contact_country"] not in COUNTRY_CODES)
 
     try:
         years = max(1, min(10, int(form["years"])))
     except ValueError:
         years = 1
 
-    user = User.objects.filter(pk=form["user_id"]).first() if form["user_id"] else None
+    selected_user = form["user_id"]
+    valid_user_id = (
+        bool(selected_user) and len(selected_user) <= 19
+        and selected_user.isascii() and selected_user.isdigit()
+        and int(selected_user) <= 2**63 - 1
+    )
+    user = User.objects.filter(pk=selected_user, is_active=True).first() if valid_user_id else None
     if not user:
         messages.error(request, "Select a client account.")
         return render(request, "admin_tools/manual_domain_register.html", context)
@@ -305,7 +331,12 @@ def manual_domain_register(request):
             messages.error(request, str(exc))
             return render(request, "admin_tools/manual_domain_register.html", context)
 
-    contact = _ensure_contact(user, request.POST)
+    from django.core.exceptions import ValidationError
+    try:
+        contact = _ensure_contact(user, request.POST, tld)
+    except ValidationError as exc:
+        context["contact_errors"] = exc.messages
+        return render(request, "admin_tools/manual_domain_register.html", context)
     price = _price_for_tld(tld, years)
 
     order = DomainOrder.objects.create(

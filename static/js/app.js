@@ -27,6 +27,21 @@ console.log('CyberAsk Domains portal loaded');
         return;
     }
 
+    var portalContent = scopedRoot.querySelector('[data-portal-content]');
+    var cookieBanner = document.getElementById('cookie-banner');
+    if (portalContent && cookieBanner) {
+        var reserveCookieSpace = function () {
+            var height = cookieBanner.getBoundingClientRect().height;
+            portalContent.style.setProperty('--portal-bottom-obstruction', (height ? height + 16 : 0) + 'px');
+        };
+        reserveCookieSpace();
+        if (typeof ResizeObserver !== 'undefined') {
+            new ResizeObserver(reserveCookieSpace).observe(cookieBanner);
+        } else {
+            window.addEventListener('resize', reserveCookieSpace);
+        }
+    }
+
     // Admin forms define their own layout and help text in the templates.
     if (scopedRoot.matches('.admin-shell')) {
         return;

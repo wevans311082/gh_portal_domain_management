@@ -53,6 +53,8 @@ Add one search entry point for email, customer name, domain, document number, an
 
 Create a unified staff customer page showing account health, owned assets, balances, open tickets, and a chronological activity timeline. Replace repeated navigation between unrelated lists with scoped actions.
 
+Support both individual and business customers. Track portal email verification, local contact-data checks, business checks where applicable, registrar email verification, and TLD eligibility independently. Individuals must not need a company number or Companies House result. The detailed requirements and regression criteria in [individual and registrar validation](individual-and-registrar-validation.md) are part of this feature and the domain-order workflows below.
+
 **Accept when:** Every panel respects permissions; restricted financial/security information is omitted for unauthorized roles; timeline entries link to source records; internal notes never appear in customer views.
 
 ### 4. Saved list views and configurable tables

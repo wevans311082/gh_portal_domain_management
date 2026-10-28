@@ -57,7 +57,7 @@
                 {% elif contact.registrant_validation_status == 'pending' %}bg-amber-100 text-amber-700
                 {% elif contact.registrant_validation_status == 'rejected' %}bg-red-100 text-red-700
                 {% else %}bg-slate-100 text-slate-700{% endif %}">
-                Registrant {{ contact.get_registrant_validation_status_display }}
+                Local review: {{ contact.get_registrant_validation_status_display }}
               </span>
             </div>
             <p class="text-sm text-gray-600 mt-0.5">{{ contact.name }}{% if contact.company %} &mdash; {{ contact.company }}{% endif %}</p>

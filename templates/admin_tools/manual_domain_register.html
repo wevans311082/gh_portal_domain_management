@@ -26,15 +26,15 @@
 
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <div class="sm:col-span-2">
-        <label class="block text-sm font-semibold text-slate-700 mb-1">Domain name</label>
-        <input type="text" name="domain_name" required placeholder="example.co.uk"
+        <label for="domain_name" class="block text-sm font-semibold text-slate-700 mb-1">Domain name</label>
+        <input id="domain_name" type="text" name="domain_name" required placeholder="example.co.uk"
                value="{{ form.domain_name|default:'' }}"
                class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-sky-500 focus:outline-none">
       </div>
 
       <div class="sm:col-span-2">
-        <label class="block text-sm font-semibold text-slate-700 mb-1">Client account</label>
-        <select name="user_id" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+        <label for="user_id" class="block text-sm font-semibold text-slate-700 mb-1">Client account</label>
+        <select id="user_id" name="user_id" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
           <option value="">Select client…</option>
           {% for u in users %}
           <option value="{{ u.pk }}" {% if form.user_id == u.pk|stringformat:"s" %}selected{% endif %}>
@@ -45,8 +45,8 @@
       </div>
 
       <div>
-        <label class="block text-sm font-semibold text-slate-700 mb-1">Registration years</label>
-        <select name="years" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+        <label for="years" class="block text-sm font-semibold text-slate-700 mb-1">Registration years</label>
+        <select id="years" name="years" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
           {% for y in year_choices %}
           <option value="{{ y }}" {% if form.years == y|stringformat:"s" or not form.years and y == 1 %}selected{% endif %}>{{ y }}</option>
           {% endfor %}
@@ -67,31 +67,75 @@
 
     <div class="border-t border-slate-100 pt-4">
       <h3 class="font-semibold text-slate-900 mb-2">Registrant contact</h3>
+      {% if contact_errors %}
+      <div role="alert" class="mb-4 rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-800">
+        <p class="font-semibold">Complete the registrant details before submitting an order.</p>
+        <ul class="list-disc pl-5">{% for error in contact_errors %}<li>{{ error }}</li>{% endfor %}</ul>
+      </div>
+      {% endif %}
+      <p class="mb-3 text-sm text-slate-700">Individuals do not need a company number. Missing required details must be supplied; no placeholder address or phone number is sent to the registrar.</p>
+      <div class="mb-3">
+        <label for="contact_registrant_type" class="block text-sm font-semibold text-slate-700 mb-1">Registrant type</label>
+        <select id="contact_registrant_type" name="contact_registrant_type" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+          <option value="">Use the existing contact's confirmed type</option>
+          <option value="individual" {% if form.contact_registrant_type == 'individual' %}selected{% endif %}>Individual</option>
+          <option value="organisation" {% if form.contact_registrant_type == 'organisation' %}selected{% endif %}>Organisation or sole trader</option>
+        </select>
+      </div>
       <p class="text-xs text-slate-500 mb-3">Uses the client’s default contact if one exists. Override fields only if needed.</p>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
-          <label class="block text-xs font-semibold text-slate-500 mb-1">Name</label>
-          <input name="contact_name" value="{{ form.contact_name|default:'' }}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" placeholder="Auto from client">
+          <label for="contact_name" class="block text-xs font-semibold text-slate-500 mb-1">Name</label>
+          <input id="contact_name" name="contact_name" value="{{ form.contact_name|default:'' }}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" placeholder="Auto from client">
         </div>
         <div>
-          <label class="block text-xs font-semibold text-slate-500 mb-1">Email</label>
-          <input name="contact_email" type="email" value="{{ form.contact_email|default:'' }}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" placeholder="Auto from client">
+          <label for="contact_email" class="block text-xs font-semibold text-slate-500 mb-1">Email</label>
+          <input id="contact_email" name="contact_email" type="email" value="{{ form.contact_email|default:'' }}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" placeholder="Auto from client">
         </div>
         <div>
-          <label class="block text-xs font-semibold text-slate-500 mb-1">Phone</label>
-          <input name="contact_phone" value="{{ form.contact_phone|default:'' }}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" placeholder="07…">
+          <label for="contact_phone" class="block text-xs font-semibold text-slate-500 mb-1">Phone</label>
+          <input id="contact_phone" name="contact_phone" value="{{ form.contact_phone|default:'' }}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" placeholder="07…">
         </div>
         <div>
-          <label class="block text-xs font-semibold text-slate-500 mb-1">Postcode</label>
-          <input name="contact_postcode" value="{{ form.contact_postcode|default:'' }}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+          <label for="contact_postcode" class="block text-xs font-semibold text-slate-500 mb-1">Postcode</label>
+          <input id="contact_postcode" name="contact_postcode" value="{{ form.contact_postcode|default:'' }}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
         </div>
         <div class="sm:col-span-2">
-          <label class="block text-xs font-semibold text-slate-500 mb-1">Address line</label>
-          <input name="contact_address" value="{{ form.contact_address|default:'' }}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+          <label for="contact_address" class="block text-xs font-semibold text-slate-500 mb-1">Address line</label>
+          <input id="contact_address" name="contact_address" value="{{ form.contact_address|default:'' }}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
         </div>
         <div>
-          <label class="block text-xs font-semibold text-slate-500 mb-1">City</label>
-          <input name="contact_city" value="{{ form.contact_city|default:'' }}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+          <label for="contact_city" class="block text-xs font-semibold text-slate-500 mb-1">City</label>
+          <input id="contact_city" name="contact_city" value="{{ form.contact_city|default:'' }}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label for="contact_state" class="block text-sm font-semibold text-slate-700 mb-1">County / state</label>
+          <input id="contact_state" name="contact_state" value="{{ form.contact_state|default:'' }}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label for="contact_company" class="block text-sm font-semibold text-slate-700 mb-1">Organisation or trading name (if applicable)</label>
+          <input id="contact_company" name="contact_company" value="{{ form.contact_company|default:'' }}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label for="contact_company_number" class="block text-sm font-semibold text-slate-700 mb-1">Company number (optional)</label>
+          <input id="contact_company_number" name="contact_company_number" value="{{ form.contact_company_number|default:'' }}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label for="contact_phone_country_code" class="block text-sm font-semibold text-slate-700 mb-1">Phone country code</label>
+          <input id="contact_phone_country_code" name="contact_phone_country_code" value="{{ form.contact_phone_country_code|default:'' }}" placeholder="44 for UK" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label for="contact_country" class="block text-sm font-semibold text-slate-700 mb-1">Country or territory</label>
+          <select id="contact_country" name="contact_country" aria-describedby="contact-country-help" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
+            <option value="">Use the selected contact or customer address country</option>
+            {% if invalid_contact_country %}<option value="{{ form.contact_country }}" selected>Unsupported code — choose an assigned country</option>{% endif %}
+            {% for code,label in country_choices %}<option value="{{ code }}"{% if form.contact_country == code %} selected{% endif %}>{{ label }}</option>{% endfor %}
+          </select>
+          <p id="contact-country-help" class="text-xs text-slate-600 mt-1">GB is the United Kingdom. Address country does not establish citizenship or registry eligibility.</p>
+        </div>
+        <div class="sm:col-span-2">
+          <label for="contact_address_line2" class="block text-sm font-semibold text-slate-700 mb-1">Address line 2 (optional)</label>
+          <input id="contact_address_line2" name="contact_address_line2" value="{{ form.contact_address_line2|default:'' }}" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
         </div>
       </div>
     </div>
@@ -108,8 +152,8 @@
         Create cPanel/WHM account after domain registration
       </label>
       <div>
-        <label class="block text-sm font-semibold text-slate-700 mb-1">WHM hosting package</label>
-        <select name="whm_package_name" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+        <label for="whm_package_name" class="block text-sm font-semibold text-slate-700 mb-1">WHM hosting package</label>
+        <select id="whm_package_name" name="whm_package_name" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
           <option value="">— none —</option>
           {% for p in whm_packages %}
           <option value="{{ p.name }}" {% if form.whm_package_name == p.name %}selected{% endif %}>
@@ -130,14 +174,14 @@
         Create unpaid invoice after successful registration
       </label>
       <div>
-        <label class="block text-sm font-semibold text-slate-700 mb-1">Invoice total override (£)</label>
-        <input type="number" step="0.01" min="0" name="invoice_amount" value="{{ form.invoice_amount|default:'' }}"
+        <label for="invoice_amount" class="block text-sm font-semibold text-slate-700 mb-1">Invoice total override (£)</label>
+        <input id="invoice_amount" type="number" step="0.01" min="0" name="invoice_amount" value="{{ form.invoice_amount|default:'' }}"
                placeholder="Auto from TLD pricing if empty"
                class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
       </div>
       <div>
-        <label class="block text-sm font-semibold text-slate-700 mb-1">Notes</label>
-        <textarea name="notes" rows="2" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" placeholder="Cash received, reference, etc.">{{ form.notes|default:'' }}</textarea>
+        <label for="notes" class="block text-sm font-semibold text-slate-700 mb-1">Notes</label>
+        <textarea id="notes" name="notes" rows="2" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" placeholder="Cash received, reference, etc.">{{ form.notes|default:'' }}</textarea>
       </div>
     </div>
 
