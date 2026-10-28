@@ -566,6 +566,15 @@ class ResellerClubClient:
         })
         return self._flatten_logicboxes_record(payload) if isinstance(payload, dict) else payload
 
+    def get_publication_reconciliation_details(self, order_id: str) -> dict:
+        """Read scoped contact IDs and the documented registrantOrgConsentDetails."""
+        from apps.domains.contact_change_confirmation import identifier
+        if not identifier(order_id):
+            raise ValueError("A valid registrar order is required.")
+        payload = self._get("domains/details", {"order-id": identifier(order_id),
+            "options": ["OrderDetails", "ContactIds", "RegistrantContactDetails", "StatusDetails"]})
+        return self._flatten_logicboxes_record(payload) if isinstance(payload, dict) else payload
+
     def resend_registrant_verification(self, order_id: str) -> bool:
         """Request one RAA email; only literal JSON true confirms acceptance."""
         result = self._post("domains/raa/resend-verification", {"order-id": order_id})
@@ -1050,17 +1059,40 @@ class ResellerClubClient:
         """Fetch a single domain contact from ResellerClub."""
         return self._get("contacts/details", {"contact-id": contact_id})
 
-    def change_domain_contacts(self, order_id, role_ids, *, registrant_org_consent=False):
+    def change_domain_contacts(self, order_id, role_ids, *, domain_name, registrant_org_consent=False):
         """Associate immutable contacts without bypassing registrant authorization."""
-        if type(registrant_org_consent) is not bool:
-            raise ValueError("Publication consent must be an explicit boolean.")
-        return self._post("domains/modify-contact", {
-            "order-id": order_id, "reg-contact-id": role_ids["reg"], "admin-contact-id": role_ids["admin"],
-            "tech-contact-id": role_ids["tech"], "billing-contact-id": role_ids["billing"],
+        from apps.domains.contact_change_confirmation import identifier
+        from apps.domains.publication_consent import publication_attributes
+        from apps.domains.registrar_policy import registration_contact_ids
+        if not identifier(order_id) or not isinstance(role_ids, dict):
+            raise ValueError("A valid registrar order and contact map are required.")
+        values = registration_contact_ids(domain_name, *(role_ids.get(role) for role in ("reg", "admin", "tech", "billing")))
+        if any(value != "-1" and not identifier(value) for value in values):
+            raise ValueError("Valid registrar contacts are required for every applicable role.")
+        data = {
+            "order-id": identifier(order_id), "reg-contact-id": values[0], "admin-contact-id": values[1],
+            "tech-contact-id": values[2], "billing-contact-id": values[3],
             "designated-agent": False, "sixty-day-lock-optout": False,
-            "attr-name1": "registrant-org-consent", "attr-value1": "true" if registrant_org_consent else "false",
-        })
+        }
+        data.update(publication_attributes(domain_name, registrant_org_consent))
+        return self._post("domains/modify-contact", data)
 
     def get_irtp_status(self, order_id):
         # The current 2804 contract documents POST for this read-only lookup.
-        return self._post("domains/irtp/verification/details", {"order-id": order_id})
+        from apps.domains.contact_change_confirmation import identifier
+        if not identifier(order_id):
+            raise ValueError("A valid registrar order is required.")
+        return self._post("domains/irtp/verification/details", {"order-id": identifier(order_id)})
+
+    def get_contact_change_action(self, order_id, action_id):
+        """Bounded read of one exact action; absence in current is not completion."""
+        from apps.domains.contact_change_confirmation import identifier, action_observation
+        if not identifier(order_id) or not identifier(action_id):
+            raise ValueError("A valid registrar order and action are required.")
+        parameters = {"order-id": [identifier(order_id)], "eaq-id": [identifier(action_id)],
+                      "no-of-records": 2, "page-no": 1}
+        for endpoint in ("actions/search-current", "actions/search-archived"):
+            result = action_observation(self._get(endpoint, parameters), order_id=order_id, action_id=action_id)
+            if result is not None:
+                return result
+        return None

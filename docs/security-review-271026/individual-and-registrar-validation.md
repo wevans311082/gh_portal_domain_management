@@ -2,7 +2,9 @@
 
 Added 28 October 2026 following the requirement that individuals can be validated without being businesses. This extends roadmap item 3 and the registration, transfer, contact-change and domain-operation workflows. These are implementation requirements; this document does not claim the current application complies.
 
-## Current code findings
+## Baseline code findings (historical)
+
+These findings describe the original review baseline. Subsequent implementation sections and [implementation-status.md](implementation-status.md) record the current state; the bullets below are not a claim that those original behaviours remain present.
 
 - `apps/domains/forms.py`: saving an individual contact sets `registrant_validation_status=validated` without external verification. Companies House success sets the same status, although this is a business-record check rather than registrar verification.
 - `apps/domains/forms.py`: domain ordering relies on this combined status, so its meaning affects order eligibility.

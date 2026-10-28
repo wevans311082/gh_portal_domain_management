@@ -3,12 +3,15 @@
 from django.core.exceptions import ValidationError
 from django.shortcuts import render
 
-from apps.domains.models import DomainOrder, DomainTransfer
+from apps.domains.models import DomainOrder, DomainTransfer, DomainContactChange
 
-REVIEW_MESSAGE = "This domain's earlier registrar association requires owner review before provider operations or renewal can continue."
+REVIEW_MESSAGE = "This domain's registrar association or contact change requires owner review before provider operations or renewal can continue."
 
 
 def registrar_review_required(domain):
+    if DomainContactChange.objects.filter(domain_id=domain.pk,
+            status__in=["queued", "preparing", "submitting", "awaiting", "unknown"]).exists():
+        return True
     transfer = DomainTransfer.objects.filter(domain_id=domain.pk).values(
         "user_id", "domain_name", "registrar_order_id", "registrar_contact_ids", "status",
         "submission_attempt__legacy_review_required",

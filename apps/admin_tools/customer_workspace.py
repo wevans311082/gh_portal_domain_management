@@ -171,6 +171,8 @@ def workspace_context(request, customer, form=None):
                 item["description"] = record.subject
             if key == "domains":
                 item["verification"] = registrar_email_summary(record)
+                from apps.domains.validation_summary import domain_eligibility_summary
+                item["eligibility"] = domain_eligibility_summary(record)
             items.append(item)
         panels.append({"key": key, "label": label, "count": page.paginator.count, "items": items,
                        "page": page if section == key else None})
@@ -204,11 +206,10 @@ def workspace_context(request, customer, form=None):
                 data_label = "Complete for general contact fields"
             except forms.ValidationError:
                 data_label = "Needs contact-data review"
-            evidence = ContactVerification.objects.filter(contact=contact, check_kind="business").first()
-            business = "Not applicable" if contact.registrant_type == "individual" else "Not confirmed"
-            if contact.registrant_type == "organisation" and evidence and evidence.is_current:
-                business = evidence.get_status_display()
-            contacts.append({"label": contact.label, "kind": contact.get_registrant_type_display(), "data": data_label, "business": business})
+            from apps.domains.validation_summary import contact_validation_summary
+            contacts.append({"label": contact.label, "kind": contact.get_registrant_type_display(), "data": data_label,
+                             "review_url": reverse("admin_tools:identity_review", args=[customer.pk, contact.pk]) if is_owner(actor) else "",
+                             **contact_validation_summary(contact)})
         context["contacts_truncated"] = len(contacts) > 5
         context["contact_checks"] = contacts[:5]
     try:

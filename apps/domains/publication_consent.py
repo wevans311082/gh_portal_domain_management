@@ -89,7 +89,7 @@ def posted_choice(data):
 def withdraw_decision(customer, identifier):
     """Stop future affirmative submission and track already-submitted redaction as support work."""
     from apps.accounts.models import User
-    from apps.domains.models import DomainOrder, DomainTransfer
+    from apps.domains.models import DomainOrder, DomainTransfer, DomainContactChange, PublicationRedaction
     from apps.audit.models import AuditLog
     from django.utils import timezone
     with transaction.atomic():
@@ -103,17 +103,22 @@ def withdraw_decision(customer, identifier):
         work_needed = (DomainOrder.objects.filter(publication_decision=decision).exclude(registrar_order_id="").exists()
             or DomainOrder.objects.filter(publication_decision=decision, registration_attempt__status__in=["submitting", "unknown", "accepted"]).exists()
             or DomainTransfer.objects.filter(publication_decision=decision).exclude(registrar_order_id="").exists()
-            or DomainTransfer.objects.filter(publication_decision=decision, submission_attempt__status__in=["submitting", "unknown", "accepted"]).exists())
+            or DomainTransfer.objects.filter(publication_decision=decision, submission_attempt__status__in=["submitting", "unknown", "accepted"]).exists()
+            or DomainContactChange.objects.filter(publication_decision=decision, submitted_at__isnull=False).exists())
         if work_needed:
             from apps.support.models import SupportTicket, SupportTicketMessage
             ticket = SupportTicket.objects.create(user=actor, subject=f"Organization publication withdrawal: {decision.domain_name}"[:255], priority="high")
             SupportTicketMessage.objects.create(ticket=ticket, user=actor, content=(
                 f"Organization publication consent {decision.pk} was withdrawn for {decision.domain_name}. "
                 "The order may already have reached the registrar. Review the original association and apply organization redaction at the provider. "
-                "This local withdrawal is not confirmation of provider redaction. Do not submit another registration or transfer."))
+                "This local withdrawal is not confirmation of provider redaction. Do not submit another registration, transfer or contact replacement."))
             decision.withdrawal_ticket = ticket
         decision.withdrawn_at = timezone.now()
         decision.save(update_fields=["withdrawn_at", "withdrawal_ticket", "updated_at"])
+        if work_needed:
+            redaction, _ = PublicationRedaction.objects.get_or_create(decision=decision)
+            from apps.domains.publication_redaction_jobs import publish_redaction
+            transaction.on_commit(lambda: publish_redaction(redaction.pk))
         AuditLog.objects.create(user=actor, action="domain.publication.consent_withdrawn", model_name="RegistrantPublicationDecision",
             object_id=str(decision.pk), data={"provider_processing_required": work_needed, "ticket_id": decision.withdrawal_ticket_id})
         return decision

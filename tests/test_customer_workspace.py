@@ -104,6 +104,20 @@ def test_individual_completeness_does_not_become_identity_or_business_verificati
     assert "Saving details does not verify identity" in response.content.decode()
 
 
+def test_workspace_shows_independent_evidence_status_without_private_reference(client, customer, staff):
+    from apps.domains.models import ContactVerification
+    contact = DomainContact.objects.create(user=customer, label="Reviewed individual", registrant_type="individual", name="Jane Smith")
+    for kind, tld in (("identity", ""), ("eligibility", "com")):
+        ContactVerification.objects.create(contact=contact, check_kind=kind, tld=tld, status="verified", source="local-policy",
+            reference="PRIVATE-IDENTITY-CASE", subject_digest=ContactVerification.digest_for(contact), checked_at=timezone.now())
+    response = client.get(workspace(customer))
+    check = response.context["contact_checks"][0]
+    assert check["identity"] == "Verified" and check["business"] == "Not applicable"
+    assert check["eligibility"][0]["label"] == "Verified"
+    assert b"Identity review" in response.content and b"contact-level evidence; no domain association confirmed" in response.content
+    assert b"PRIVATE-IDENTITY-CASE" not in response.content
+
+
 def test_panels_and_timeline_never_include_another_customers_records(client, customer, staff, django_user_model):
     other = django_user_model.objects.create_user(email="other360@example.test", password="testpass")
     Domain.objects.create(user=other, name="OTHER-PRIVATE.example", tld="example")

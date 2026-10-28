@@ -12,7 +12,7 @@ from apps.domains.publication_consent import withdraw_decision
 @login_required
 @require_GET
 def decisions(request):
-    page = Paginator(RegistrantPublicationDecision.objects.filter(customer=request.user).order_by("-created_at", "-pk"), 20).get_page(request.GET.get("page"))
+    page = Paginator(RegistrantPublicationDecision.objects.filter(customer=request.user).select_related("redaction").order_by("-created_at", "-pk"), 20).get_page(request.GET.get("page"))
     response = render(request, "domains/publication_decisions.html", {"page_obj": page})
     response["Cache-Control"] = "no-store"
     return response

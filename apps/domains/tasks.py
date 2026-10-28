@@ -759,3 +759,5 @@ def monitor_registrar_balance():
 
 # Register the durable verification workers with Celery's standard task discovery.
 from apps.domains.verification_actions import dispatch_verification_actions, run_verification_action, schedule_verification_checks  # noqa: E402,F401
+from apps.domains.contact_change_jobs import dispatch_contact_changes, run_contact_change  # noqa: E402,F401
+from apps.domains.publication_redaction_jobs import dispatch_publication_redactions, run_publication_redaction  # noqa: E402,F401

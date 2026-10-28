@@ -1,6 +1,7 @@
 from django.urls import path
 from . import views
 from . import publication_views
+from . import contact_change_views
 
 app_name = "domains"
 
@@ -14,6 +15,7 @@ urlpatterns = [
     path("my-domains/", views.my_domains, name="my_domains"),
     path("my-domains/bulk-renew/", views.domain_bulk_add_to_cart, name="bulk_add_to_cart"),
     path("<int:pk>/", views.domain_detail, name="detail"),
+    path("<int:pk>/contacts/", contact_change_views.contacts, name="contact_change"),
     path("<int:pk>/verification/", views.domain_verification_action, name="verification_action"),
     path("<int:pk>/toggle-autorenew/", views.domain_toggle_autorenew, name="toggle_autorenew"),
     path("<int:pk>/toggle-lock/", views.domain_toggle_lock, name="toggle_lock"),

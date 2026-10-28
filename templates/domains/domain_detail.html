@@ -5,12 +5,13 @@
 
 {% block header_actions %}
 <a href="{% url 'domains:my_domains' %}" class="btn-secondary text-xs">Back to domains</a>
+<a href="{% url 'domains:contact_change' domain.pk %}" class="btn-secondary text-xs">Domain contacts</a>
 {% if not registrar_review_required and not registry_renewal_review %}<a href="{% url 'domains:renew' pk=domain.pk %}" class="btn-primary text-xs">Renew</a>{% endif %}
 {% endblock %}
 
 {% block content %}
 {% if registry_renewal_review %}<section class="mb-5 rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-950" aria-labelledby="renewal-registry-heading"><h2 id="renewal-registry-heading" class="font-semibold">Renewal needs registrant review</h2><p class="mt-2 text-sm">{{ registry_renewal_review }}</p><a class="mt-3 inline-block font-semibold underline" href="{% url 'support:create' %}">Contact support before renewal</a></section>{% endif %}
-{% if registrar_review_required %}<section class="mb-5 rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-950" aria-labelledby="registrar-hold-heading"><h2 id="registrar-hold-heading" class="font-semibold">Registrar association awaiting review</h2><p class="mt-2">Provider operations, transfer codes and renewal are paused until an owner confirms the earlier registrar record.</p><a class="mt-2 inline-block font-semibold underline text-amber-950" href="{% url 'support:create' %}">Contact support about this review</a></section>{% endif %}
+{% if registrar_review_required %}<section class="mb-5 rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-950" aria-labelledby="registrar-hold-heading"><h2 id="registrar-hold-heading" class="font-semibold">Registrar association awaiting review</h2><p class="mt-2">Provider operations, transfer codes and renewal are paused until the registrar record or open contact change is confirmed.</p><a class="mt-2 inline-block font-semibold underline text-amber-950" href="{% url 'support:create' %}">Contact support about this review</a></section>{% endif %}
 <div class="space-y-4">
     {% include "domains/partials/registrar_verification.html" %}
     <div class="fluent-card p-5">

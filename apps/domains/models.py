@@ -304,6 +304,10 @@ class ContactVerification(TimeStampedModel):
     )
     domain_name = models.CharField(max_length=255, blank=True)
 
+    review_key = models.UUIDField(null=True, blank=True, unique=True, editable=False)
+    reviewer = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="contact_reviews")
+    policy_reference = models.CharField(max_length=100, blank=True)
+
     class Meta:
         ordering = ["-checked_at", "-pk"]
         indexes = [models.Index(fields=["contact", "check_kind", "tld", "-checked_at"], name="contact_check_evidence")]
@@ -397,6 +401,36 @@ class RegistrantPublicationDecision(TimeStampedModel):
     withdrawal_ticket = models.ForeignKey("support.SupportTicket", on_delete=models.SET_NULL, null=True, blank=True)
 
 
+class PublicationRedaction(TimeStampedModel):
+    """One durable provider-redaction outcome for one withdrawn decision."""
+
+    decision = models.OneToOneField(RegistrantPublicationDecision, on_delete=models.PROTECT, related_name="redaction")
+    token = models.UUIDField(default=uuid.uuid4, editable=False)
+    status = models.CharField(max_length=16, default="queued", choices=[("queued", "Queued"),
+        ("submitting", "Submission started"), ("awaiting", "Awaiting provider confirmation"),
+        ("confirmed", "Provider consent revoked"), ("unknown", "Provider review required"),
+        ("review", "Association review required")])
+    provider_scope = models.CharField(max_length=64, blank=True)
+    registrar_order_id = models.CharField(max_length=19, blank=True)
+    customer_id = models.CharField(max_length=19, blank=True)
+    role_ids = models.JSONField(default=dict)
+    action_id = models.CharField(max_length=19, blank=True)
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    checked_at = models.DateTimeField(null=True, blank=True)
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+    available_at = models.DateTimeField(default=timezone.now)
+    lease_until = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["status", "available_at"], name="publication_redact_dispatch")]
+
+
+class ContactChangeQueueState(models.Model):
+    """Singleton lock serializing global contact-change queue admission."""
+
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
+
+
 class DomainContactChange(TimeStampedModel):
     """Proposed domain associations remain separate until provider confirmation."""
 
@@ -422,6 +456,7 @@ class DomainContactChange(TimeStampedModel):
     role_ids = models.JSONField(default=dict)
     action_id = models.CharField(max_length=19, blank=True)
     irtp_status = models.CharField(max_length=20, blank=True)
+    provider_observation = models.JSONField(default=dict)
     available_at = models.DateTimeField(default=timezone.now)
     lease_until = models.DateTimeField(null=True, blank=True)
     submitted_at = models.DateTimeField(null=True, blank=True)

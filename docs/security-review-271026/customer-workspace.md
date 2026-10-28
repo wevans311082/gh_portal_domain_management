@@ -39,6 +39,10 @@ There is no ordinary edit endpoint. Owner redaction clears the live note body, r
 
 ## Verification and remaining scope
 
+The final validation-summary refinement reads independent identity and business evidence and up to three recent eligibility scopes per displayed contact. Stale versions are labelled Needs recheck. References, documents and raw provider details are omitted. Domain eligibility is evaluated separately against the exact current owned registration association, provider scope, remote registrant ID and contact digest; a contact-level approval or another domain's result cannot verify that domain. Missing/unscoped evidence is explicit, and this bounded recent-contact summary is not a complete compliance assessment.
+
+This refinement passed 36 focused summary/workspace tests and eight populated/empty/Support/Billing desktop/mobile browser states. It performs no provider HTTP during workspace reads.
+
 Focused tests cover panel and timeline filtering, role revocation, privileged-account exclusion, per-currency balances, individual checks, deterministic cursor pagination, cursor tampering/customer binding, source indexes, note audiences, direct-link filtering, CSRF, request bounds, shared-limit failure, Unicode text, escaping, replay, recent MFA, redaction and audit rollback. Browser fixtures cover desktop/mobile populated, empty, invalid, saving, Support, Billing and redacted-note states; checks include contrast, accessible names, linked error focus, long text, repeated submission and cookie-banner clearance. Representative validation and note screenshots were inspected.
 
 This delivers the workspace UI and its permission-filtered timeline/notes. Roadmap item 3 remains in progress because its broader individual/registrar requirements include workflows and TLD adapters still listed in [individual-and-registrar-validation.md](individual-and-registrar-validation.md). A review gate for an unsupported extension is not counted as delivery of its adapter. No later roadmap feature is marked complete by this workspace milestone.

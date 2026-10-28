@@ -15,10 +15,9 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AlterField(
-            model_name='domainorder',
-            name='status',
-            field=models.CharField(choices=[('draft', 'Draft'), ('pending_payment', 'Pending payment'), ('paid', 'Paid'), ('processing', 'Processing'), ('paused', 'Paused'), ('completed', 'Completed'), ('failed', 'Failed'), ('cancelled', 'Cancelled')], default='draft', max_length=20),
+        migrations.CreateModel(
+            name='ContactChangeQueueState',
+            fields=[('id', models.PositiveSmallIntegerField(default=1, editable=False, primary_key=True, serialize=False))],
         ),
         migrations.CreateModel(
             name='DomainContactChange',
@@ -37,6 +36,7 @@ class Migration(migrations.Migration):
                 ('role_ids', models.JSONField(default=dict)),
                 ('action_id', models.CharField(blank=True, max_length=19)),
                 ('irtp_status', models.CharField(blank=True, max_length=20)),
+                ('provider_observation', models.JSONField(default=dict)),
                 ('available_at', models.DateTimeField(default=django.utils.timezone.now)),
                 ('lease_until', models.DateTimeField(blank=True, null=True)),
                 ('submitted_at', models.DateTimeField(blank=True, null=True)),

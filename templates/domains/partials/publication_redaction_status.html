@@ -1,0 +1,16 @@
+{% if decision.redaction %}
+<div class="mt-4 rounded-md border border-slate-300 bg-slate-50 p-4 text-slate-900">
+<h3 class="font-semibold">Provider redaction: {{ decision.redaction.get_status_display }}</h3>
+{% if decision.redaction.status == 'confirmed' %}
+<p class="mt-2 text-sm">The registrar reported revoked organization-publication consent{% if decision.redaction.confirmed_at %} on {{ decision.redaction.confirmed_at|date:"d M Y H:i" }}{% endif %}. Public WHOIS/RDAP services may retain cached information. Contact support if the organization remains visible.</p>
+{% elif decision.redaction.status == 'unknown' %}
+<p class="mt-2 text-sm">The submission outcome is uncertain. The system will check the registrar without repeating the change. Your support request remains open for review.</p>
+{% elif decision.redaction.status == 'review' %}
+<p class="mt-2 text-sm">The domain association or an in-flight contact change needs review before redaction can proceed. Background checks will resume when the association is confirmed.</p>
+{% elif decision.redaction.status == 'awaiting' or decision.redaction.status == 'submitting' %}
+<p class="mt-2 text-sm">Redaction has been submitted or is being submitted. It is not confirmed until the registrar reports revoked consent.</p>
+{% else %}
+<p class="mt-2 text-sm">Your withdrawal is queued for a registrar check. This local request does not yet confirm provider redaction.</p>
+{% endif %}
+</div>
+{% endif %}

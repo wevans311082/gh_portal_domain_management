@@ -214,6 +214,8 @@ CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 CELERY_BEAT_SCHEDULE = {
     "public-delivery-dispatch": {"task": "core.dispatch_public_deliveries", "schedule": 60.0},
     "registrar-verification-dispatch": {"task": "domains.dispatch_verification_actions", "schedule": 60.0},
+    "registrar-contact-change-dispatch": {"task": "domains.dispatch_contact_changes", "schedule": 60.0},
+    "registrar-publication-redaction-dispatch": {"task": "domains.dispatch_publication_redactions", "schedule": 60.0},
     "registrar-verification-scan": {"task": "domains.schedule_verification_checks", "schedule": 60.0},
 }
 CELERY_TASK_DEFAULT_QUEUE = "default"

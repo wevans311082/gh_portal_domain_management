@@ -11,6 +11,7 @@ from . import role_views
 from . import search_views
 from . import customer_workspace
 from . import transfer_views
+from . import identity_reviews
 
 app_name = "admin_tools"
 
@@ -26,6 +27,7 @@ urlpatterns = [
     # People
     path("users/", views.users, name="users"),
     path("customers/<int:pk>/", customer_workspace.customer_workspace, name="customer_workspace"),
+    path("customers/<int:pk>/contacts/<int:contact_pk>/identity/", identity_reviews.identity_review, name="identity_review"),
     path("customers/<int:pk>/notes/add/", customer_workspace.customer_note_add, name="customer_note_add"),
     path("customers/<int:pk>/notes/<int:note_pk>/", customer_workspace.customer_note, name="customer_note"),
     path("customers/<int:pk>/notes/<int:note_pk>/redact/", customer_workspace.customer_note_redact, name="customer_note_redact"),

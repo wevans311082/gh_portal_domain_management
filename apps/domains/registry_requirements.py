@@ -98,9 +98,18 @@ def validate_renewal_registrant(domain):
     if order is None or order.registration_contact.user_id != domain.user_id:
         raise ValidationError("The .me.uk registrant association needs review before renewal. Contact support to confirm the actual individual or a documented registry exception.")
     validate_uk_registrant(order.registration_contact, "me.uk")
+    from apps.domains.models import DomainContactChange, ContactVerification
+    confirmed = DomainContactChange.objects.filter(domain=domain, user_id=domain.user_id,
+        domain_name=domain.name, registrar_order_id=domain.registrar_id, status="confirmed").order_by("-confirmed_at", "-pk").first()
+    if confirmed:
+        if (confirmed.subject.get("source_kind") != "registration" or confirmed.subject.get("source_id") != order.pk
+                or confirmed.registration_contact_id != order.registration_contact_id
+                or confirmed.role_ids != order.registrar_contact_ids
+                or confirmed.subject.get("contact_digests", {}).get("registration_contact") != ContactVerification.digest_for(order.registration_contact)):
+            raise ValidationError("The .me.uk contact changed since registrar confirmation. Contact support before renewal.")
+        return
     attempt = getattr(order, "registration_attempt", None)
     if attempt and attempt.subject.get("contacts"):
-        from apps.domains.models import ContactVerification
         digest = attempt.subject["contacts"].get(str(order.registration_contact_id))
         if digest != ContactVerification.digest_for(order.registration_contact):
             raise ValidationError("The .me.uk contact changed since registration. Contact support to confirm current registrar eligibility before renewal.")
