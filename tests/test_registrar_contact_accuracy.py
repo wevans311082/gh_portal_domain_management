@@ -59,9 +59,10 @@ def test_invalid_customer_identifier_is_rejected(identifier):
 
 
 def test_eu_field_limits_and_individual_company_value():
-    assert contact().as_resellerclub_payload("999", "eu")["company"] == "NA"
+    eligibility = {"eu_eligibility_basis": "citizen", "eu_citizenship_country": "IE", "eu_eligibility_certified": True}
+    assert contact(**eligibility).as_resellerclub_payload("999", "eu")["company"] == "NA"
     with pytest.raises(ValidationError) as error:
-        contact(name="x" * 51).as_resellerclub_payload("999", "eu")
+        contact(name="x" * 51, **eligibility).as_resellerclub_payload("999", "eu")
     assert "name" in error.value.message_dict
 
 

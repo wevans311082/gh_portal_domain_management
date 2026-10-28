@@ -50,7 +50,7 @@ def test_build_nameservers_prefers_runtime_then_whm(settings, monkeypatch):
         "apps.core.runtime_settings.get_runtime_setting",
         lambda key, default="": default,
     )
-    order = type("O", (), {"dns_provider": "cpanel"})()
+    order = type("O", (), {"dns_provider": "cpanel", "tld": "com"})()
     assert _build_nameservers(order) == ["ns1.runtime.test", "ns2.runtime.test"]
 
     monkeypatch.setattr(

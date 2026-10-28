@@ -83,6 +83,20 @@
         </div>
         {% endif %}
 
+        <fieldset class="rounded-md border border-slate-300 p-4 space-y-4">
+          <legend class="px-1 text-sm font-semibold text-slate-900">US registry declaration (only for .US)</legend>
+          <p class="text-sm text-slate-700">Leave these fields blank for other extensions. US registrant contacts need an accurate nexus declaration before ordering. It does not prove citizenship or registry acceptance. .US prohibits privacy/proxy registration and may publish actual registrant details. Foreign-entity categories require additional review.</p>
+          <div><label class="block text-sm font-medium text-slate-800" for="{{ form.us_nexus_category.id_for_label }}">{{ form.us_nexus_category.label }}</label>{{ form.us_nexus_category }}{{ form.us_nexus_category.errors }}</div>
+          <div><label class="block text-sm font-medium text-slate-800" for="{{ form.us_application_purpose.id_for_label }}">{{ form.us_application_purpose.label }}</label>{{ form.us_application_purpose }}{{ form.us_application_purpose.errors }}</div>
+          <div class="flex items-start gap-2">{{ form.us_nexus_certified }}<label class="text-sm text-slate-800" for="{{ form.us_nexus_certified.id_for_label }}">{{ form.us_nexus_certified.label }} Confirm again when saving an existing declaration.</label></div>{{ form.us_nexus_certified.errors }}
+        </fieldset>
+        <fieldset class="rounded-md border border-slate-300 p-4 space-y-4">
+          <legend class="px-1 text-sm font-semibold text-slate-900">EU registry declaration (only for .EU)</legend>
+          <p class="text-sm text-slate-700">Leave this section blank for other extensions. Declare residence, citizenship or organization establishment separately from the address country. Individuals do not need a company number. This records your declaration, not registry verification; .EU ordering still requires the remaining provider-policy checks.</p>
+          <div><label class="block text-sm font-medium text-slate-800" for="{{ form.eu_eligibility_basis.id_for_label }}">{{ form.eu_eligibility_basis.label }}</label>{{ form.eu_eligibility_basis }}{{ form.eu_eligibility_basis.errors }}</div>
+          <div><label class="block text-sm font-medium text-slate-800" for="{{ form.eu_citizenship_country.id_for_label }}">{{ form.eu_citizenship_country.label }}</label>{{ form.eu_citizenship_country }}<p class="mt-2 text-sm text-slate-700">Provide this only when relying on citizenship. Never enter passport numbers or upload identity documents here. Citizenship registrations from outside the eligible area may require registrar review.</p>{{ form.eu_citizenship_country.errors }}</div>
+          <div class="flex items-start gap-2">{{ form.eu_eligibility_certified }}<label class="text-sm text-slate-800" for="{{ form.eu_eligibility_certified.id_for_label }}">{{ form.eu_eligibility_certified.label }} Confirm again when saving an existing declaration.</label></div>{{ form.eu_eligibility_certified.errors }}
+        </fieldset>
         <!-- Email -->
         <div>
           <label for="{{ form.email.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">{{ form.email.label }}</label>

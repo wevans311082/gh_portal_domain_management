@@ -12,6 +12,7 @@ from django.utils import timezone
 from apps.audit.models import AuditLog
 from apps.domains.models import ContactVerification, DomainOrder, VerificationAction, VerificationQueueState
 from apps.domains.verification import _identifier, reconcile_registrant_verification
+from apps.domains.registrar_policy import email_workstream_tlds
 
 MAX_OPEN_ACTIONS = 500
 
@@ -67,7 +68,7 @@ def request_verification_action(domain, actor, kind, key, *, automatic=False):
         if not _identifier(order.remote_registrant_id):
             raise ValidationError("The registrar contact must be linked before verification.")
         # RAA email resend is not a universal ccTLD/KYC mechanism.
-        if order.tld not in {"com", "net", "org"}:
+        if order.tld not in email_workstream_tlds():
             raise ValidationError("Contact support for this extension's verification process.")
         open_jobs = VerificationAction.objects.filter(status__in=["queued", "running", "unknown"])
         if open_jobs.filter(domain_order=order, kind=kind, status="unknown").exists():
@@ -239,7 +240,7 @@ def schedule_verification_checks():
             pk__gt=state.scan_after, status="completed", user__is_active=True,
             domain__status__in=["active", "expired", "suspended"],
             domain__user_id=F("user_id"), domain__name=F("domain_name"),
-            tld__in=["com", "net", "org"],
+            tld__in=email_workstream_tlds(),
         ).exclude(registrar_order_id="").select_related("domain", "registration_contact").order_by("pk")[:100])
         if not orders:
             state.scan_after = 0

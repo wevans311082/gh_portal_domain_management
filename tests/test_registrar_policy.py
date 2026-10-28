@@ -11,6 +11,29 @@ from apps.domains.registrar_policy import ALL_ROLES, policy_for, tld_for_domain
 from apps.domains.resellerclub_client import ResellerClubClient
 
 
+def test_shared_profile_membership_and_independent_email_workstream():
+    assert policy_for("com") is policy_for("net") is policy_for("org")
+    assert policy_for("uk") is policy_for("co.uk") is policy_for("me.uk")
+    assert policy_for("com").email_workstream == "icann_raa"
+    assert policy_for("io").email_workstream == "registry_specific"
+    assert policy_for("us").eligibility_workstream == "us_nexus"
+
+
+def test_duplicate_tld_assignment_cannot_silently_replace_a_profile():
+    from apps.domains.registrar_policy import GENERAL, US, build_policy_catalogue
+    with pytest.raises(ValueError, match="unique"):
+        build_policy_catalogue({"first": (GENERAL, ("com",)), "second": (US, ("com",))})
+
+
+def test_service_roles_use_profile_routing_and_normalize_extension():
+    from apps.domains.registrar_policy import contact_payload_tld
+    assert contact_payload_tld(".US", "registration_contact") == "us"
+    assert contact_payload_tld(".US", "admin_contact") == "com"
+    assert contact_payload_tld("co.uk", "registration_contact") == "co.uk"
+    with pytest.raises(ValidationError):
+        contact_payload_tld("unknown", "registration_contact")
+
+
 @pytest.mark.parametrize("extension", ["com", "net", "org", "io"])
 def test_general_contact_routing(extension):
     assert policy_for(extension).roles == ALL_ROLES
@@ -25,7 +48,7 @@ def test_uk_contact_routing(extension):
     assert tld_for_domain("Example." + extension) == extension
 
 
-@pytest.mark.parametrize("extension", ["ca", "eu", "es", "us", "de", "unknown", "com.invalid", ""])
+@pytest.mark.parametrize("extension", ["ca", "eu", "es", "de", "unknown", "com.invalid", ""])
 def test_unimplemented_eligibility_requires_review(extension):
     with pytest.raises(ValidationError, match="review"):
         policy_for(extension)

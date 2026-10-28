@@ -46,13 +46,17 @@ def verified_existing_order(payload, *, identifier, domain_name, customer_id):
             raise ValidationError("The historical registrant contact identifier is missing.")
         role_ids[key] = value or "-1"
     nameservers = []
+    from apps.domains.registrar_policy import POLICIES, tld_for_domain
+    policy = POLICIES.get(tld_for_domain(domain_name))
     count = payload.get("noOfNameServers")
     if status == "pending" and count is None and not payload.get("ns1") and not payload.get("ns2"):
         count = 0
     if type(count) not in (str, int) or len(str(count)) > 2 or not str(count).isascii() or not str(count).isdigit():
         raise ValidationError("The registrar nameservers require review.")
     count = int(count)
-    if not (2 <= count <= 13 or status == "pending" and count == 0):
+    minimum = policy.min_nameservers if policy else 2
+    maximum = policy.max_nameservers if policy else 13
+    if not (minimum <= count <= maximum or status == "pending" and count == 0):
         raise ValidationError("The registrar nameservers require review.")
     if count == 0 and any(payload.get(f"ns{index}") for index in range(1, 14)):
         raise ValidationError("The registrar nameservers require review.")
@@ -65,8 +69,6 @@ def verified_existing_order(payload, *, identifier, domain_name, customer_id):
         if len(value) > 253 or value in nameservers:
             raise ValidationError("The registrar nameservers require review.")
         nameservers.append(value)
-    from apps.domains.registrar_policy import POLICIES, tld_for_domain
-    policy = POLICIES.get(tld_for_domain(domain_name))
     if policy:
         for role in policy.roles:
             key = "reg" if role == "registration_contact" else role.removesuffix("_contact")

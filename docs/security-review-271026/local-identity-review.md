@@ -1,0 +1,17 @@
+# Local identity review
+
+Owners can open Record local identity review from a contact on the Customer 360 workspace. The route is owner-only, requires recent MFA, uses CSRF and shared request bounds, and excludes privileged customer accounts. Ordinary staff cannot open references/history or submit reviews. Customer views do not expose review references.
+
+An individual needs no organization, company number or Companies House match. Saving accurate contact details is not itself identity verification. This screen records an owner's local policy assessment only; it never sets registrar-email or TLD-eligibility evidence and never calls external providers. A policy review must actually have taken place before choosing a passed outcome.
+
+The organization operating the portal must define and approve the referenced local policy, including when review is required, accepted evidence, authorized access, review validity and evidence retention. The application does not invent a universal identity-document requirement. Collect no documents, identity numbers or credentials through this form. Record only a policy identifier/version and a case reference pointing to the authorized review process. These references are restricted to the owner review screen, not ordinary workspace summaries or metadata audit records.
+
+The form shows the specific contact version. Submission rechecks owner privileges, customer/contact ownership and the contact digest under locks. Changes require a fresh review. Accurate general contact data is required without fabricated substitutions. A unique review key makes identical submissions idempotent and rejects reuse for another outcome. Status, policy/case reference, reviewer and expiry are preserved as independent evidence; earlier evidence is not overwritten. Audit failure rolls back the review.
+
+Validity is explicitly supplied under the policy, from 1 to 365 days. Expiry and relevant contact edits make the review stale; changing a cosmetic contact label does not. Expiry is not deletion. Metadata audit history remains for accountability, while any separately collected evidence must follow the approved process's retention rules. No document-storage or automated document-verification feature is introduced.
+
+A later outcome in the same assessment scope supersedes prior case references, including rejected, pending or unknown outcomes. Expiry of a later outcome never resurrects an older approval. Different domain/TLD assessments remain independent, and registrar-email evidence remains scoped to its provider account/order. Historical evidence is retained with its original outcome and shown as needing recheck when superseded.
+
+Migration 0023 adds optional reviewer, policy reference and unique review-key fields. Existing rows remain unattributed rather than acquiring invented approval or provenance. No production migration has been applied during implementation.
+
+Verification covers owner/non-owner access, recent MFA, CSRF, foreign-customer contact IDs, stale digests, duplicate submissions, missing policy acknowledgement, bounded validity, independent result types and audit rollback. Route-inventory tests cover the new guarded route. Browser fixtures cover form, errors, recorded review and stale submission at desktop/mobile widths.

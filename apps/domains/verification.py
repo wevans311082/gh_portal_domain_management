@@ -10,16 +10,20 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.domains.models import ContactVerification, DomainContact, DomainOrder
+from apps.domains.registrar_policy import email_workstream_tlds
 
 
 def registrar_email_summary(domain):
     """Return safe, domain-scoped display data without calling a provider."""
     result = {"status": "unknown", "label": "Not confirmed", "checked_at": None, "action_due_at": None,
               "can_refresh": False, "can_resend": False, "action_label": "", "needs_review": False}
-    from apps.domains.registrar_policy import tld_for_domain
-    from apps.domains.registry_requirements import UK_EXTENSIONS
+    from apps.domains.registrar_policy import policy_for, tld_for_domain
     extension = tld_for_domain(domain.name)
-    if extension in UK_EXTENSIONS or extension == "io":
+    try:
+        email_workstream = policy_for(extension).email_workstream
+    except ValidationError:
+        return result
+    if email_workstream != "icann_raa":
         result.update(status="not_applicable", label="ICANN RAA workflow not applicable")
         return result
     order = DomainOrder.objects.filter(
@@ -35,7 +39,7 @@ def registrar_email_summary(domain):
     if registrar_review_required(domain):
         result.update(label="Registrar association review required", needs_review=True, review_message="The saved domain association does not match the current registrar account or record. Contact support before requesting another registrar check.")
         return result
-    result["can_refresh"] = bool(extension in {"com", "net", "org"} and _identifier(order.registrar_order_id) and _identifier(order.remote_registrant_id))
+    result["can_refresh"] = bool(extension in email_workstream_tlds() and _identifier(order.registrar_order_id) and _identifier(order.remote_registrant_id))
     review = order.verification_actions.filter(status="unknown").first()
     result["needs_review"] = bool(review)
     action = review or order.verification_actions.first()
@@ -55,7 +59,7 @@ def registrar_email_summary(domain):
     result.update(status=evidence.status, label=evidence.get_status_display())
     if evidence.status in {"pending", "suspended"}:
         result["action_due_at"] = evidence.action_due_at
-        result["can_resend"] = not review and result["can_refresh"] and order.tld in {"com", "net", "org"}
+        result["can_resend"] = not review and result["can_refresh"] and order.tld in email_workstream_tlds()
     return result
 
 
@@ -128,7 +132,7 @@ def reconcile_registrant_verification(order_id, customer_id, *, client):
     )
     started = _start_time(payload.get("raaVerificationStartTime"), checked_at) if status in {"pending", "suspended"} else None
     # The 15-day RAA rule is not a universal ccTLD or identity-check deadline.
-    due = started + timedelta(days=15) if started and order.tld in {"com", "net", "org"} else None
+    due = started + timedelta(days=15) if started and order.tld in email_workstream_tlds() else None
     with transaction.atomic():
         current_order = DomainOrder.objects.select_for_update().get(pk=order.pk)
         current = DomainContact.objects.select_for_update().get(pk=contact.pk)

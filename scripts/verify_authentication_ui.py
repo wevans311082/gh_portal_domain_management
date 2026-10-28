@@ -186,6 +186,22 @@ def main():
             email=search_customer.email, address_line1="1 High Street", city="London", state="London",
             postcode="SW1A 1AA", country="GB", phone_country_code="44", phone="07700900000",
         )
+        identity_url = reverse("admin_tools:identity_review", args=[search_customer.pk, search_contact.pk])
+        identity_form = client.get(identity_url)
+        assert identity_form.status_code == 200
+        fixtures["/admin-identity-review"] = identity_form.content
+        fixtures["/admin-identity-review-invalid"] = client.post(identity_url, {}).content
+        identity_post = {"key": str(uuid.uuid4()), "subject_digest": ContactVerification.digest_for(search_contact),
+            "status": "verified", "policy_reference": "LOCAL-IDENTITY-POLICY-v1", "evidence_reference": "REVIEW-CASE-100",
+            "valid_days": "90", "policy_reviewed": "on"}
+        assert client.post(identity_url, identity_post).status_code == 302
+        fixtures["/admin-identity-review-recorded"] = client.get(identity_url).content
+        search_contact.name = "Changed after the original review snapshot"
+        search_contact.save()
+        identity_post["key"] = str(uuid.uuid4())
+        fixtures["/admin-identity-review-stale"] = client.post(identity_url, identity_post).content
+        search_contact.name = "Global Search"
+        search_contact.save()
         search_customer.email = "customer-" + "x" * 110 + "@example.test"
         org_user = get_user_model().objects.create_user(email="publication-ui@example.test", password="fixture-password")
         org_contact = DomainContact.objects.create(user=org_user, registrant_type="organisation", label="Organization registrant",
@@ -244,6 +260,27 @@ def main():
         from apps.domains.contact_bindings import provider_scope
         contact_client = Client()
         contact_client.force_login(search_customer)
+        us_declaration = {"label": "US registry declaration", "registrant_type": "individual", "name": "Global Search",
+            "email": "us-declaration@example.test", "phone_country_code": "44", "phone": "07700900000",
+            "address_line1": "1 High Street", "city": "London", "state": "London", "postcode": "SW1A 1AA", "country": "GB",
+            "us_nexus_category": "C11", "us_application_purpose": "P3"}
+        fixtures["/registrant-us-declaration-invalid"] = contact_client.post(reverse("domains:contact_create"), us_declaration).content
+        us_declaration["us_nexus_certified"] = "on"
+        assert contact_client.post(reverse("domains:contact_create"), us_declaration).status_code == 302
+        us_contact = DomainContact.objects.get(user=search_customer, label="US registry declaration")
+        fixtures["/registrant-us-declaration"] = contact_client.get(reverse("domains:contact_edit", args=[us_contact.pk])).content
+        eu_declaration = {key: value for key, value in us_declaration.items() if not key.startswith("us_")}
+        eu_declaration.update(label="EU citizenship declaration", eu_eligibility_basis="citizen", eu_citizenship_country="IE")
+        fixtures["/registrant-eu-declaration-invalid"] = contact_client.post(reverse("domains:contact_create"), eu_declaration).content
+        eu_declaration["eu_eligibility_certified"] = "on"
+        assert contact_client.post(reverse("domains:contact_create"), eu_declaration).status_code == 302
+        eu_contact = DomainContact.objects.get(user=search_customer, label="EU citizenship declaration")
+        fixtures["/registrant-eu-declaration"] = contact_client.get(reverse("domains:contact_edit", args=[eu_contact.pk])).content
+        TLDPricing.objects.get_or_create(tld="us", defaults={"registration_cost": "12", "is_active": True})
+        fixtures["/registrant-us-registration"] = contact_client.get(reverse("domains:register"), {"domain": "registry-policy.us"}).content
+        fixtures["/registrant-us-registration-invalid"] = contact_client.post(reverse("domains:register"), {
+            "domain_name": "registry-policy.us", "registration_years": "1", "contact": search_contact.pk,
+            "privacy_enabled": "on", "dns_provider": "cpanel", "publication_choice": "redact"}).content
         contact_domain = Domain.objects.create(user=search_customer, name="contact-change-ui.com", tld="com",
             status="active", registrar_id="7501")
         contact_order = DomainOrder.objects.create(user=search_customer, domain=contact_domain, domain_name=contact_domain.name,
@@ -442,7 +479,7 @@ def main():
             page.on("pageerror", lambda error: errors.append(str(error)))
             for width in (1440, 390):
                 page.set_viewport_size({"width": width, "height": 960})
-                for name in ("publication-redaction-review", "publication-redaction-unknown", "publication-redaction-awaiting", "publication-redaction-confirmed", "portal-contact-change-form", "portal-contact-change-invalid", "portal-contact-change-queued", "portal-contact-change-awaiting", "portal-contact-change-unknown", "portal-contact-change-confirmed", "portal-contact-change-review", "registry-me-registration", "registry-me-invalid", "registry-uk-domain", "registry-uk-operation", "registry-me-renewal-review", "registry-me-held-domain", "registry-me-domain-list", "publication-registration", "publication-empty", "publication-shop", "publication-cart", "publication-active", "publication-stale-cart", "publication-withdrawn", "publication-provider-pending", "admin-registrar-diagnostic", "admin-registrar-diagnostic-failed", "admin-transfer-preparing", "admin-transfer-submitting", "admin-transfer-unknown", "admin-transfer-accepted", "admin-transfer-aborted", "admin-transfer-historical", "admin-transfers", "admin-transfers-empty", "admin-transfers-invalid", "portal-transfer-review", "portal-historical-domain", "portal-historical-action-held", "portal-historical-review", "admin-historical-review", "admin-historical-list", "admin-historical-pending", "admin-historical-suspended", "admin-registration-preparing", "admin-registration-submitting", "admin-registration-unknown", "admin-registration-accepted", "admin-registration-aborted", "admin-customer-workspace", "admin-customer-workspace-loading", "admin-customer-workspace-invalid", "admin-customer-workspace-empty", "admin-customer-workspace-support", "admin-customer-workspace-billing", "admin-customer-note-redacted", "portal-cart-empty", "portal-cart", "public-cart-review", "registrant-verification-automatic", "registrant-verification-queued", "registrant-verification-error", "registrant-verification-review", "registrant-verification-verified", "registrant-verification-pending", "registrant-verification-suspended", "registrant-verification-unknown", "registrant-domain-uk", "registrant-domain-review", "admin-manual-domain", "admin-manual-domain-invalid", "registrant-contact", "registrant-contact-invalid", "mfa", "mfa-invalid", "reauthenticate", "reauth-required", "staff-roles", "staff-roles-invalid", "staff-workspace", "staff-customers", "branding", "branding-invalid", "configuration", "configuration-invalid", "deliveries", "deliveries-invalid", "public-contact", "public-contact-invalid", "public-error-413", "public-error-429", "public-error-503", "public-quote", "public-domain-error", "public-acceptance", "public-acceptance-unavailable", "public-acceptance-expired", "public-mail-reset", "public-mail-verification", "admin-customers", "admin-customers-empty", "admin-customers-loading", "admin-user-invalid", "admin-invoices", "admin-invoices-empty", "admin-search", "admin-search-start", "admin-search-suggestions-error", "admin-search-empty", "admin-search-invalid", "admin-search-pagination", "admin-search-support", "admin-search-record"):
+                for name in ("registrant-eu-declaration", "registrant-eu-declaration-invalid", "registrant-us-registration", "registrant-us-registration-invalid", "registrant-us-declaration", "registrant-us-declaration-invalid", "admin-identity-review", "admin-identity-review-invalid", "admin-identity-review-recorded", "admin-identity-review-stale", "publication-redaction-review", "publication-redaction-unknown", "publication-redaction-awaiting", "publication-redaction-confirmed", "portal-contact-change-form", "portal-contact-change-invalid", "portal-contact-change-queued", "portal-contact-change-awaiting", "portal-contact-change-unknown", "portal-contact-change-confirmed", "portal-contact-change-review", "registry-me-registration", "registry-me-invalid", "registry-uk-domain", "registry-uk-operation", "registry-me-renewal-review", "registry-me-held-domain", "registry-me-domain-list", "publication-registration", "publication-empty", "publication-shop", "publication-cart", "publication-active", "publication-stale-cart", "publication-withdrawn", "publication-provider-pending", "admin-registrar-diagnostic", "admin-registrar-diagnostic-failed", "admin-transfer-preparing", "admin-transfer-submitting", "admin-transfer-unknown", "admin-transfer-accepted", "admin-transfer-aborted", "admin-transfer-historical", "admin-transfers", "admin-transfers-empty", "admin-transfers-invalid", "portal-transfer-review", "portal-historical-domain", "portal-historical-action-held", "portal-historical-review", "admin-historical-review", "admin-historical-list", "admin-historical-pending", "admin-historical-suspended", "admin-registration-preparing", "admin-registration-submitting", "admin-registration-unknown", "admin-registration-accepted", "admin-registration-aborted", "admin-customer-workspace", "admin-customer-workspace-loading", "admin-customer-workspace-invalid", "admin-customer-workspace-empty", "admin-customer-workspace-support", "admin-customer-workspace-billing", "admin-customer-note-redacted", "portal-cart-empty", "portal-cart", "public-cart-review", "registrant-verification-automatic", "registrant-verification-queued", "registrant-verification-error", "registrant-verification-review", "registrant-verification-verified", "registrant-verification-pending", "registrant-verification-suspended", "registrant-verification-unknown", "registrant-domain-uk", "registrant-domain-review", "admin-manual-domain", "admin-manual-domain-invalid", "registrant-contact", "registrant-contact-invalid", "mfa", "mfa-invalid", "reauthenticate", "reauth-required", "staff-roles", "staff-roles-invalid", "staff-workspace", "staff-customers", "branding", "branding-invalid", "configuration", "configuration-invalid", "deliveries", "deliveries-invalid", "public-contact", "public-contact-invalid", "public-error-413", "public-error-429", "public-error-503", "public-quote", "public-domain-error", "public-acceptance", "public-acceptance-unavailable", "public-acceptance-expired", "public-mail-reset", "public-mail-verification", "admin-customers", "admin-customers-empty", "admin-customers-loading", "admin-user-invalid", "admin-invoices", "admin-invoices-empty", "admin-search", "admin-search-start", "admin-search-suggestions-error", "admin-search-empty", "admin-search-invalid", "admin-search-pagination", "admin-search-support", "admin-search-record"):
                     if args.pages and name not in args.pages:
                         continue
                     pending_routes = []

@@ -146,20 +146,22 @@ def _configured_nameservers() -> list[str]:
 def _build_nameservers(order):
     """Nameservers attached to a new registration.
 
-    Sources (first match with ≥2 hosts wins for non-Cloudflare):
+    Sources (first match meeting the TLD minimum wins for non-Cloudflare):
     1. Order contact domain fields already set on a related domain (rare)
     2. WHM_NAMESERVERS from runtime settings / .env
     3. Live WHM nameserver config / hostname-derived ns1/ns2
     4. Cloudflare placeholder pair only when provider is Cloudflare
     """
     configured = _configured_nameservers()
+    from apps.domains.registrar_policy import policy_for
+    minimum = policy_for(order.tld).min_nameservers
 
     if order.dns_provider == Domain.DNS_PROVIDER_CLOUDFLARE:
         # Temporary NS for the initial register call; CF NS applied after zone create.
         return (configured[:2] or ["ns1.pending-cloudflare.invalid", "ns2.pending-cloudflare.invalid"])
 
-    if len(configured) >= 2:
-        return configured[:4]
+    if len(configured) >= minimum:
+        return configured
 
     # Fall back to WHM so registration still works when env var was never set
     # but WHM credentials are present (typical lab/prod gap).
@@ -167,11 +169,11 @@ def _build_nameservers(order):
         from apps.provisioning.whm_client import WHMClient
 
         whm_ns = _normalize_ns_list(WHMClient().get_nameservers())
-        if len(whm_ns) >= 2:
+        if len(whm_ns) >= minimum:
             logger.info("Using nameservers from WHM: %s", whm_ns)
-            return whm_ns[:4]
+            return whm_ns
         if whm_ns:
-            logger.warning("WHM returned fewer than 2 nameservers: %s", whm_ns)
+            logger.warning("WHM returned fewer than the required %s nameservers: %s", minimum, whm_ns)
     except Exception as exc:
         logger.warning("Could not load nameservers from WHM: %s", exc)
 
@@ -257,10 +259,12 @@ def register_domain_order(self, order_id):
     registrar_client = ResellerClubClient()
     nameservers = acknowledgement.subject.get("nameservers", []) if already_acknowledged else _build_nameservers(order)
 
-    if not already_acknowledged and len(nameservers) < 2:
+    from apps.domains.registrar_policy import policy_for
+    minimum_nameservers = policy_for(order.tld).min_nameservers
+    if not already_acknowledged and len(nameservers) < minimum_nameservers:
         order.status = DomainOrder.STATUS_FAILED
         order.last_error = (
-            "At least two nameservers are required before registering domains. "
+            f"At least {minimum_nameservers} nameserver(s) are required before registering this domain. "
             "Set WHM_NAMESERVERS in .env (comma-separated, e.g. ns1.example.com,ns2.example.com), "
             "or under Admin → Integrations / runtime settings, or ensure WHM API can return "
             "nameserver config (get_nameserver_config / gethostname)."

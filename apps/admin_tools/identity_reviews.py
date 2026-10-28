@@ -31,6 +31,10 @@ class IdentityReviewForm(forms.Form):
         cleaned = super().clean()
         if hasattr(self.data, "getlist") and any(len(self.data.getlist(key)) != 1 for key in self.data):
             raise forms.ValidationError("Submit each field once.")
+        if self.errors.get("key") or self.errors.get("subject_digest"):
+            self._errors.pop("key", None)
+            self._errors.pop("subject_digest", None)
+            raise forms.ValidationError("Reload this page to obtain a current review form before submitting.")
         return cleaned
 
 

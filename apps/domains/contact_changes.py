@@ -15,7 +15,7 @@ from apps.domains.models import (
     DomainOrder, DomainTransfer,
 )
 from apps.domains.publication_consent import capture_decision, publication_snapshot
-from apps.domains.registrar_policy import ALL_ROLES, policy_for, tld_for_domain
+from apps.domains.registrar_policy import ALL_ROLES, policy_for, tld_for_domain, contact_payload_tld
 
 OPEN_STATUSES = ("queued", "preparing", "submitting", "awaiting", "unknown")
 MAX_OPEN_CHANGES = 500
@@ -100,7 +100,7 @@ def request_contact_change(*, customer, domain_id, key, contacts, publication_ch
         source, attempt, kind = locked_source(domain)
         digests = {}
         for role, contact in selected.items():
-            contact.as_resellerclub_payload(attempt.customer_id, tld_for_domain(domain.name))
+            contact.as_resellerclub_payload(attempt.customer_id, contact_payload_tld(tld_for_domain(domain.name), role))
             digests[role] = ContactVerification.digest_for(contact)
         proposal = {"roles": {role: contact.pk for role, contact in selected.items()},
                     "contact_digests": digests, "publication_choice": publication_choice}
@@ -158,7 +158,7 @@ def _locked_proposal(change_id, *, allow_withdrawn_publication=False):
         if (contact is None or contact.user_id != owner.pk
                 or ContactVerification.digest_for(contact) != change.subject.get("contact_digests", {}).get(role)):
             raise ValidationError("A proposed contact changed. Review the request.")
-        contact.as_resellerclub_payload(change.customer_id, tld_for_domain(domain.name))
+        contact.as_resellerclub_payload(change.customer_id, contact_payload_tld(tld_for_domain(domain.name), role))
     publication = publication_snapshot(change, contacts[change.registration_contact_id])
     if publication != change.subject.get("publication"):
         from apps.domains.models import RegistrantPublicationDecision
@@ -242,7 +242,7 @@ def submit_contact_change(change_id, *, client):
         for role in policy_for(tld_for_domain(change.domain_name)).roles:
             contact = contacts[getattr(change, role + "_id")]
             role_ids[REMOTE_ROLES[role]] = resolve_contact_binding(contact, change.customer_id,
-                tld_for_domain(change.domain_name), client=client)
+                contact_payload_tld(tld_for_domain(change.domain_name), role), client=client)
         with transaction.atomic(durable=True):
             current, contacts = _locked_proposal(change_id)
             if current.status != "preparing" or current.token != token:

@@ -84,6 +84,9 @@ def add_domain_registration_item(
     label, tld = _split_domain_name(normalized)
     if not _is_valid_label(label):
         raise CartPreflightError("Invalid domain name.")
+    from apps.domains.registrar_policy import POLICIES
+    if tld in POLICIES and not POLICIES[tld].privacy_supported:
+        privacy_enabled = False
 
     pricing = TLDPricing.objects.filter(tld=tld, is_active=True).first()
     if not pricing:
@@ -305,6 +308,12 @@ def preflight_cart_domains(cart: PortalCart):
             raise CartPreflightError(f"{item.domain_name}: this extension needs a registrar eligibility review. Contact support before checkout.") from None
         if item.item_type == PortalCartItem.TYPE_DOMAIN_TRANSFER and policy.roles != ALL_ROLES:
             raise CartPreflightError("This extension requires a registrar-specific transfer workflow. Contact support before checkout.")
+        if item.item_type == PortalCartItem.TYPE_DOMAIN_TRANSFER and tld == "us":
+            from apps.domains.us_registry import validate_us_transfer_code
+            try:
+                validate_us_transfer_code(item.transfer_auth_code)
+            except ValidationError as exc:
+                raise CartPreflightError(" ".join(exc.messages)) from None
         try:
             contact.as_resellerclub_payload("1", tld)
         except ValidationError as exc:

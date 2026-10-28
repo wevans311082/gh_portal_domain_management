@@ -217,6 +217,12 @@ class DomainContact(TimeStampedModel):
     postcode = models.CharField(max_length=20)
     country = models.CharField(max_length=2, default="GB")
     is_default = models.BooleanField(default=False)
+    us_nexus_category = models.CharField(max_length=3, blank=True)
+    us_application_purpose = models.CharField(max_length=2, blank=True)
+    us_nexus_certified = models.BooleanField(default=False)
+    eu_eligibility_basis = models.CharField(max_length=12, blank=True)
+    eu_citizenship_country = models.CharField(max_length=2, blank=True)
+    eu_eligibility_certified = models.BooleanField(default=False)
     registrar_contact_id = models.CharField(max_length=255, blank=True)
     registrant_validation_status = models.CharField(
         max_length=20,
@@ -322,8 +328,18 @@ class ContactVerification(TimeStampedModel):
             "phone_country_code", "phone", "address_line1", "address_line2",
             "city", "state", "postcode", "country", "registrar_contact_id",
         )
+        values = {field: getattr(contact, field) for field in fields}
+        # Blank new declarations do not change the historical digest contract.
+        if contact.us_nexus_category or contact.us_application_purpose or contact.us_nexus_certified:
+            values.update(us_nexus_category=contact.us_nexus_category,
+                          us_application_purpose=contact.us_application_purpose,
+                          us_nexus_certified=contact.us_nexus_certified)
+        if contact.eu_eligibility_basis or contact.eu_citizenship_country or contact.eu_eligibility_certified:
+            values.update(eu_eligibility_basis=contact.eu_eligibility_basis,
+                          eu_citizenship_country=contact.eu_citizenship_country,
+                          eu_eligibility_certified=contact.eu_eligibility_certified)
         serialized = json.dumps(
-            {field: getattr(contact, field) for field in fields},
+            values,
             sort_keys=True, ensure_ascii=True, separators=(",", ":"),
         )
         return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
@@ -353,14 +369,21 @@ class ContactVerification(TimeStampedModel):
                 return False
             if self.provider_scope != linked_order.registrar_contact_ids.get("_scope", ""):
                 return False
+        scope = {"contact_id": self.contact_id, "check_kind": self.check_kind,
+                 "tld": self.tld, "domain_name": self.domain_name}
+        if self.check_kind == "registrar_email":
+            # Email observations belong to a particular provider order/account.
+            scope.update(domain_order_id=self.domain_order_id, reference=self.reference,
+                         provider_scope=self.provider_scope)
+        elif self.check_kind == "eligibility":
+            scope["domain_order_id"] = self.domain_order_id
+        # Case references identify evidence, not independent approvals. A later
+        # outcome for the same assessment scope supersedes every earlier case.
         return (
             self.subject_digest == self.digest_for(current)
             and self.checked_at <= now
             and (self.expires_at is None or self.expires_at > now)
-            and type(self).objects.filter(
-                contact_id=self.contact_id, check_kind=self.check_kind,
-                tld=self.tld, reference=self.reference,
-            ).values_list("pk", flat=True).first() == self.pk
+            and type(self).objects.filter(**scope).values_list("pk", flat=True).first() == self.pk
         )
 
     @property

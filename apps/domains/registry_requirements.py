@@ -55,6 +55,24 @@ def validate_registration(domain_name, contact=None, years=1):
             validate_uk_registrant(contact, extension)
     elif label.startswith("xn--"):
         raise ValidationError("IDN registration requires a reviewed language-specific workflow. Contact support before ordering.")
+    if extension == "us":
+        if len(label) < 3:
+            raise ValidationError("US names shorter than three characters require reserved/premium-name review before ordering.")
+        if contact is not None:
+            from apps.domains.us_registry import us_contact_attributes
+            us_contact_attributes(contact)
+    if extension == "eu":
+        from apps.domains.contact_codes import COUNTRY_CODES
+        if len(label) < 2 or len(label) >= 4 and label[2:4] == "--":
+            raise ValidationError("EU labels need 2-63 ASCII characters and cannot have hyphens in both the third and fourth positions.")
+        if label.upper() in COUNTRY_CODES or label in {"eurid", "registry", "nic", "dns", "internic", "whois", "das", "coc", "eurethix", "eurethics", "euthics"}:
+            raise ValidationError("This EU name is a country code or reserved registry name. Contact support for any documented registry exception.")
+        if contact is not None:
+            from apps.domains.eu_registry import eu_contact_attributes
+            eu_contact_attributes(contact)
+            email_domain = contact.email.rpartition("@")[2].lower().rstrip(".")
+            if email_domain == domain_name or email_domain.endswith("." + domain_name):
+                raise ValidationError("EU registration requires a reachable contact email outside the domain being registered. Do not replace it with invented details.")
 
 
 def capabilities(domain_name):
@@ -63,21 +81,21 @@ def capabilities(domain_name):
     except ValidationError:
         return {"reviewed": False, "lock": False, "auth_code": False, "max_nameservers": None, "uk_domain": False}
     return {"reviewed": True, "lock": policy.lock_supported, "auth_code": policy.auth_code_supported,
-            "max_nameservers": policy.max_nameservers, "uk_domain": tld_for_domain(domain_name) in UK_EXTENSIONS}
+            "min_nameservers": policy.min_nameservers, "max_nameservers": policy.max_nameservers, "uk_domain": tld_for_domain(domain_name) in UK_EXTENSIONS}
 
 
 def policy_snapshot(domain_name):
     extension = tld_for_domain(domain_name)
     policy = policy_for(extension)
     return {"version": POLICY_VERSION, "extension": extension, "contact_type": policy.contact_type,
-        "natural_person_required": extension == "me.uk", "max_nameservers": policy.max_nameservers,
+        "natural_person_required": extension == "me.uk", "min_nameservers": policy.min_nameservers, "max_nameservers": policy.max_nameservers,
         "scope": "local_requirements_only"}
 
 
 def validate_nameservers(domain_name, nameservers):
     policy = policy_for(tld_for_domain(domain_name))
-    if not isinstance(nameservers, (list, tuple)) or not 2 <= len(nameservers) <= policy.max_nameservers:
-        raise ValidationError(f"Choose between two and {policy.max_nameservers} nameservers for this extension.")
+    if not isinstance(nameservers, (list, tuple)) or not policy.min_nameservers <= len(nameservers) <= policy.max_nameservers:
+        raise ValidationError(f"Choose between {policy.min_nameservers} and {policy.max_nameservers} nameservers for this extension.")
     normalized = []
     for name in nameservers:
         if not isinstance(name, str):
@@ -90,6 +108,14 @@ def validate_nameservers(domain_name, nameservers):
 
 def validate_renewal_registrant(domain):
     """Exceptional .me.uk legacy ownership must be reviewed, not silently renewed."""
+    if tld_for_domain(domain.name) == "us":
+        from apps.domains.us_registry import validate_us_renewal
+        validate_us_renewal(domain)
+        return
+    if tld_for_domain(domain.name) == "eu":
+        from apps.domains.registrant_renewal import validate_declared_renewal
+        validate_declared_renewal(domain, "eu")
+        return
     if tld_for_domain(domain.name) != "me.uk":
         return
     from apps.domains.models import DomainOrder

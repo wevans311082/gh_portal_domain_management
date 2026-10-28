@@ -528,6 +528,9 @@ class ResellerClubClient:
         from apps.domains.registrar_policy import ALL_ROLES, policy_for, tld_for_domain
         if policy_for(tld_for_domain(domain_name)).roles != ALL_ROLES:
             raise ValidationError("This extension requires a registrar-specific transfer workflow. Contact support before submitting a transfer.")
+        if tld_for_domain(domain_name) == "us":
+            from apps.domains.us_registry import validate_us_transfer_code
+            validate_us_transfer_code(auth_code)
         data = {
             "domain-name": domain_name,
             "customer-id": customer_id,
@@ -1058,6 +1061,13 @@ class ResellerClubClient:
     def get_contact(self, contact_id: str) -> dict:
         """Fetch a single domain contact from ResellerClub."""
         return self._get("contacts/details", {"contact-id": contact_id})
+
+    def get_registrant_eligibility_observations(self, contact_ids, *, tld):
+        """Read exact documented criteria without claiming identity/email approval."""
+        from apps.domains.eligibility_contract import eligibility_request, eligibility_observations
+        parameters = eligibility_request(contact_ids, tld)
+        response = self._get("contacts/validate-registrant", parameters)
+        return eligibility_observations(response, contact_ids=contact_ids, tld=tld)
 
     def change_domain_contacts(self, order_id, role_ids, *, domain_name, registrant_org_consent=False):
         """Associate immutable contacts without bypassing registrant authorization."""

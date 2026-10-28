@@ -111,7 +111,7 @@ def test_short_letters_remain_subject_to_provider_availability_not_an_invented_b
 def test_nameserver_limits_are_explicit_and_case_insensitive_duplicates_are_refused():
     ten = [f"ns{index}.example.com" for index in range(10)]
     validate_nameservers("example.uk", ten)
-    with pytest.raises(ValidationError, match="two and 10"):
+    with pytest.raises(ValidationError, match="2 and 10"):
         validate_nameservers("example.uk", ten + ["extra.example.com"])
     validate_nameservers("example.com", ten + [f"extra{index}.example.com" for index in range(3)])
     with pytest.raises(ValidationError, match="distinct"):

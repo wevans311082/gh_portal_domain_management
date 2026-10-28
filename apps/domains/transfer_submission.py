@@ -79,6 +79,9 @@ def _locked_subject(transfer_id, customer_id):
     publication = publication_snapshot(transfer, transfer.registration_contact)
     if len(transfer.auth_code) > 255 or any(ord(char) < 32 or ord(char) == 127 for char in transfer.auth_code):
         raise ValidationError("The transfer authorization code contains unsupported characters.")
+    if transfer.tld == "us":
+        from apps.domains.us_registry import validate_us_transfer_code
+        validate_us_transfer_code(transfer.auth_code)
     if transfer.domain_id or Domain.objects.filter(name__iexact=transfer.domain_name).exists():
         raise ValidationError("This domain already has a local record. Reconcile its association before submitting a transfer.")
     if DomainOrder.objects.filter(domain_name__iexact=transfer.domain_name).exists():
@@ -149,11 +152,14 @@ def submit_transfer(transfer_id, customer_id, nameservers, *, client):
         transfer = DomainTransfer.objects.get(pk=transfer_id)
         service, synced = DomainContactService(client), {}
         role_ids = {"_scope": attempt.provider_scope}
+        from apps.domains.registrar_policy import contact_payload_tld
         for role in ALL_ROLES:
             contact = getattr(transfer, role)
-            if contact.pk not in synced:
-                synced[contact.pk] = service.sync_remote_contact(contact, customer_id, transfer.tld)
-            role_ids["reg" if role == "registration_contact" else role.removesuffix("_contact")] = synced[contact.pk]
+            payload_tld = contact_payload_tld(transfer.tld, role)
+            cache_key = (contact.pk, payload_tld)
+            if cache_key not in synced:
+                synced[cache_key] = service.sync_remote_contact(contact, customer_id, payload_tld)
+            role_ids["reg" if role == "registration_contact" else role.removesuffix("_contact")] = synced[cache_key]
         with transaction.atomic(durable=True):
             current, contacts, subject = _locked_subject(transfer_id, customer_id)
             active = DomainTransferAttempt.objects.select_for_update().get(pk=attempt.pk)

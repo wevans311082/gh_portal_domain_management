@@ -6,6 +6,8 @@ from apps.domains.models import ContactVerification, Domain, DomainContact
 from apps.companies.services import CompaniesHouseService
 from apps.domains.contact_codes import CountryChoiceField
 from apps.domains.publication_consent import CHOICES, DISCLOSURE
+from apps.domains.eu_registry import BASIS_CHOICES, ELIGIBLE_COUNTRIES
+from apps.domains.contact_codes import COUNTRY_CHOICES
 
 _INPUT = "block w-full rounded-md border-gray-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm"
 _SELECT = _INPUT
@@ -24,6 +26,15 @@ class VerificationActionForm(forms.Form):
 
 
 class DomainContactForm(forms.ModelForm):
+    eu_eligibility_basis = forms.ChoiceField(choices=BASIS_CHOICES, required=False, label="EU eligibility basis", widget=forms.Select(attrs={"class": _SELECT}))
+    eu_citizenship_country = forms.ChoiceField(choices=[("", "Not needed unless citizenship is the chosen basis"),
+        *((code, label) for code, label in COUNTRY_CHOICES if code in ELIGIBLE_COUNTRIES)], required=False,
+        label="Country of citizenship for EU eligibility", widget=forms.Select(attrs={"class": _SELECT}))
+    eu_eligibility_certified = forms.BooleanField(required=False, label="I certify this registrant meets the declared EU eligibility basis.")
+    from apps.domains.us_registry import NEXUS_CHOICES, PURPOSE_CHOICES
+    us_nexus_category = forms.ChoiceField(choices=NEXUS_CHOICES, required=False, label="US nexus category", widget=forms.Select(attrs={"class": _SELECT}))
+    us_application_purpose = forms.ChoiceField(choices=PURPOSE_CHOICES, required=False, label="US intended use", widget=forms.Select(attrs={"class": _SELECT}))
+    us_nexus_certified = forms.BooleanField(required=False, label="I certify this registrant's declared US nexus and intended use are accurate.")
     country = CountryChoiceField(
         label="Country or territory", widget=forms.Select(attrs={"class": _SELECT}),
         help_text="Choose the contact address country. GB is the United Kingdom. This does not establish citizenship or TLD eligibility.",
@@ -42,6 +53,8 @@ class DomainContactForm(forms.ModelForm):
             "email", "phone_country_code", "phone",
             "address_line1", "address_line2", "city", "state", "postcode", "country",
             "is_default",
+            "us_nexus_category", "us_application_purpose", "us_nexus_certified",
+            "eu_eligibility_basis", "eu_citizenship_country", "eu_eligibility_certified",
         ]
         widgets = {
             "label":             forms.TextInput(attrs={"class": _INPUT, "placeholder": "e.g. Primary Contact"}),
@@ -79,6 +92,8 @@ class DomainContactForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._companies_house_payload = None
+        self.initial["us_nexus_certified"] = False
+        self.initial["eu_eligibility_certified"] = False
         self.fields["phone_country_code"].help_text = "Use an assigned international calling code without +, for example 44 or 1. It may differ from the address country."
         if self.initial.get("registrant_type") == "unspecified":
             self.initial["registrant_type"] = ""
@@ -113,6 +128,22 @@ class DomainContactForm(forms.ModelForm):
         candidate = DomainContact(**{
             key: value for key, value in cleaned.items() if key in self.Meta.fields
         })
+        if candidate.us_nexus_category or candidate.us_application_purpose or candidate.us_nexus_certified:
+            from apps.domains.us_registry import validate_us_declaration
+            try:
+                validate_us_declaration(candidate)
+            except ValidationError as exc:
+                for key, errors in exc.message_dict.items():
+                    for error in errors:
+                        self.add_error(key, error)
+        if candidate.eu_eligibility_basis or candidate.eu_citizenship_country or candidate.eu_eligibility_certified:
+            from apps.domains.eu_registry import validate_eu_declaration
+            try:
+                validate_eu_declaration(candidate)
+            except ValidationError as exc:
+                for key, errors in exc.message_dict.items():
+                    for error in errors:
+                        self.add_error(key, error)
         try:
             candidate.as_resellerclub_payload("1")
         except ValidationError as exc:
@@ -210,6 +241,8 @@ class DomainRegistrationForm(forms.Form):
                     self.initial["privacy_enabled"] = False
                     self.fields["privacy_enabled"].help_text = "Registrar privacy protection is not supported for this extension."
                 from apps.domains.registry_requirements import UK_EXTENSIONS
+                if tld_for_domain(domain_hint) == "us":
+                    self.registry_guidance = "US registration requires an explicit, accurate nexus category and intended use on the registrant contact. Individuals do not need a company number. Privacy/proxy registrations are prohibited; actual registrant details may be published. Foreign-entity categories require support review."
                 if tld_for_domain(domain_hint) in UK_EXTENSIONS:
                     self.registry_guidance = "UK domains use only the registrant contact and do not use registrar locks or EPP codes. Supply the actual full registrant name; individuals do not need a company number."
                     self.registry_guidance += " A sole trader registering as a person should select Individual and use their actual full name, not a trading name."

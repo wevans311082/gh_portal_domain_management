@@ -141,10 +141,11 @@ def _claim(order_id, customer_id, nameservers, client):
 
 
 def _check_bindings(order, contacts, customer_id, scope, role_ids):
+    from apps.domains.registrar_policy import contact_payload_tld
     policy = policy_for(order.tld)
     for role in policy.roles:
         contact = contacts[getattr(order, role + "_id")]
-        digest = _fingerprint(contact.as_resellerclub_payload(customer_id, order.tld))
+        digest = _fingerprint(contact.as_resellerclub_payload(customer_id, contact_payload_tld(order.tld, role)))
         key = "reg" if role == "registration_contact" else role.removesuffix("_contact")
         if not RegistrarContactBinding.objects.filter(
             contact=contact, provider_scope=scope, customer_id=customer_id, contact_type=policy.contact_type,
@@ -165,12 +166,15 @@ def submit_registration(order_id, customer_id, nameservers, *, client):
         service = DomainContactService(client)
         role_ids = {"_scope": attempt.provider_scope, "admin": "-1", "tech": "-1", "billing": "-1"}
         synced = {}
+        from apps.domains.registrar_policy import contact_payload_tld
         for role in policy_for(order.tld).roles:
             contact = getattr(order, role)
-            if contact.pk not in synced:
-                synced[contact.pk] = service.sync_remote_contact(contact, customer_id, order.tld)
+            payload_tld = contact_payload_tld(order.tld, role)
+            cache_key = (contact.pk, payload_tld)
+            if cache_key not in synced:
+                synced[cache_key] = service.sync_remote_contact(contact, customer_id, payload_tld)
             key = "reg" if role == "registration_contact" else role.removesuffix("_contact")
-            role_ids[key] = synced[contact.pk]
+            role_ids[key] = synced[cache_key]
         # Commit the paid-call marker before entering the transaction that holds
         # local subjects stable through the bounded provider request.
         with transaction.atomic(durable=True):

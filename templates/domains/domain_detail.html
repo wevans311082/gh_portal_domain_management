@@ -76,7 +76,7 @@
                     <input type="text" name="nameserver1" value="{{ domain.nameserver1 }}" placeholder="ns1.example.com" class="font-mono">
                 </div>
                 <div>
-                    <label>Nameserver 2</label>
+                    <label>Nameserver 2{% if registrar_capabilities.min_nameservers == 1 %} (optional){% endif %}</label>
                     <input type="text" name="nameserver2" value="{{ domain.nameserver2 }}" placeholder="ns2.example.com" class="font-mono">
                 </div>
                 <div>

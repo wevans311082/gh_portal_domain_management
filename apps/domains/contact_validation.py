@@ -9,14 +9,14 @@ from apps.domains.contact_codes import COUNTRY_CODES, CALLING_CODES
 
 def validate_order_contacts(order, customer_id, tld):
     """Check every contact role before the first external contact mutation."""
-    from apps.domains.registrar_policy import policy_for, tld_for_domain
+    from apps.domains.registrar_policy import policy_for, tld_for_domain, contact_payload_tld
     if tld_for_domain(order.domain_name) != str(tld).strip().lower().lstrip("."):
         raise ValidationError("The domain extension does not match the order's TLD policy.")
     for role in policy_for(tld).roles:
         contact = getattr(order, role)
         if contact.user_id != order.user_id:
             raise ValidationError("Every domain contact must belong to the order's customer.")
-        contact.as_resellerclub_payload(customer_id, tld)
+        contact.as_resellerclub_payload(customer_id, contact_payload_tld(tld, role))
 
 
 def resellerclub_contact_payload(contact, customer_id, tld=""):
@@ -85,6 +85,6 @@ def resellerclub_contact_payload(contact, customer_id, tld=""):
     }
     if errors:
         raise ValidationError(errors)
-    from apps.domains.registry_requirements import validate_uk_registrant
-    validate_uk_registrant(contact, extension)
+    from apps.domains.registrar_policy import contact_workstream_attributes
+    payload.update(contact_workstream_attributes(contact, extension))
     return payload

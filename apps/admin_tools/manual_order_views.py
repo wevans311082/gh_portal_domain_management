@@ -80,6 +80,8 @@ def _ensure_contact(user: User, post, tld="") -> DomainContact:
         "city": "contact_city", "state": "contact_state", "postcode": "contact_postcode",
         "country": "contact_country", "registrant_type": "contact_registrant_type",
         "company": "contact_company", "company_number": "contact_company_number",
+        "us_nexus_category": "contact_us_nexus_category", "us_application_purpose": "contact_us_application_purpose",
+        "us_nexus_certified": "contact_us_nexus_certified",
     }
     supplied = {field: str(post.get(alias) or "").strip() for field, alias in aliases.items()}
     if existing and not any(supplied.values()):
@@ -239,7 +241,9 @@ def manual_domain_register(request):
         contacts_by_user.setdefault(c.user_id, []).append(c)
 
     from apps.domains.contact_codes import COUNTRY_CHOICES, COUNTRY_CODES
+    from apps.domains.us_registry import NEXUS_CHOICES, PURPOSE_CHOICES
     context = {
+        "us_nexus_choices": NEXUS_CHOICES, "us_purpose_choices": PURPOSE_CHOICES,
         "country_choices": COUNTRY_CHOICES,
         "users": users,
         "whm_packages": whm_packages,

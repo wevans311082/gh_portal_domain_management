@@ -1027,6 +1027,14 @@ def domain_update_nameservers(request, pk):
 
     client = ResellerClubClient()
     try:
+        from apps.domains.registrar_policy import tld_for_domain
+        if tld_for_domain(domain.name) == "eu":
+            from apps.domains.eu_registry import validate_eu_delegation_change
+            try:
+                validate_eu_delegation_change(domain, ns_list, client=client)
+            except ValidationError as exc:
+                messages.error(request, " ".join(exc.messages))
+                return redirect("domains:detail", pk=pk)
         client.modify_nameservers(domain.registrar_id, ns_list)
         domain.nameserver1 = ns_list[0] if len(ns_list) > 0 else ""
         domain.nameserver2 = ns_list[1] if len(ns_list) > 1 else ""

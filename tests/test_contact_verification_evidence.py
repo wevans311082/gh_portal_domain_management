@@ -71,3 +71,26 @@ def test_business_check_does_not_create_email_or_eligibility_evidence(saved_cont
     assert not saved_contact.verification_evidence.filter(
         check_kind__in=["registrar_email", "eligibility"]
     ).exists()
+
+
+@pytest.mark.parametrize("kind", ["identity", "business", "eligibility"])
+@pytest.mark.parametrize("status", ["rejected", "unknown", "pending"])
+def test_later_case_outcome_supersedes_older_approval_in_same_scope(saved_contact, kind, status):
+    original = evidence(saved_contact, check_kind=kind, reference="CASE-OLD", tld="com")
+    later = evidence(saved_contact, check_kind=kind, reference="CASE-NEW", tld="com", status=status)
+    assert later.is_current
+    assert not original.is_current and not original.is_verified
+    original.refresh_from_db()
+    assert original.status == "verified"  # Preserve the historical outcome.
+
+
+def test_eligibility_for_other_domain_does_not_supersede_this_domain(saved_contact):
+    first = evidence(saved_contact, check_kind="eligibility", domain_name="first.com", tld="com", reference="CASE-ONE")
+    second = evidence(saved_contact, check_kind="eligibility", domain_name="second.com", tld="com", reference="CASE-TWO", status="rejected")
+    assert first.is_verified and second.is_current
+
+
+def test_expired_later_rejection_does_not_resurrect_prior_approval(saved_contact):
+    original = evidence(saved_contact, check_kind="identity", reference="CASE-OLD")
+    evidence(saved_contact, check_kind="identity", reference="CASE-NEW", status="rejected", expires_at=timezone.now() - timedelta(seconds=1))
+    assert not original.is_current
