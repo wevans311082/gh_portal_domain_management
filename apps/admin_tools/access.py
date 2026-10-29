@@ -51,6 +51,7 @@ class RoutePolicy:
     recent_mfa: bool = False
     staff_landing: bool = False
     read_any: tuple = ()
+    write_any: tuple = ()
 
     def permits(self, user, method="GET"):
         if not user.is_authenticated or not user.is_active or not user.is_staff:
@@ -61,6 +62,8 @@ class RoutePolicy:
             return method in {"GET", "HEAD"}
         if self.read_any and method in {"GET", "HEAD"}:
             return is_owner(user) or any(user.has_perm(f"admin_tools.{code}") for code in self.read_any)
+        if self.write_any and method not in {"GET", "HEAD"}:
+            return is_owner(user) or any(user.has_perm(f"admin_tools.{code}") for code in self.write_any)
         capability = self.read if method in {"GET", "HEAD"} else self.write
         if not capability:
             return False
@@ -81,6 +84,7 @@ def _routes(names, policy):
 _routes("search search_suggestions search_record", RoutePolicy(read_any=(
     "view_customers", "view_domains", "view_services", "view_billing", "view_support",
 )))
+_routes("saved_view_action", RoutePolicy(write_any=("view_customers", "view_domains", "view_billing", "view_support")))
 
 
 _routes("users company_lookup", RoutePolicy("view_customers"))

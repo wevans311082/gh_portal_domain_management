@@ -12,8 +12,9 @@
     {% include "admin_tools/components/stat_card.html" with label="Superadmins" value=superuser_count %}{% endif %}
 </div>
 
-{% include "admin_tools/partials/users_actions.html" with action_bar_label="Customer search and actions" %}
+{% if IS_PLATFORM_OWNER %}{% include "admin_tools/partials/users_actions.html" with action_bar_label="Customer actions" %}{% endif %}
 
-{% include "admin_tools/partials/users_table.html" with table_label="Customer accounts" %}
+{% include "admin_tools/partials/list_controls.html" %}
+{% include "admin_tools/partials/configurable_table.html" %}
 {% include "admin_tools/_pagination.html" %}
 {% endblock %}

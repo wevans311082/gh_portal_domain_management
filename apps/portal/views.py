@@ -776,7 +776,7 @@ def login_history(request):
 
 @login_required
 def gdpr_data_export(request):
-    """Return a JSON file containing all personal data for the current user."""
+    """Export explicit account and owned-record fields for the current user."""
     import json
     from django.http import HttpResponse
     from apps.billing.models import Invoice
@@ -789,7 +789,7 @@ def gdpr_data_export(request):
             "email": request.user.email,
             "first_name": request.user.first_name,
             "last_name": request.user.last_name,
-            "date_joined": request.user.date_joined.isoformat(),
+            "date_joined": request.user.created_at.isoformat(),
         },
         "invoices": list(
             Invoice.objects.filter(user=request.user).values(
@@ -815,6 +815,7 @@ def gdpr_data_export(request):
     payload = json.dumps(data, indent=2, default=str)
     response = HttpResponse(payload, content_type="application/json")
     response["Content-Disposition"] = 'attachment; filename="my_data.json"'
+    response["Cache-Control"] = "no-store"
     return response
 
 

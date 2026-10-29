@@ -1,3 +1,4 @@
+from tests.agreement_helpers import accept_cart_item
 from decimal import Decimal
 from unittest.mock import patch
 
@@ -116,6 +117,7 @@ def test_cart_quote_acceptance_creates_invoice_and_domain_order(mock_email, clie
     )
     cart = get_active_cart(user)
     quote = create_quote_from_cart(cart)
+    accept_cart_item(cart.items.get())
 
     client.force_login(user)
     response = client.post(reverse("billing_public:quote_public_accept", args=[quote.public_token]))
@@ -202,6 +204,7 @@ def test_cart_checkout_invoice_creates_domain_transfer_and_queues_it(mock_email,
     )
     assert response.status_code == 302
 
+    accept_cart_item(get_active_cart(user).items.get())
     client.post(reverse("portal:cart_checkout_invoice"))
     invoice = Invoice.objects.get(user=user)
     transfer = DomainTransfer.objects.get(invoice=invoice, domain_name="transferme.com")

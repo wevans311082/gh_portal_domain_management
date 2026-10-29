@@ -200,6 +200,7 @@ def _finalize_quote_acceptance(request, token):
         return render(request, "public/quote_cart_review.html", {
             "quote": _get_quote_by_token(token), "message": str(exc),
             "contact_id": exc.contact_id, "issues": exc.issues,
+            "agreement_item_id": exc.agreement_item_id,
         }, status=400)
     except forms.ValidationError:
         messages.error(request, "This quote can no longer be accepted.")

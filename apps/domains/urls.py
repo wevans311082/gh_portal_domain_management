@@ -8,6 +8,7 @@ app_name = "domains"
 
 urlpatterns = [
     path("agreements/", agreement_views.request_list, name="agreement_requests"),
+    path("agreements/registration/<int:pk>/invoice/", agreement_views.registration_invoice, name="registration_invoice"),
     path("agreements/cart/<int:pk>/", agreement_views.cart_agreements, name="cart_agreements"),
     path("agreements/<str:kind>/<int:pk>/", agreement_views.cart_agreements, name="request_agreements"),
     path("publication/", publication_views.decisions, name="publication_decisions"),

@@ -17,10 +17,11 @@ from apps.services.models import Service
 
 class CartPreflightError(ValueError):
     """Customer-correctable cart validation; safe to display with escaping."""
-    def __init__(self, message, *, contact_id=None, issues=None):
+    def __init__(self, message, *, contact_id=None, issues=None, agreement_item_id=None):
         super().__init__(message)
         self.contact_id = contact_id
         self.issues = issues or []
+        self.agreement_item_id = agreement_item_id
 
 
 def get_active_cart(user, *, created_by_staff=None) -> PortalCart:
@@ -271,6 +272,11 @@ def preflight_cart_domains(cart: PortalCart):
     domain_items = [item for item in items if item.item_type in {
         PortalCartItem.TYPE_DOMAIN_REGISTRATION, PortalCartItem.TYPE_DOMAIN_TRANSFER,
     }]
+    if domain_items:
+        from apps.accounts.models import User
+        customer = User.objects.select_for_update().get(pk=current.user_id)
+        if not customer.is_active or customer.is_staff or customer.is_superuser:
+            raise CartPreflightError("An active customer account is required before domain checkout.")
     default = None
     if any(not item.domain_contact_id for item in domain_items):
         default = DomainContact.objects.filter(user_id=current.user_id).order_by("-is_default", "pk").first()
@@ -341,6 +347,15 @@ def preflight_cart_domains(cart: PortalCart):
             publication_snapshot(item, contact, customer_id=current.user_id)
         except ValidationError as exc:
             raise CartPreflightError(" ".join(exc.messages)) from None
+        from apps.domains.agreements import assert_acceptance_current
+        try:
+            if not item.domain_contact_id:
+                raise ValidationError("Remove and re-add this item with an explicit registrant contact before reviewing agreements.")
+            assert_acceptance_current(receipt_id=item.agreement_acceptance_id, customer_id=current.user_id,
+                contact_id=contact.pk, domain_name=item.domain_name,
+                operation="registration" if item.item_type == PortalCartItem.TYPE_DOMAIN_REGISTRATION else "transfer")
+        except ValidationError as exc:
+            raise CartPreflightError(" ".join(exc.messages), agreement_item_id=item.pk) from None
         result[item.pk] = contact
     return result
 

@@ -193,6 +193,20 @@ def test_notes_are_idempotent_escaped_and_audited_without_text(client, customer,
     assert client.get(reverse("admin_tools:customer_note", args=[customer.pk, note.pk])).status_code == 302
 
 
+@pytest.mark.parametrize("route", ["portal:dashboard", "portal:account_statement", "domains:my_domains", "portal:gdpr_data_export"])
+def test_internal_note_audiences_never_appear_in_customer_pages_or_export(client, customer, staff, route):
+    for audience in ("general", "billing", "security"):
+        CustomerNote.objects.create(customer=customer, author=staff, audience=audience,
+            body="INTERNAL-ONLY-" + audience, submission_key=uuid.uuid4())
+    client.force_login(customer)
+    response = client.get(reverse(route))
+    assert response.status_code == 200
+    assert b"INTERNAL-ONLY-" not in response.content
+    if route == "portal:gdpr_data_export":
+        assert response.json()["user"]["date_joined"] == customer.created_at.isoformat()
+        assert "no-store" in response["Cache-Control"]
+
+
 def test_role_revocation_hides_previously_visible_timeline_sources(client, customer, staff):
     grant(staff, "view_billing")
     Invoice.objects.create(user=customer, number="REVOKED-FINANCIAL-RECORD")

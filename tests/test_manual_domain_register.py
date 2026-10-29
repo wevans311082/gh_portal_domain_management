@@ -100,7 +100,7 @@ def test_manual_register_waits_for_actual_customer_acceptance_without_provider_s
     assert resp.status_code == 302
     order = DomainOrder.objects.get(domain_name="cashsale.com")
     assert order.invoice_id is None
-    assert order.status == DomainOrder.STATUS_FAILED
+    assert order.status == DomainOrder.STATUS_PAID
     assert not order.agreement_acceptance_id
     assert not Domain.objects.filter(name="cashsale.com", user=customer).exists()
     assert not provider_calls

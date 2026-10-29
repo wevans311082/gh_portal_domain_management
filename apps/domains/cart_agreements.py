@@ -28,19 +28,27 @@ def cart_agreement_target(customer, item_id, *, lock=False):
     if item is None or item.cart_id != cart.pk:
         raise Http404
     if (cart.status not in (PortalCart.STATUS_ACTIVE, PortalCart.STATUS_QUOTED)
-            or cart.invoice_id or cart.submitted_at):
+            or cart.invoice_id or (cart.status == PortalCart.STATUS_ACTIVE and cart.submitted_at)):
         raise ValidationError("This cart has already been submitted or closed. Contact support about its agreements.")
+    if cart.status == PortalCart.STATUS_QUOTED:
+        # Quote issuance records submitted_at too; it is not paid admission.
+        # Do not invert quote-conversion's quote -> cart locking order here.
+        quote = cart.quote
+        if (quote is None or quote.user_id != customer.pk or quote.converted_invoice_id
+                or quote.status not in {"draft", "sent", "viewed", "accepted"}):
+            raise ValidationError("This cart's quote is closed or needs support review before accepting agreements.")
     contact = DomainContact.objects.filter(pk=item.domain_contact_id, user_id=customer.pk).first()
     if contact is None:
         raise ValidationError("Select an owned registrant contact by removing and re-adding this item. Manage your saved contacts first if needed.")
     operation = "registration" if item.item_type == PortalCartItem.TYPE_DOMAIN_REGISTRATION else "transfer"
     # Bind substantive request values without exposing the transfer secret in HTML or audit data.
-    request_digest = _digest({"item": item.pk, "cart": cart.pk, "customer": customer.pk,
+    request_digest = _digest({"item": item.pk, "cart": cart.pk, "quote": cart.quote_id, "customer": customer.pk,
         "domain": item.domain_name, "operation": operation, "contact": contact.pk,
         "years": item.registration_years, "quantity": item.quantity, "price": str(item.unit_price),
         "privacy": item.privacy_enabled, "auto_renew": item.auto_renew, "dns": item.dns_provider,
         "publication": item.publication_decision_id, "auth_digest": _digest(item.transfer_auth_code)})
     digest = salted_hmac("cart-agreement-context-v1", request_digest, algorithm="sha256").hexdigest()
+    item.cart = cart
     return item, contact, operation, digest
 
 

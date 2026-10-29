@@ -1,0 +1,9 @@
+<div class="admin-card overflow-hidden">
+  <div class="admin-table-scroll overflow-x-auto" role="region" aria-label="{{ list_resource|capfirst }} results" tabindex="0">
+    <table class="w-full text-sm" data-configurable-table="{{ list_resource }}">
+      <caption class="sr-only">{{ list_resource|capfirst }} matching the applied table settings</caption>
+      <thead class="bg-slate-50"><tr>{% for heading in list_headings %}<th scope="col" class="px-4 py-3 text-left" data-column="{{ heading.key }}">{{ heading.label }}</th>{% endfor %}<th scope="col" class="px-4 py-3 text-left">Actions</th></tr></thead>
+      <tbody class="divide-y">{% for row in list_rows %}<tr>{% for cell in row.cells %}<td class="px-4 py-3 align-top {% if cell.key == 'number' or cell.key == 'domain' or cell.key == 'email' or cell.key == 'total' %}whitespace-nowrap{% else %}break-words{% endif %}">{{ cell.value|default_if_none:'' }}</td>{% endfor %}<td class="px-4 py-3 align-top">{% include "admin_tools/partials/list_row_actions.html" with obj=row.object %}</td></tr>{% empty %}<tr><td colspan="{{ list_headings|length|add:'1' }}" class="p-6 text-center">No records match these settings.</td></tr>{% endfor %}</tbody>
+    </table>
+  </div>
+</div>

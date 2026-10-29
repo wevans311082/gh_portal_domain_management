@@ -29,7 +29,7 @@ def test_register_view_creates_default_contact_for_user(client, django_user_mode
 
 
 @pytest.mark.django_db
-def test_register_view_creates_invoice_and_domain_order(client, django_user_model):
+def test_registration_reviews_customer_agreements_before_creating_invoice_and_order(client, django_user_model):
     user = django_user_model.objects.create_user(email="buyer@example.com", password="password123")
     pricing_settings = DomainPricingSettings.get_solo()
     pricing_settings.default_profit_margin_percentage = Decimal("20.00")
@@ -65,13 +65,23 @@ def test_register_view_creates_invoice_and_domain_order(client, django_user_mode
         },
     )
 
-    order = DomainOrder.objects.get(domain_name="example.com")
+    from tests.agreement_helpers import publish_test_agreement
+    order = DomainOrder.objects.get(user=user, domain_name="example.com")
+    assert response.status_code == 302
+    assert response.url == reverse("domains:request_agreements", kwargs={"kind": "registration", "pk": order.pk})
+    assert order.status == DomainOrder.STATUS_DRAFT and order.total_price == Decimal("24.00")
+    assert order.invoice_id is None and not Invoice.objects.exists()
+    publish_test_agreement()
+    review = client.get(response.url)
+    token = review.context["form"].initial["review"]
+    assert client.post(response.url, {"review": token, "accepted": "on"}).status_code == 302
+    assert not Invoice.objects.exists()
+    checkout = client.post(reverse("domains:registration_invoice", args=[order.pk]), {"review": token})
+    order.refresh_from_db()
     invoice = Invoice.objects.get(id=order.invoice_id)
     line_item = InvoiceLineItem.objects.get(invoice=invoice)
-
-    assert response.status_code == 302
-    assert response.url == reverse("payments:stripe_checkout", kwargs={"invoice_id": invoice.id})
+    assert checkout.status_code == 302 and checkout.url == reverse("payments:stripe_checkout", kwargs={"invoice_id": invoice.pk})
     assert order.status == DomainOrder.STATUS_PENDING_PAYMENT
-    assert order.total_price == Decimal("24.00")
-    assert invoice.total == Decimal("24.00")
+    assert order.total_price == Decimal("24.00") and invoice.total == Decimal("24.00")
+    assert order.agreement_acceptance_id
     assert line_item.description == "Domain registration: example.com (2 year(s))"

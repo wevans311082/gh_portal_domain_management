@@ -98,10 +98,12 @@ def domain_order_detail(request, pk):
     except Exception:
         resolved_ns = []
 
+    from .manual_followups import manual_followup_summary
     return render(
         request,
         "admin_tools/ops/domain_order_detail.html",
         {
+            "manual_followup": manual_followup_summary(order=order, actor=request.user),
             "order": order,
             "registration_attempt": registration_attempt,
             "contacts": contacts,
@@ -201,6 +203,13 @@ def _save_order_details(request, order: DomainOrder):
 def domain_order_action(request, pk, action):
     action = (action or "").strip().lower()
     if action in {"process", "retry_failed"}:
+        from .manual_followups import authorize_manual_followup
+        from django.core.exceptions import ValidationError
+        try:
+            authorize_manual_followup(order_id=pk, actor=request.user)
+        except ValidationError as exc:
+            messages.error(request, " ".join(exc.messages))
+            return redirect("admin_tools:domain_order_detail", pk=pk)
         with transaction.atomic():
             order = get_object_or_404(DomainOrder.objects.select_for_update(), pk=pk)
             attempt = DomainRegistrationAttempt.objects.select_for_update().filter(order=order).first()
@@ -239,8 +248,27 @@ def _mutate_order_action(request, pk, action):
     return redirect("admin_tools:domain_order_detail", pk=pk)
 
 
+def _finish_manual_followups(request, order):
+    from .manual_followups import complete_manual_followup
+    from django.core.exceptions import ValidationError, PermissionDenied
+    try:
+        record = complete_manual_followup(order_id=order.pk, actor=request.user)
+    except (ValidationError, PermissionDenied) as exc:
+        detail = " ".join(exc.messages) if isinstance(exc, ValidationError) else str(exc)
+        messages.warning(request, "Registration is retained; saved follow-ups need attention. " + detail)
+        return
+    except Exception as exc:
+        logger.error("Manual follow-ups for order %s could not be prepared (%s)", order.pk, type(exc).__name__)
+        messages.warning(request, "Registration is retained. Saved follow-ups were not completed; reopen this order to retry or review them.")
+        return
+    if record:
+        messages.success(request, "Saved follow-up records are ready." + (
+            " The hosting job was sent; its completion is tracked separately." if record.dispatch_state == "dispatched" else ""))
+
+
 def _action_process(request, order: DomainOrder):
     if order.status == DomainOrder.STATUS_COMPLETED and order.domain_id:
+        _finish_manual_followups(request, order)
         messages.info(request, "Order already completed.")
         return redirect("admin_tools:domain_order_detail", pk=order.pk)
     if order.status == DomainOrder.STATUS_CANCELLED:
@@ -271,6 +299,7 @@ def _action_process(request, order: DomainOrder):
         # throw=True avoids Celery wrapping permanent API failures in Retry noise.
         domain_id = register_domain_order.apply(args=[order.id], throw=True).get(timeout=180)
         order.refresh_from_db()
+        _finish_manual_followups(request, order)
         messages.success(
             request,
             f"Processed {order.domain_name} → status {order.get_status_display()}"
@@ -335,6 +364,10 @@ def _action_cancel(request, order: DomainOrder):
 
 
 def _action_delete(request, order: DomainOrder):
+    from .models import ManualDomainFollowup
+    if ManualDomainFollowup.objects.filter(order=order).exists():
+        messages.error(request, "Saved manual choices protect this order's history. Cancel the unsubmitted request instead of deleting it.")
+        return redirect("admin_tools:domain_order_detail", pk=order.pk)
     if order.status == DomainOrder.STATUS_COMPLETED and order.domain_id:
         messages.error(
             request,

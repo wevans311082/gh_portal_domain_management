@@ -184,3 +184,42 @@ def test_receipt_survives_cart_materialization(item, document, order, operation)
     invoice = create_invoice_from_cart(item.cart, send_email=False)
     model = DomainOrder if operation == "registration" else DomainTransfer
     assert model.objects.get(invoice=invoice).agreement_acceptance_id == receipt.pk
+
+
+@pytest.mark.parametrize("status", ["sent", "viewed", "accepted"])
+def test_issued_quote_can_still_receive_real_customer_agreement_acceptance(client, item, document, status):
+    from apps.portal.cart_service import create_quote_from_cart
+    quote = create_quote_from_cart(item.cart)
+    quote.status = status
+    quote.save(update_fields=["status"])
+    item.cart.refresh_from_db()
+    assert item.cart.submitted_at is not None
+    client.force_login(item.cart.user)
+    response = client.get(url(item))
+    assert response.status_code == 200 and response.context["form"]
+    assert reverse("billing_public:quote_public", args=[quote.public_token]).encode() in response.content
+    token = response.context["form"].initial["review"]
+    assert client.post(url(item), {"review": token, "accepted": "on"}).status_code == 302
+    item.refresh_from_db()
+    assert item.agreement_acceptance_id and not item.cart.invoice_id
+
+
+@pytest.mark.parametrize("status", ["converted", "declined", "expired", "void"])
+def test_closed_quote_cannot_receive_a_new_agreement_receipt(item, document, status):
+    from apps.portal.cart_service import create_quote_from_cart
+    values = acceptance(item)
+    quote = create_quote_from_cart(item.cart)
+    quote.status = status
+    quote.save(update_fields=["status"])
+    with pytest.raises(ValidationError, match="quote is closed"):
+        accept_cart_agreements(**values)
+    assert not DomainAgreementAcceptance.objects.exists()
+
+
+def test_foreign_quote_association_cannot_receive_customer_acceptance(item, document, owner):
+    from apps.portal.cart_service import create_quote_from_cart
+    quote = create_quote_from_cart(item.cart)
+    quote.user = owner
+    quote.save(update_fields=["user"])
+    with pytest.raises(ValidationError, match="quote is closed or needs support review"):
+        cart_agreement_target(item.cart.user, item.pk)

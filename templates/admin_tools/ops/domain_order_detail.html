@@ -4,6 +4,23 @@
 
 {% block content %}
 {% include "admin_tools/components/page_header.html" with heading="Domain registration order" description=order.domain_name %}
+{% if manual_followup %}
+<section class="admin-card admin-card-body mb-4" aria-labelledby="manual-followup-heading">
+  <h2 id="manual-followup-heading" class="text-lg font-semibold text-slate-900">Saved manual follow-ups</h2>
+  {% if not manual_followup.intact %}<p class="mt-3 text-sm text-red-800">The retained choices need owner review. They cannot be used for billing or provisioning.</p>
+  {% else %}
+  <p class="mt-3 text-sm text-slate-700">Hosting {% if manual_followup.hosting %}requested{% else %}not requested{% endif %}. Invoice {% if manual_followup.invoice_requested %}requested{% else %}not requested{% endif %}. {% if order.status == 'cancelled' %}The request is cancelled; saved choices are retained and will not run.{% elif manual_followup.prepared %}Follow-up records are retained.{% else %}The choices are saved and will resume after customer agreement review and registration.{% endif %}</p>
+  {% if manual_followup.package %}<p class="mt-2 text-sm text-slate-700 break-words">Hosting package: {{ manual_followup.package }}. Delivery: {{ manual_followup.dispatch_status }}. Job: {{ manual_followup.job_status }}{% if manual_followup.job_id %} (#{{ manual_followup.job_id }}){% endif %}.</p>{% endif %}
+  {% if manual_followup.hosting_price != None %}<p class="mt-2 text-sm text-slate-700">Retained annual hosting price: GBP {{ manual_followup.hosting_price }}.</p>{% endif %}
+  {% if manual_followup.override != None %}<p class="mt-2 text-sm text-slate-700">Invoice subtotal override: GBP {{ manual_followup.override }}.</p>{% endif %}
+  {% if manual_followup.notes %}<p class="mt-2 text-sm text-slate-700 whitespace-pre-wrap break-words">{{ manual_followup.notes }}</p>{% endif %}
+  {% if manual_followup.invoice_id %}<p class="mt-2 text-sm text-slate-700">Retained invoice #{{ manual_followup.invoice_id }}.</p>{% endif %}
+  {% if manual_followup.worker_requires_review %}<p class="mt-3 text-sm font-semibold text-amber-900">This hosting worker started and its outcome needs provider review. This action will not create another account.</p>{% endif %}
+  {% if manual_followup.can_resume %}<form method="post" action="{% url 'admin_tools:domain_order_action' pk=order.pk action='process' %}" class="mt-4">{% csrf_token %}<button class="admin-button admin-button-primary" type="submit">Resume saved follow-ups</button></form>{% endif %}
+  <p class="mt-3 text-sm text-slate-700">Queue delivery and completed hosting are separate states. Reopening this order reuses retained records; a worker that has started cannot create another account through this action.</p>
+  {% endif %}
+</section>
+{% endif %}
 {% if registration_attempt %}
 <section class="admin-card admin-card-body mb-4" aria-labelledby="registration-attempt-heading">
   <h2 id="registration-attempt-heading" class="text-lg font-semibold text-slate-900">Registrar submission</h2>

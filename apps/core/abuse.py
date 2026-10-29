@@ -28,6 +28,7 @@ class PublicPolicy:
 
 FORM = 32 * 1024
 POLICIES = {
+    "admin_tools:saved_view_action": PublicPolicy(frozenset({"POST"}), 16 * 1024, 30, 60, 300),
     "admin_tools:search": PublicPolicy(frozenset({"GET"}), 0, 120, 60, 1000),
     "admin_tools:search_suggestions": PublicPolicy(frozenset({"GET"}), 0, 120, 60, 1000),
     "admin_tools:customer_workspace": PublicPolicy(frozenset({"GET"}), 0, 120, 60, 1000),
@@ -36,6 +37,7 @@ POLICIES = {
     "admin_tools:customer_note_redact": PublicPolicy(frozenset({"POST"}), FORM, 10, 60, 100),
     "admin_tools:identity_review": PublicPolicy(frozenset({"POST"}), FORM, 10, 600, 100),
     "admin_tools:registrar_agreements": PublicPolicy(frozenset({"POST"}), 256 * 1024, 10, 600, 100),
+    "admin_tools:manual_domain_register": PublicPolicy(frozenset({"POST"}), 64 * 1024, 10, 600, 100),
     "core:contact": PublicPolicy(frozenset({"POST"}), FORM, 5, 600, 100, 3),
     "billing_public:quote_submit": PublicPolicy(frozenset({"POST"}), 64 * 1024, 5, 600, 100, 3),
     "billing_public:quote_public_pdf": PublicPolicy(frozenset({"GET"}), 0, 5, 600, 30),
@@ -63,6 +65,8 @@ POLICIES = {
     "domains:contact_change": PublicPolicy(frozenset({"POST"}), FORM, 10, 600, 100),
     "domains:cart_agreements": PublicPolicy(frozenset({"POST"}), FORM, 10, 600, 100),
     "domains:request_agreements": PublicPolicy(frozenset({"POST"}), FORM, 10, 600, 100),
+    "domains:registration_invoice": PublicPolicy(frozenset({"POST"}), FORM, 10, 600, 100),
+    "domains:register": PublicPolicy(frozenset({"POST"}), FORM, 10, 600, 100),
     "domains:publication_withdraw": PublicPolicy(frozenset({"POST"}), FORM, 10, 600, 100),
     "domains:search": PublicPolicy(frozenset({"GET"}), 0, 20, 60, 600),
 }

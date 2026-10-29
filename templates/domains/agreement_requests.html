@@ -11,12 +11,12 @@
   </header>
   {% for group in request_pages %}
   <section class="rounded-lg border border-slate-300 bg-white p-5" aria-labelledby="{{ group.kind }}-heading">
-    <h2 id="{{ group.kind }}-heading" class="text-lg font-semibold">{% if group.kind == 'registration' %}Registration requests{% else %}Transfer requests{% endif %}</h2>
+    <h2 id="{{ group.kind }}-heading" class="text-lg font-semibold">{% if group.kind == 'registration' %}Registration requests{% elif group.kind == 'cart' %}Cart and quote items{% else %}Transfer requests{% endif %}</h2>
     <ul class="mt-4 space-y-4">
     {% for item in group.page %}
       <li class="break-words">
         <p class="font-semibold">{{ item.domain_name }}</p>
-        <p class="mt-1 text-sm">{{ item.get_status_display }}. {% if item.agreement_acceptance_id %}Earlier acceptance retained; current details and versions may require review.{% else %}No agreement acceptance attached.{% endif %}</p>
+        <p class="mt-1 text-sm">{% if group.kind == 'cart' %}{{ item.cart.get_status_display }} cart{% else %}{{ item.get_status_display }}{% endif %}. {% if item.agreement_acceptance_id %}Earlier acceptance retained; current details and versions may require review.{% else %}No agreement acceptance attached.{% endif %}</p>
         <a class="mt-2 inline-block font-semibold text-blue-800 underline" href="{% url 'domains:request_agreements' kind=group.kind pk=item.pk %}">Review agreements for {{ item.domain_name }}</a>
       </li>
     {% empty %}<li class="text-sm">No {{ group.kind }} requests awaiting agreement review. Already admitted or closed requests retain their earlier history.</li>{% endfor %}

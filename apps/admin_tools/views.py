@@ -34,6 +34,7 @@ from apps.support.models import SupportTicket
 from . import wizard_views
 from .forms import Microsoft365GraphSettingsForm
 from .decorators import staff_member_required
+from .list_view_controls import prepare_list
 
 
 def _build_task_summary():
@@ -1422,22 +1423,18 @@ def users(request):
 
             return redirect("admin_tools:users")
 
-    q = request.GET.get("q", "").strip()
-    qs = User.objects.select_related("business_profile").order_by("-created_at")
+    qs = User.objects.select_related("business_profile")
     if not request.user.is_superuser:
         qs = qs.filter(is_staff=False, is_superuser=False)
-    if q:
-        qs = qs.filter(Q(email__icontains=q) | Q(first_name__icontains=q) | Q(last_name__icontains=q))
-
-    paginator = Paginator(qs, 30)
-    page = paginator.get_page(request.GET.get("page"))
-    return render(request, "admin_tools/users.html", {
-        "page_obj": page,
-        "search_q": q,
-        "total_users": qs.count(),
+    response, context = prepare_list(request, qs, "customers")
+    if response is not None:
+        return response
+    context.update({
+        "total_users": context["page_obj"].paginator.count,
         "staff_count": User.objects.filter(is_staff=True).count() if request.user.is_superuser else None,
         "superuser_count": User.objects.filter(is_superuser=True).count() if request.user.is_superuser else None,
     })
+    return render(request, "admin_tools/users.html", context)
 
 
 # ---------------------------------------------------------------------------

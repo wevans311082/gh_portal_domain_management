@@ -1,0 +1,20 @@
+<div class="flex flex-wrap gap-3 min-w-[120px]">
+{% if list_resource == 'customers' %}
+  {% if not obj.is_staff and not obj.is_superuser %}<a class="text-sky-700 underline" href="{% url 'admin_tools:customer_workspace' obj.pk %}">Customer workspace</a>{% endif %}
+  {% if IS_PLATFORM_OWNER %}<a class="text-sky-700 underline" href="{% url 'admin_tools:user_edit' obj.pk %}">Edit user</a><a class="text-sky-700 underline" href="{% url 'admin_tools:user_mfa_manage' obj.pk %}">Manage MFA</a>{% endif %}
+  {% if not obj.is_staff and ADMIN_ACCESS.cart_builder %}<a class="text-sky-700 underline" href="{% url 'admin_tools:cart_builder' %}?user_id={{ obj.pk }}">Cart builder</a>{% endif %}
+  {% if IS_PLATFORM_OWNER and obj.pk != request.user.pk and not obj.is_staff and not obj.is_superuser and obj.is_active %}<form method="post" action="{% url 'admin_tools:user_su_start' obj.pk %}">{% csrf_token %}<label class="sr-only" for="impersonation-reason-{{ obj.pk }}">Reason for impersonating {{ obj.email }}</label><input id="impersonation-reason-{{ obj.pk }}" name="reason" maxlength="500" required placeholder="Support reason"><button class="admin-button">Start customer impersonation</button></form>{% endif %}
+{% elif list_resource == 'domains' %}
+  <a class="text-sky-700 underline" href="{% url 'admin_tools:search_record' 'domains' obj.pk %}">View record</a>
+  {% if ADMIN_ACCESS.domains_edit %}<a class="text-sky-700 underline" href="{% url 'admin_tools:domains_edit' obj.pk %}">Edit</a>{% endif %}
+  {% if ADMIN_ACCESS.domains_delete %}<form method="post" action="{% url 'admin_tools:domains_delete' obj.pk %}">{% csrf_token %}<button class="text-rose-700 underline" onclick="return confirm('Delete domain?')">Delete</button></form>{% endif %}
+{% elif list_resource == 'invoices' %}
+  <a class="text-sky-700 underline" href="{% url 'admin_tools:search_record' 'invoices' obj.pk %}">View record</a>
+  <a class="text-sky-700 underline" href="{% url 'admin_tools:invoice_pdf' obj.pk %}?inline=1" target="_blank" rel="noopener">PDF</a>
+  {% if ADMIN_ACCESS.invoice_edit %}<a class="text-sky-700 underline" href="{% url 'admin_tools:invoice_edit' obj.pk %}">Edit</a>{% endif %}
+{% elif list_resource == 'tickets' %}
+  <a class="text-sky-700 underline" href="{% url 'admin_tools:search_record' 'tickets' obj.pk %}">View record</a>
+  {% if ADMIN_ACCESS.tickets_edit %}<a class="text-sky-700 underline" href="{% url 'admin_tools:tickets_edit' obj.pk %}">Edit</a>{% endif %}
+  {% if ADMIN_ACCESS.tickets_delete %}<form method="post" action="{% url 'admin_tools:tickets_delete' obj.pk %}">{% csrf_token %}<button class="text-rose-700 underline" onclick="return confirm('Delete ticket?')">Delete</button></form>{% endif %}
+{% endif %}
+</div>

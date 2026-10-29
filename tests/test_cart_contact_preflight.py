@@ -1,3 +1,4 @@
+from tests.agreement_helpers import accept_cart_item
 from unittest.mock import patch
 
 import pytest
@@ -37,6 +38,7 @@ def test_invalid_contact_stops_before_invoice_or_email(cart, changes):
 
 
 def test_individual_can_checkout_without_company_or_registrar_email_approval(cart):
+    accept_cart_item(cart.items.get())
     with patch("apps.billing.services.email_document"):
         invoice = create_invoice_from_cart(cart)
     order = DomainOrder.objects.get(invoice=invoice)
@@ -87,12 +89,14 @@ def test_unimplemented_tld_stops_before_invoice(cart):
 
 def test_uk_cart_order_does_not_request_unsupported_privacy(cart):
     PortalCartItem.objects.filter(cart=cart).update(domain_name="cart-check.co.uk", privacy_enabled=True)
+    accept_cart_item(cart.items.get())
     with patch("apps.billing.services.email_document"):
         invoice = create_invoice_from_cart(cart)
     assert not DomainOrder.objects.get(invoice=invoice).privacy_enabled
 
 
 def test_repeated_checkout_with_stale_cart_returns_same_invoice(cart):
+    accept_cart_item(cart.items.get())
     with patch("apps.billing.services.email_document"):
         invoice = create_invoice_from_cart(cart)
         assert create_invoice_from_cart(cart).pk == invoice.pk
@@ -178,6 +182,7 @@ def test_late_domain_conflict_rolls_back_without_invoice_email(cart, django_capt
     from apps.domains.models import Domain
 
     Domain.objects.create(user=cart.user, name="cart-check.com", tld="com")
+    accept_cart_item(cart.items.get())
     with patch("apps.billing.services.email_document") as email:
         with django_capture_on_commit_callbacks(execute=True) as callbacks:
             with pytest.raises(ValueError):
@@ -189,6 +194,7 @@ def test_late_domain_conflict_rolls_back_without_invoice_email(cart, django_capt
 
 
 def test_successful_checkout_emails_only_after_commit(cart, django_capture_on_commit_callbacks):
+    accept_cart_item(cart.items.get())
     with patch("apps.billing.services.email_document") as email:
         with django_capture_on_commit_callbacks(execute=True):
             invoice = create_invoice_from_cart(cart, send_email=True)
@@ -210,6 +216,7 @@ def test_corrected_quote_can_be_accepted_after_preflight_failure(cart, client):
     assert client.post(url).status_code == 400
     contact.phone = "07700900000"
     contact.save()
+    accept_cart_item(cart.items.get())
     assert client.post(url).status_code == 302
     quote.refresh_from_db()
     assert quote.converted_invoice_id

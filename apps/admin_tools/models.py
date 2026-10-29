@@ -7,6 +7,7 @@ from django.db import models, transaction
 from django.core.cache import cache
 from apps.core.models import TimeStampedModel
 from django.conf import settings
+import uuid
 
 
 class IntegrationSettingQuerySet(models.QuerySet):
@@ -90,6 +91,19 @@ class IntegrationSetting(TimeStampedModel):
         return obj
 
 
+class StaffListView(TimeStampedModel):
+    """Personal table preferences, never a source of record authorization."""
+
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="staff_list_views")
+    resource = models.CharField(max_length=16)
+    name = models.CharField(max_length=80)
+    configuration = models.JSONField(default=dict)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=("owner", "resource", "name"), name="staff_list_view_owner_name")]
+        ordering = ("name", "pk")
+
+
 class CustomerNote(TimeStampedModel):
     """Staff-only append-only text. Body is erased on authorized redaction."""
 
@@ -104,6 +118,33 @@ class CustomerNote(TimeStampedModel):
     class Meta:
         ordering = ["-created_at", "-pk"]
         indexes = [models.Index(fields=["customer", "-created_at", "-id"], name="customer_note_history")]
+
+
+class ManualDomainFollowup(TimeStampedModel):
+    """Retained manual-sale choices and one local fulfilment/queue fence."""
+    order = models.OneToOneField("domains.DomainOrder", on_delete=models.PROTECT, related_name="manual_followup")
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="manual_domain_plans")
+    plan = models.JSONField()
+    plan_digest = models.CharField(max_length=64)
+    package = models.ForeignKey("products.Package", on_delete=models.PROTECT, null=True, blank=True)
+    service = models.OneToOneField("services.Service", on_delete=models.PROTECT, null=True, blank=True, related_name="manual_domain_followup")
+    invoice = models.ForeignKey("billing.Invoice", on_delete=models.PROTECT, null=True, blank=True)
+    job = models.OneToOneField("provisioning.ProvisioningJob", on_delete=models.PROTECT, null=True, blank=True, related_name="manual_domain_followup")
+    prepared_at = models.DateTimeField(null=True, blank=True)
+    dispatch_state = models.CharField(max_length=16, default="pending", choices=[
+        ("pending", "Not sent"), ("submitting", "Delivery started"), ("dispatched", "Sent to queue"),
+        ("unknown", "Delivery needs review"), ("not_required", "No hosting requested")])
+    dispatch_actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="dispatched_manual_domain_plans")
+    dispatch_token = models.UUIDField(default=uuid.uuid4, editable=False)
+    worker_started_at = models.DateTimeField(null=True, blank=True)
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            previous = type(self).objects.get(pk=self.pk)
+            if any(getattr(previous, field) != getattr(self, field) for field in ("order_id", "created_by_id", "package_id", "plan", "plan_digest")):
+                from django.core.exceptions import ValidationError
+                raise ValidationError("Retained manual order choices cannot be replaced.")
+        return super().save(*args, **kwargs)
 
 
 class WizardProgress(TimeStampedModel):

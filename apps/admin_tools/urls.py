@@ -13,10 +13,12 @@ from . import customer_workspace
 from . import transfer_views
 from . import identity_reviews
 from . import agreement_views
+from . import saved_view_views
 
 app_name = "admin_tools"
 
 urlpatterns = [
+    path("lists/<str:resource>/preferences/", saved_view_views.saved_view_action, name="saved_view_action"),
     path("domains/agreements/", agreement_views.registrar_agreements, name="registrar_agreements"),
     path("domains/agreements/<int:pk>/", agreement_views.registrar_agreement_detail, name="registrar_agreement_detail"),
     path("domains/transfers/", transfer_views.domain_transfers_list, name="domain_transfers_list"),

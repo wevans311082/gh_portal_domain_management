@@ -21,16 +21,16 @@ from apps.services.models import Service
 from apps.support.models import SupportTicket
 from apps.website_templates.models import WebsiteTemplate
 from .decorators import staff_member_required
+from .list_view_controls import prepare_list
 
 
 @staff_member_required
 def domains_list(request):
-    q = (request.GET.get("q") or "").strip()
-    qs = Domain.objects.select_related("user", "order__registration_contact").order_by("name")
-    if q:
-        qs = qs.filter(Q(name__icontains=q) | Q(user__email__icontains=q) | Q(status__icontains=q))
-    page_obj = Paginator(qs, 30).get_page(request.GET.get("page"))
-    return render(request, "admin_tools/ops/domains_list.html", {"page_obj": page_obj, "search_q": q})
+    qs = Domain.objects.select_related("user", "order__registration_contact")
+    response, context = prepare_list(request, qs, "domains")
+    if response is not None:
+        return response
+    return render(request, "admin_tools/ops/domains_list.html", context)
 
 
 @staff_member_required
@@ -189,12 +189,11 @@ def services_delete(request, pk):
 
 @staff_member_required
 def tickets_list(request):
-    q = (request.GET.get("q") or "").strip()
-    qs = SupportTicket.objects.select_related("user", "department", "assigned_to").order_by("-created_at")
-    if q:
-        qs = qs.filter(Q(subject__icontains=q) | Q(user__email__icontains=q) | Q(status__icontains=q))
-    page_obj = Paginator(qs, 30).get_page(request.GET.get("page"))
-    return render(request, "admin_tools/ops/tickets_list.html", {"page_obj": page_obj, "search_q": q})
+    qs = SupportTicket.objects.select_related("user", "department", "assigned_to")
+    response, context = prepare_list(request, qs, "tickets")
+    if response is not None:
+        return response
+    return render(request, "admin_tools/ops/tickets_list.html", context)
 
 
 @staff_member_required

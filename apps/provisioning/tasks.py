@@ -99,6 +99,19 @@ def provision_hosting_account(self, service_id: int, job_id: int):
         logger.error(f"Cannot find service or job: {e}")
         return
 
+    from apps.admin_tools.manual_followups import claim_manual_provisioning
+    from apps.admin_tools.secrets import IntegrationSecretError
+    from django.core.exceptions import ValidationError, PermissionDenied
+    try:
+        service, manual_job = claim_manual_provisioning(service=service, job=job)
+    except (ValidationError, PermissionDenied, IntegrationSecretError):
+        job.status = ProvisioningJob.STATUS_FAILED
+        job.last_error = "Saved manual hosting choices require review before provisioning."
+        job.save(update_fields=["status", "last_error", "updated_at"])
+        return
+    if service is None:
+        return
+
     # Idempotency check
     if job.status == ProvisioningJob.STATUS_COMPLETED:
         logger.info(f"Provisioning job {job_id} already completed, skipping.")
@@ -129,6 +142,10 @@ def provision_hosting_account(self, service_id: int, job_id: int):
 
     try:
         provider = get_provider_for_service(service)
+        if manual_job:
+            if provider.provider_key != "whm":
+                raise ProvisioningProviderError("Saved manual hosting requires the reviewed WHM provider.")
+            provider.client = service._manual_whm_client
         username = (service.cpanel_username or "").strip()
         if not username:
             username = generate_cpanel_username(domain, unique_suffix=str(service.id))
@@ -136,7 +153,7 @@ def provision_hosting_account(self, service_id: int, job_id: int):
             service.save(update_fields=["cpanel_username"])
         password = generate_secure_password()
 
-        result = provider.create_site(
+        provider.create_site(
             domain=domain,
             username=username,
             password=password,
@@ -158,7 +175,7 @@ def provision_hosting_account(self, service_id: int, job_id: int):
             job.result_data = {
                 "username": username,
                 "provider": provider.provider_key,
-                "result": str(result),
+                "provider_acknowledged": True,
             }
             job.save(update_fields=["status", "completed_at", "result_data"])
 
@@ -178,6 +195,14 @@ def provision_hosting_account(self, service_id: int, job_id: int):
         logger.info(f"Provisioning completed for service {service_id}, username={username}")
 
     except (ProvisioningProviderError, WHMClientError) as e:
+        if manual_job:
+            logger.error("Manual hosting job %s needs review (%s)", job.pk, type(e).__name__)
+            job.last_error = "The hosting request outcome needs provider review before any retry."
+            job.status = ProvisioningJob.STATUS_FAILED
+            job.save(update_fields=["last_error", "status", "updated_at"])
+            service.status = Service.STATUS_REVIEW
+            service.save(update_fields=["status", "updated_at"])
+            return
         logger.error(f"Provider error provisioning service {service_id}: {e}")
         job.last_error = str(e)
         job.status = ProvisioningJob.STATUS_RETRY

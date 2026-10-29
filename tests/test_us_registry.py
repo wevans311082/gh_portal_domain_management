@@ -1,3 +1,4 @@
+from tests.agreement_helpers import accept_cart_item
 from tests.agreement_helpers import attach_agreement
 import pytest
 from django.core.exceptions import ValidationError
@@ -105,6 +106,7 @@ def test_us_cart_suppresses_privacy_and_rechecks_nexus_before_invoice(order):
         create_invoice_from_cart(item.cart, send_email=False)
     contact.us_nexus_category, contact.us_application_purpose, contact.us_nexus_certified = "C11", "P3", True
     contact.save()
+    accept_cart_item(item)
     invoice = create_invoice_from_cart(item.cart, send_email=False)
     assert DomainOrder.objects.get(invoice=invoice).privacy_enabled is False
 

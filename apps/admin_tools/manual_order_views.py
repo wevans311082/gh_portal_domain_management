@@ -6,6 +6,8 @@ import re
 from decimal import Decimal
 
 from django.contrib import messages
+from django.db import transaction
+from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -195,6 +197,8 @@ def _resolve_package_for_whm_name(whm_package_name: str) -> Package:
     name = (whm_package_name or "").strip()
     if not name:
         raise ValueError("WHM package name is required.")
+    if len(name) > 100 or any(ord(char) < 32 or ord(char) == 127 for char in name):
+        raise ValueError("Use a WHM package name of at most 100 characters without control characters.")
 
     existing = Package.objects.filter(whm_package_name__iexact=name).order_by("-is_active", "id").first()
     if existing:
@@ -309,14 +313,13 @@ def manual_domain_register(request):
         return render(request, "admin_tools/manual_domain_register.html", context)
     blocking = (
         DomainOrder.objects.filter(domain_name__iexact=domain_name)
-        .exclude(status=DomainOrder.STATUS_CANCELLED)
         .order_by("-id")
         .first()
     )
     if blocking:
         messages.error(
             request,
-            f"An open platform order already exists for {domain_name} "
+            f"A platform order already exists for {domain_name} "
             f"(order #{blocking.pk}, status: {blocking.get_status_display()}). "
             f"Open Domain orders to process, cancel, or delete it first.",
         )
@@ -345,139 +348,38 @@ def manual_domain_register(request):
         return render(request, "admin_tools/manual_domain_register.html", context)
     price = _price_for_tld(tld, years)
 
-    order = DomainOrder.objects.create(
-        user=user,
-        invoice=None,
-        domain_name=domain_name,
-        tld=tld,
-        registration_years=years,
-        quoted_price=price,
-        total_price=price,
-        status=DomainOrder.STATUS_PAID,
-        privacy_enabled=form["privacy_enabled"],
-        auto_renew=form["auto_renew"],
-        dns_provider=Domain.DNS_PROVIDER_CPANEL if form["create_hosting"] else Domain.DNS_PROVIDER_REGISTRAR,
-        registration_contact=contact,
-        admin_contact=contact,
-        tech_contact=contact,
-        billing_contact=contact,
-        last_error="",
-    )
-
+    from apps.domains.registrar_policy import policy_for
+    from .manual_followups import capture_manual_followup
     try:
-        # Run registration in-process so staff get immediate success/error.
-        domain_id = register_domain_order.apply(args=[order.id]).get(timeout=180)
-    except Exception as exc:
-        logger.exception("Manual domain registration failed for %s", domain_name)
-        order.refresh_from_db()
-        if isinstance(exc, ValidationError) and not order.agreement_acceptance_id:
-            messages.warning(request,
-                "The request is saved but has not been registered. The customer must sign in and open "
-                "My domains > Request agreements to review and accept the applicable terms. "
-                "Staff can then process this same order. Any requested hosting or invoice has not been created; "
-                "arrange those follow-up items after registration.")
-            return redirect("admin_tools:domain_order_detail", pk=order.pk)
-        messages.error(
-            request,
-            f"Domain registration failed: {order.last_error or exc}. "
-            "Fix the error and retry from the domain order, or check ResellerClub credentials.",
-        )
-        return redirect("admin_tools:domains_list")
-
-    order.refresh_from_db()
-    domain = Domain.objects.filter(pk=domain_id).first() or order.domain
-    service = None
-
-    if form["create_hosting"] and package and domain:
-        service = Service.objects.create(
-            user=user,
-            package=package,
-            domain_name=domain.name,
-            status=Service.STATUS_PENDING,
-            billing_period="annually",
-            notes=f"Manual staff order {timezone.now():%Y-%m-%d} — cash/offline sale.",
-        )
-        try:
-            create_provisioning_job(service)
-            messages.success(request, f"WHM hosting provision queued for {domain.name} ({package.name}).")
-        except Exception as exc:
-            logger.exception("Hosting provision queue failed")
-            messages.warning(request, f"Domain registered, but hosting queue failed: {exc}")
-
-    invoice = None
-    if form["create_invoice"] and domain:
-        try:
-            amount = Decimal(form["invoice_amount"] or str(price))
-        except Exception:
-            amount = price
-        if amount < 0:
-            amount = Decimal("0.00")
-        lines = [
-            LineItemSpec(
-                description=f"Domain registration: {domain.name} × {years} year(s) (manual/cash order)",
-                unit_price=amount if not (form["create_hosting"] and package) else price,
-                quantity=Decimal("1"),
-                position=0,
+        with transaction.atomic():
+            order = DomainOrder.objects.create(
+                user=user,
+                invoice=None,
+                domain_name=domain_name,
+                tld=tld,
+                registration_years=years,
+                quoted_price=price,
+                total_price=price,
+                status=DomainOrder.STATUS_PAID,
+                privacy_enabled=form["privacy_enabled"] and policy_for(tld).privacy_supported,
+                auto_renew=form["auto_renew"],
+                dns_provider=Domain.DNS_PROVIDER_CPANEL if form["create_hosting"] else Domain.DNS_PROVIDER_REGISTRAR,
+                registration_contact=contact,
+                admin_contact=contact,
+                tech_contact=contact,
+                billing_contact=contact,
+                last_error="",
             )
-        ]
-        if form["create_hosting"] and package:
-            lines = [
-                LineItemSpec(
-                    description=f"Domain registration: {domain.name} × {years} year(s)",
-                    unit_price=price,
-                    quantity=Decimal("1"),
-                    position=0,
-                ),
-                LineItemSpec(
-                    description=f"Hosting: {package.name} ({domain.name})",
-                    unit_price=package.price_annually,
-                    quantity=Decimal("1"),
-                    position=1,
-                ),
-            ]
-            # If staff set a single override total, fold into first line note
-            if form["invoice_amount"]:
-                try:
-                    override = Decimal(form["invoice_amount"])
-                    lines = [
-                        LineItemSpec(
-                            description=(
-                                f"Manual order: {domain.name}"
-                                + (f" + {package.name}" if package else "")
-                                + f" × {years} yr domain"
-                            ),
-                            unit_price=override,
-                            quantity=Decimal("1"),
-                            position=0,
-                        )
-                    ]
-                except Exception:
-                    pass
-
-        notes = form["notes"] or f"Manual/cash order registered by staff on {timezone.now():%Y-%m-%d %H:%M}."
-        invoice = create_invoice(
-            user=user,
-            line_items=lines,
-            source_kind=Invoice.SOURCE_MANUAL_ADMIN,
-            status=Invoice.STATUS_UNPAID,
-            notes=notes,
-            created_by_staff=request.user,
-            send_email=False,
-        )
-        order.invoice = invoice
-        order.save(update_fields=["invoice", "updated_at"])
-        if service:
-            service.invoice = invoice
-            service.save(update_fields=["invoice"])
-
-    messages.success(
-        request,
-        f"Registered {domain.name if domain else domain_name} for {user.email}"
-        + (f" · Invoice {invoice.number}" if invoice else " · no invoice created"),
-    )
-    return redirect(
-        reverse("admin_tools:manual_domain_result", args=[order.pk])
-    )
+            capture_manual_followup(order=order, actor=request.user, hosting=form["create_hosting"], package=package,
+                invoice=form["create_invoice"], invoice_amount=form["invoice_amount"], notes=form["notes"])
+    except ValidationError as exc:
+        context["contact_errors"] = exc.messages
+        return render(request, "admin_tools/manual_domain_register.html", context)
+    messages.info(request,
+        "The manual request and follow-up choices are saved. The customer must sign in and open "
+        "My domains > Request agreements to accept the applicable terms. Staff can then process this same order; "
+        "saved hosting and invoice choices will resume after registration.")
+    return redirect("admin_tools:domain_order_detail", pk=order.pk)
 
 
 @staff_member_required
@@ -503,12 +405,34 @@ def manual_domain_result(request, order_id):
 
 @staff_member_required
 @require_POST
+@transaction.atomic
 def manual_domain_generate_invoice(request, order_id):
     """Create an unpaid invoice after the fact for a manual domain order."""
-    order = get_object_or_404(DomainOrder.objects.select_related("user", "domain", "invoice"), pk=order_id)
+    order = get_object_or_404(DomainOrder.objects.select_for_update(of=("self",)).select_related("user", "domain", "invoice"), pk=order_id)
     if order.invoice_id:
         messages.info(request, f"Order already has invoice {order.invoice.number}.")
         return redirect("admin_tools:invoice_edit", pk=order.invoice_id)
+    if order.domain_id and (order.domain.user_id != order.user_id or order.domain.name != order.domain_name):
+        messages.error(request, "The domain association needs support review before invoicing.")
+        return redirect("admin_tools:domain_order_detail", pk=order.pk)
+
+    if order.status != DomainOrder.STATUS_COMPLETED or not order.domain_id:
+        attempt = getattr(order, "registration_attempt", None)
+        if attempt and (attempt.status != "aborted" or attempt.submitted_at or attempt.legacy_review_required):
+            messages.error(request, "Review the registrar submission before changing this order's invoice association.")
+            return redirect("admin_tools:domain_order_detail", pk=order.pk)
+        from apps.domains.agreements import assert_acceptance_current
+        try:
+            from apps.domains.request_agreements import request_agreement_target
+            from apps.domains.registration_checkout import validate_registration_invoice_source
+            order, contact, _, _ = request_agreement_target(order.user, order.pk, kind="registration", lock=True)
+            User.objects.select_for_update().get(pk=order.user_id)
+            validate_registration_invoice_source(order)
+            assert_acceptance_current(receipt_id=order.agreement_acceptance_id, customer_id=order.user_id,
+                contact_id=order.registration_contact_id, domain_name=order.domain_name, operation="registration")
+        except ValidationError as exc:
+            messages.error(request, "Customer agreement review is required before creating this invoice. " + " ".join(exc.messages))
+            return redirect("admin_tools:domain_order_detail", pk=order.pk)
 
     amount_raw = (request.POST.get("amount") or "").strip()
     include_hosting = request.POST.get("include_hosting") == "on"

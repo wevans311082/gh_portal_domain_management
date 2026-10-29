@@ -50,6 +50,7 @@ from apps.portal.cart_service import (
     remove_cart_item,
 )
 from .decorators import staff_member_required
+from .list_view_controls import prepare_list
 from apps.products.models import Package
 
 
@@ -237,31 +238,12 @@ def invoice_preview(request):
 
 @staff_member_required
 def invoice_list(request):
-    q = (request.GET.get("q") or "").strip()
-    status = (request.GET.get("status") or "").strip()
-    qs = Invoice.objects.select_related("user").order_by("-created_at")
-    if q:
-        qs = qs.filter(
-            Q(number__icontains=q)
-            | Q(user__email__icontains=q)
-            | Q(billing_name__icontains=q)
-        )
-    if status:
-        qs = qs.filter(status=status)
-
-    paginator = Paginator(qs, 25)
-    page_obj = paginator.get_page(request.GET.get("page"))
-    return render(
-        request,
-        "admin_tools/billing/invoice_list.html",
-        {
-            "page_obj": page_obj,
-            "invoices": page_obj.object_list,
-            "search_q": q,
-            "status_filter": status,
-            "status_choices": Invoice.STATUS_CHOICES,
-        },
-    )
+    qs = Invoice.objects.select_related("user")
+    response, context = prepare_list(request, qs, "invoices")
+    if response is not None:
+        return response
+    context.update({"invoices": context["page_obj"].object_list, "status_choices": Invoice.STATUS_CHOICES})
+    return render(request, "admin_tools/billing/invoice_list.html", context)
 
 
 @staff_member_required

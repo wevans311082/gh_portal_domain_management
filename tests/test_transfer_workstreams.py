@@ -1,3 +1,4 @@
+from tests.agreement_helpers import accept_cart_item
 from tests.agreement_helpers import attach_agreement
 from dataclasses import replace
 from unittest.mock import Mock
@@ -85,6 +86,8 @@ def test_edited_cart_secret_is_rechecked_before_invoice_creation(cart):
 
 def test_transfer_profile_is_rechecked_before_cart_invoice(cart, monkeypatch):
     add_domain_transfer_item(user=cart.user, domain_name="new-transfer.com", auth_code="SAFE-CODE")
+    for item in cart.items.all():
+        accept_cart_item(item)
     monkeypatch.setitem(POLICIES, "com", replace(POLICIES["com"], transfer_workstream="review"))
     with pytest.raises(CartPreflightError, match="registrar-specific"):
         create_invoice_from_cart(cart)
@@ -125,6 +128,9 @@ def test_us_authorization_code_can_be_deferred_using_the_documented_approval_flo
     contact.save()
     TLDPricing.objects.create(tld="us", transfer_cost=12, is_active=True)
     add_domain_transfer_item(user=cart.user, domain_name="deferred-transfer.us", auth_code="", domain_contact_id=contact.pk)
+    cart.refresh_from_db()
+    for cart_item in cart.items.all():
+        accept_cart_item(cart_item)
     invoice = create_invoice_from_cart(cart, send_email=False)
     assert DomainTransfer.objects.get(invoice=invoice).auth_code == ""
     client = object.__new__(ResellerClubClient)

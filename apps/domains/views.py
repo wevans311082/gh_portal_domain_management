@@ -499,49 +499,21 @@ def domain_register(request):
     if request.method == "POST":
         form = DomainRegistrationForm(request.POST, user=request.user)
         if form.is_valid():
-            contact = form.cleaned_data["contact"]
-            registration_years = form.cleaned_data["registration_years"]
-            total_price = (pricing.registration_price * Decimal(str(registration_years))).quantize(Decimal("0.01"))
-            billing_name = request.user.full_name
-            billing_address = ""
-            if hasattr(request.user, "client_profile"):
-                profile = request.user.client_profile
-                billing_address = "\n".join(filter(None, [profile.address_line1, profile.address_line2, profile.city, profile.county, profile.postcode, profile.country]))
+            from apps.domains.agreement_views import _require_customer
+            from apps.domains.registration_checkout import create_registration_draft
+            from django.core.exceptions import ValidationError
+            _require_customer(request)
+            try:
+                order = create_registration_draft(customer=request.user, domain_name=domain_name,
+                    contact_id=form.cleaned_data["contact"].pk, years=form.cleaned_data["registration_years"],
+                    privacy_enabled=form.cleaned_data["privacy_enabled"], auto_renew=form.cleaned_data["auto_renew"],
+                    dns_provider=form.cleaned_data["dns_provider"], publication_choice=form.cleaned_data["publication_choice"])
+            except ValidationError as exc:
+                form.add_error(None, exc)
+            else:
+                messages.info(request, "Your draft is saved. Review the registrant details and agreements before creating an invoice.")
+                return redirect("domains:request_agreements", kind="registration", pk=order.pk)
 
-            invoice = create_invoice(
-                user=request.user,
-                line_items=[{
-                    "description": f"Domain registration: {domain_name.lower()} ({registration_years} year(s))",
-                    "quantity": 1,
-                    "unit_price": total_price,
-                }],
-                source_kind=Invoice.SOURCE_DOMAIN_REGISTRATION,
-                vat_rate=Decimal("0.00"),
-                due_date=timezone.now().date(),
-            )
-            from apps.domains.publication_consent import capture_decision
-            decision = capture_decision(customer=request.user, contact=contact, domain_name=domain_name,
-                choice=form.cleaned_data["publication_choice"])
-            order = DomainOrder.objects.create(
-                user=request.user,
-                invoice=invoice,
-                domain_name=domain_name.lower(),
-                tld=tld,
-                registration_years=registration_years,
-                quoted_price=total_price,
-                total_price=total_price,
-                status=DomainOrder.STATUS_PENDING_PAYMENT,
-                privacy_enabled=form.cleaned_data["privacy_enabled"],
-                auto_renew=form.cleaned_data["auto_renew"],
-                dns_provider=form.cleaned_data["dns_provider"],
-                registration_contact=contact,
-                admin_contact=contact,
-                tech_contact=contact,
-                billing_contact=contact,
-                publication_decision=decision,
-            )
-            messages.success(request, f"Order created for {order.domain_name}. Continue to payment.")
-            return redirect("payments:stripe_checkout", invoice_id=invoice.id)
     else:
         form = DomainRegistrationForm(
             user=request.user,

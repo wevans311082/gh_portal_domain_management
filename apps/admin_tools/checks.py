@@ -16,7 +16,7 @@ def check_route_policies(app_configs, **kwargs):
         ))
     capabilities = {code for code, _ in CAPABILITIES}
     for name, policy in ROUTE_POLICIES.items():
-        if any(code and code not in capabilities for code in (policy.read, policy.write, *policy.read_any)):
+        if any(code and code not in capabilities for code in (policy.read, policy.write, *policy.read_any, *policy.write_any)):
             errors.append(Error(f"Unknown capability for {name}.", id="admin_tools.E002"))
     return errors
 
