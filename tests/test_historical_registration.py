@@ -1,3 +1,4 @@
+from tests.agreement_helpers import attach_agreement
 from datetime import datetime, timezone as datetime_timezone
 import importlib
 from types import SimpleNamespace
@@ -86,6 +87,7 @@ def test_early_unverified_legacy_bootstrap_is_not_mistaken_for_a_paid_acknowledg
 
 
 def test_real_paid_acknowledgement_is_preserved_even_with_older_legacy_audit_entries(order, provider):
+    attach_agreement(order)
     submit(order, provider)
     AuditLog.objects.create(action="domain.registration.legacy_link_retained", model_name="DomainOrder", object_id=str(order.pk))
     seed()
@@ -107,6 +109,7 @@ def test_inconsistent_completed_asset_cannot_bypass_review_in_worker(order, prov
 
 def test_backfill_does_not_overwrite_modern_attempts_and_batches_large_histories(order, provider):
     from apps.domains.registration_submission import _claim
+    attach_agreement(order)
     attempt, _ = _claim(order.pk, "999", NS, provider)
     rows = [DomainOrder(user=order.user, domain_name=f"old-{i}.com", tld="com", registration_contact=order.registration_contact,
         admin_contact=order.admin_contact, tech_contact=order.tech_contact, billing_contact=order.billing_contact) for i in range(501)]
@@ -128,6 +131,7 @@ def test_no_order_confirmation_is_audited_but_does_not_itself_purchase(order, pr
     assert not attempt.legacy_review_required and attempt.status == "aborted"
     assert AuditLog.objects.filter(action="domain.registration.historical_reviewed", user=owner).count() == 1
     provider.register_domain.assert_not_called()
+    attach_agreement(order)
     assert submit(order, provider) == "501"
     assert provider.register_domain.call_count == 1
 

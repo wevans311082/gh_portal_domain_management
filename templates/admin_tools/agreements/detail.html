@@ -1,0 +1,19 @@
+{% extends "base_admin.html" %}
+{% block title %}Agreement version - {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Agreement version{% endblock %}
+{% block content %}
+{% include "admin_tools/components/page_header.html" with heading="Published agreement version" description=document.title %}
+<p class="mb-5"><a href="{% url 'admin_tools:registrar_agreements' %}">Back to agreements and new version form</a></p>
+{% if not intact %}<div class="admin-error-summary" role="alert"><h2>Agreement record needs review</h2><p>The stored document does not pass its integrity checks. Do not rely on it for new customer acceptance. The stored text remains visible below for owner investigation; its source link is withheld.</p></div>{% endif %}
+<section class="admin-card p-5 mb-5 space-y-3" aria-labelledby="agreement-version-heading">
+  <h2 id="agreement-version-heading" class="text-lg font-semibold">{{ document.title }} — {{ document.version }}</h2>
+  <dl class="admin-workspace-verification"><div><dt>Requirement key</dt><dd>{{ document.agreement_key }}</dd></div>
+  <div><dt>Published</dt><dd>{{ document.published_at|date:"d M Y H:i T" }}</dd></div>
+  <div><dt>Publisher</dt><dd>{{ document.publisher.get_full_name|default:document.publisher.email }}</dd></div>
+  <div><dt>Document checksum</dt><dd class="admin-agreement-digest">{{ document.document_digest }}</dd></div>
+  {% if source_reference %}<div><dt>Source reference</dt><dd><a href="{{ source_reference }}" rel="noopener noreferrer" target="_blank">{{ source_reference }}</a></dd></div>{% endif %}</dl>
+  <p>This version is retained without editing. Publish a new version to change its text or scope. A checksum is an integrity check, not legal certification or customer acceptance.</p>
+  <h3 class="font-semibold">Current assignments</h3><ul>{% for binding in bindings %}<li>{{ binding.profile }}: {{ binding.operation }}</li>{% empty %}<li>No current assignments; retained history.</li>{% endfor %}</ul>
+</section>
+<section class="admin-card p-5 space-y-3" aria-labelledby="agreement-text-heading"><h2 id="agreement-text-heading" class="text-lg font-semibold">Exact published text</h2><div class="admin-agreement-text">{{ document.body }}</div></section>
+{% endblock %}

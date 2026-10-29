@@ -4,6 +4,36 @@ from apps.domains.models import ContactVerification, DomainOrder
 from apps.domains.registrar_policy import tld_for_domain
 
 
+def domain_workstream_summary(domain):
+    """Describe applicable steps, never their completion or eligibility approval."""
+    from django.core.exceptions import ValidationError
+    from apps.domains.registrar_policy import policy_for, registry_exception_for, workstream_tlds
+    extension = tld_for_domain(domain.name)
+    try:
+        policy = policy_for(extension)
+    except ValidationError:
+        return {"reviewed": False, "requirements": "Registrar policy review required"}
+    requirements = {"general": "Standard registrant contact details", "uk_accuracy": "UK registrant contact requirements",
+        "us_nexus": "US nexus declaration", "eu_presence": "EU eligibility declaration"}.get(policy.eligibility_workstream)
+    if requirements is None:
+        return {"reviewed": False, "requirements": "Registrar policy review required"}
+    members = sorted(workstream_tlds("eligibility", policy.eligibility_workstream))
+    return {"reviewed": True, "requirements": requirements,
+        "shared_tlds": ", ".join("." + member for member in members[:20]), "members_truncated": len(members) > 20,
+        "individual_required": registry_exception_for(extension).natural_person_required,
+        "email_process": "ICANN RAA email verification" if policy.email_workstream == "icann_raa"
+            else "Registry-specific process; ICANN RAA workflow does not apply",
+        "contact_changes": "IRTP authorization checks apply" if policy.contact_change_workstream == "icann_irtp"
+            else "Registry-specific contact-change rules apply",
+        "incoming_transfer": ("Authorization-code transfer; the code may be supplied during registrar approval"
+            if policy.transfer_auth_optional else "Authorization-code transfer; the code is required before submission")
+            if policy.transfer_workstream == "epp" else "Registrar-specific transfer review required",
+        "publication": "Explicit consent is required to publish the organisation name"
+            if policy.publication_workstream == "organisation_consent" else "Registry-specific publication rules apply",
+        "privacy": "Privacy may be requested, subject to provider availability" if policy.privacy_supported
+            else "Optional privacy service is not supported"}
+
+
 def evidence_label(evidence):
     if evidence is None:
         return "Not confirmed"

@@ -177,6 +177,12 @@ def add_domain_transfer_item(
     created_by_staff=None,
     publication_choice="redact",
 ) -> PortalCartItem:
+    from django.core.exceptions import ValidationError
+    from apps.domains.transfer_requirements import validate_transfer_code_storage
+    try:
+        validate_transfer_code_storage(auth_code)
+    except ValidationError as exc:
+        raise CartPreflightError(" ".join(exc.messages)) from None
     cart = get_active_cart(user, created_by_staff=created_by_staff)
     normalized = (domain_name or "").strip().lower()
     label, tld = _split_domain_name(normalized)
@@ -207,7 +213,7 @@ def add_domain_transfer_item(
             "unit_price": pricing.transfer_price,
             "quantity": 1,
             "domain_contact": contact,
-            "transfer_auth_code": (auth_code or "").strip(),
+            "transfer_auth_code": auth_code,
             "publication_decision": decision,
             "auto_renew": auto_renew,
             "dns_provider": dns_provider,
@@ -256,7 +262,7 @@ def preflight_cart_domains(cart: PortalCart):
     may remain estimates; accepting a cart quote runs this check again.
     """
     from django.core.exceptions import ValidationError
-    from apps.domains.registrar_policy import ALL_ROLES, policy_for
+    from apps.domains.registrar_policy import policy_for
 
     current = _locked_cart(cart)
     items = list(current.items.select_for_update().order_by("pk"))
@@ -303,15 +309,13 @@ def preflight_cart_domains(cart: PortalCart):
         if not _is_valid_label(label):
             raise CartPreflightError("A domain in your cart is invalid. Correct it before checkout.")
         try:
-            policy = policy_for(tld)
+            policy_for(tld)
         except ValidationError:
             raise CartPreflightError(f"{item.domain_name}: this extension needs a registrar eligibility review. Contact support before checkout.") from None
-        if item.item_type == PortalCartItem.TYPE_DOMAIN_TRANSFER and policy.roles != ALL_ROLES:
-            raise CartPreflightError("This extension requires a registrar-specific transfer workflow. Contact support before checkout.")
-        if item.item_type == PortalCartItem.TYPE_DOMAIN_TRANSFER and tld == "us":
-            from apps.domains.us_registry import validate_us_transfer_code
+        if item.item_type == PortalCartItem.TYPE_DOMAIN_TRANSFER:
+            from apps.domains.transfer_requirements import validate_transfer_code
             try:
-                validate_us_transfer_code(item.transfer_auth_code)
+                validate_transfer_code(tld, item.transfer_auth_code)
             except ValidationError as exc:
                 raise CartPreflightError(" ".join(exc.messages)) from None
         try:
@@ -409,6 +413,7 @@ def materialize_cart_to_invoice(cart: PortalCart, invoice: Invoice) -> Invoice:
                     "status": DomainOrder.STATUS_PENDING_PAYMENT,
                     "privacy_enabled": item.privacy_enabled and policy_for(tld).privacy_supported,
                     "publication_decision_id": item.publication_decision_id,
+                    "agreement_acceptance_id": item.agreement_acceptance_id,
                     "auto_renew": item.auto_renew,
                     "dns_provider": item.dns_provider,
                     "registration_contact": contact,
@@ -448,6 +453,7 @@ def materialize_cart_to_invoice(cart: PortalCart, invoice: Invoice) -> Invoice:
                     "user": invoice.user,
                     "tld": tld,
                     "auth_code": item.transfer_auth_code,
+                    "agreement_acceptance_id": item.agreement_acceptance_id,
                     "publication_decision_id": item.publication_decision_id,
                     "quoted_price": item.unit_price,
                     "total_price": item.line_total,

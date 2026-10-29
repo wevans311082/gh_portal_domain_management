@@ -259,3 +259,8 @@
 .admin-customer-workspace .admin-card h3, .admin-customer-note h3 { font-size: 1rem; font-weight: 650; }
 .admin-customer-workspace .admin-card > p { color: #475569; }
 .admin-customer-workspace .admin-record-details dl { margin: .875rem 0; }
+.admin-workstream-summary { margin-top: .75rem; border: 1px solid var(--admin-border); border-radius: 6px; padding: .75rem; }
+.admin-workstream-summary > summary { display: list-item; list-style-position: inside; cursor: pointer; color: var(--admin-ink); font-weight: 600; overflow-wrap: anywhere; }
+.admin-workstream-summary > p { margin: .75rem 0; color: var(--admin-muted); }
+.admin-agreement-text { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--admin-ink); background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: 6px; padding: 1rem; max-width: 100%; }
+.admin-agreement-digest { overflow-wrap: anywhere; font-family: monospace; }

@@ -4,7 +4,7 @@
 
 Registrant validation implementation is organised into shared workstreams with explicit TLD membership, as specified in [validation-workstreams.md](validation-workstreams.md). Product 3 must use this structure rather than independent per-TLD KYC implementations; registry exceptions remain explicit.
 
-This is a proposed implementation plan, based on the current repository and the security review in this folder. It contains **20 product improvements and new features**, plus **nine application-security workstreams**. It does not authorise implementation.
+This implementation roadmap is based on the repository and the security review in this folder. Its full scope is **20 product improvements and new features**, plus **nine application-security workstreams**. Current completion evidence and remaining work are tracked in [implementation-status.md](implementation-status.md).
 
 Swarm, Docker, nginx, reverse-proxy configuration, network exposure, server processes, infrastructure changes, and deployment work are excluded. SR-003 remains outside this plan. Application portions of SR-004, SR-005, SR-006, and SR-008 are included with external prerequisites explicitly identified below; completing these portions does not close the infrastructure-dependent parts of those findings.
 

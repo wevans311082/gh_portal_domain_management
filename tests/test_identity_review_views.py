@@ -17,7 +17,7 @@ def url(order):
 
 
 def payload(order):
-    return dict(key=str(uuid.uuid4()), subject_digest=ContactVerification.digest_for(order.registration_contact), status="verified",
+    return dict(key=str(uuid.uuid4()), subject_digest=ContactVerification.digest_for(order.registration_contact), status="verified", check_kind="identity",
         policy_reference="POLICY-IDENTITY-v1", evidence_reference="CASE-100", valid_days=90, policy_reviewed="on")
 
 

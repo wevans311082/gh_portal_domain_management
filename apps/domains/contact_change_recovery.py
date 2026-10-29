@@ -82,7 +82,7 @@ def confirm_provider_completed(change_id, *, owner_id, reference, reason, provid
     from types import SimpleNamespace
     from apps.domains.contact_change_confirmation import irtp_state
     from apps.domains.contact_changes import _locked_proposal, _live_association
-    from apps.domains.publication_consent import REVIEWED_GTLDS
+    from apps.domains.registrar_policy import workstream_tlds
     from apps.domains.registrar_policy import ALL_ROLES, policy_for, tld_for_domain
     from apps.domains.registration_submission import _check_bindings
 
@@ -109,7 +109,7 @@ def confirm_provider_completed(change_id, *, owner_id, reference, reason, provid
                 or not int(current.submitted_at.timestamp()) <= int(evidence.completed_at) <= int(now.timestamp()) + 300):
             raise ValidationError("The exact provider action lacks a matching completion timestamp.")
         state = "not_applicable"
-        if tld_for_domain(current.domain_name) in REVIEWED_GTLDS:
+        if tld_for_domain(current.domain_name) in workstream_tlds("contact_change", "icann_irtp"):
             state = irtp_state(client.get_irtp_status(current.registrar_order_id),
                                order_id=current.registrar_order_id, domain_name=current.domain_name)
             if state != "SUCCESS":

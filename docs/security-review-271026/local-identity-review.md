@@ -1,8 +1,12 @@
-# Local identity review
+# Local identity and business review
 
-Owners can open Record local identity review from a contact on the Customer 360 workspace. The route is owner-only, requires recent MFA, uses CSRF and shared request bounds, and excludes privileged customer accounts. Ordinary staff cannot open references/history or submit reviews. Customer views do not expose review references.
+Owners can open Record local contact review from a contact on the Customer 360 workspace. The route is owner-only, requires recent MFA, uses CSRF and shared request bounds, and excludes privileged customer accounts. Ordinary staff cannot open references/history or submit reviews. Customer views do not expose review references.
 
 An individual needs no organization, company number or Companies House match. Saving accurate contact details is not itself identity verification. This screen records an owner's local policy assessment only; it never sets registrar-email or TLD-eligibility evidence and never calls external providers. A policy review must actually have taken place before choosing a passed outcome.
+
+The shared assurance workstream now also supports local organisation/sole-trader business reviews. Overseas organisations and sole traders need no UK incorporation number to use this process. The owner explicitly selects identity or business scope for an organisation; individuals can select only identity scope, and the service rejects forged business assessments for an individual. The screen shows the actual trading name, company number when supplied and country. It labels Companies House evidence separately from local policy evidence and retains both in the history. A local business assessment is not a claim of incorporation, a Companies House match or registry eligibility.
+
+Identity and business outcomes have independent histories and expiry. A new business outcome supersedes an earlier business outcome, including Companies House evidence, without superseding an identity assessment. A single submission key cannot be reused to write another scope. The implementation uses one transaction, evidence model and review form for the two scopes rather than a separate KYC flow per TLD.
 
 The organization operating the portal must define and approve the referenced local policy, including when review is required, accepted evidence, authorized access, review validity and evidence retention. The application does not invent a universal identity-document requirement. Collect no documents, identity numbers or credentials through this form. Record only a policy identifier/version and a case reference pointing to the authorized review process. These references are restricted to the owner review screen, not ordinary workspace summaries or metadata audit records.
 
@@ -15,3 +19,5 @@ A later outcome in the same assessment scope supersedes prior case references, i
 Migration 0023 adds optional reviewer, policy reference and unique review-key fields. Existing rows remain unattributed rather than acquiring invented approval or provenance. No production migration has been applied during implementation.
 
 Verification covers owner/non-owner access, recent MFA, CSRF, foreign-customer contact IDs, stale digests, duplicate submissions, missing policy acknowledgement, bounded validity, independent result types and audit rollback. Route-inventory tests cover the new guarded route. Browser fixtures cover form, errors, recorded review and stale submission at desktop/mobile widths.
+
+The shared business increment passed 89 focused local-review/evidence/workspace checks and 14 desktop/mobile browser states, including business form errors and recorded history. Tests prove no Companies House/provider call, no company-number requirement, rejection of external outcome types, independent scope, cross-scope replay rejection, edit invalidation, supersession and audit rollback. The final full suite passed 1,996 tests with the unchanged deployment assertion excluded. The mobile recorded-business screen was visually inspected; no live provider verification is claimed.

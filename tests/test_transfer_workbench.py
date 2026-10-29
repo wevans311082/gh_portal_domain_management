@@ -1,3 +1,4 @@
+from tests.agreement_helpers import attach_agreement
 from unittest.mock import patch
 
 import pytest
@@ -20,6 +21,7 @@ def staff_login(client, django_user_model, role="Portal Support"):
 
 
 def test_workbench_is_readonly_and_excludes_secrets_financial_data_and_diagnostics(transfer, provider, client, django_user_model):
+    attach_agreement(transfer)
     submit(transfer, provider)
     DomainTransfer.objects.filter(pk=transfer.pk).update(last_error="PRIVATE-PROVIDER-DIAGNOSTIC")
     staff_login(client, django_user_model)

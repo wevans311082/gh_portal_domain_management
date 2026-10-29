@@ -12,7 +12,7 @@ from apps.domains.contact_bindings import provider_scope
 from apps.domains.contact_change_confirmation import acknowledgement
 from apps.domains.contact_changes import locked_source, _live_association
 from apps.domains.models import Domain, DomainContactChange, PublicationRedaction, RegistrantPublicationDecision
-from apps.domains.publication_consent import REVIEWED_GTLDS
+from apps.domains.registrar_policy import workstream_tlds
 from apps.domains.publication_verification import publication_observation
 from apps.domains.registrar_policy import tld_for_domain
 
@@ -22,7 +22,7 @@ def _locked_context(job_id, client):
     identity = PublicationRedaction.objects.values("decision__customer_id", "decision__domain_name", "decision_id").get(pk=job_id)
     User.objects.select_for_update().get(pk=identity["decision__customer_id"])
     domain = Domain.objects.select_for_update().filter(name=identity["decision__domain_name"], user_id=identity["decision__customer_id"]).first()
-    if domain is None or tld_for_domain(domain.name) not in REVIEWED_GTLDS:
+    if domain is None or tld_for_domain(domain.name) not in workstream_tlds("publication", "organisation_consent"):
         raise ValidationError("Publication redaction requires registrar association review.")
     source, attempt, kind = locked_source(domain)
     decision = RegistrantPublicationDecision.objects.select_for_update().get(pk=identity["decision_id"])

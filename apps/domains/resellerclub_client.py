@@ -525,12 +525,10 @@ class ResellerClubClient:
     ) -> dict:
         """Transfer a domain name into the registrar account."""
         from django.core.exceptions import ValidationError
-        from apps.domains.registrar_policy import ALL_ROLES, policy_for, tld_for_domain
-        if policy_for(tld_for_domain(domain_name)).roles != ALL_ROLES:
-            raise ValidationError("This extension requires a registrar-specific transfer workflow. Contact support before submitting a transfer.")
-        if tld_for_domain(domain_name) == "us":
-            from apps.domains.us_registry import validate_us_transfer_code
-            validate_us_transfer_code(auth_code)
+        from apps.domains.registrar_policy import tld_for_domain
+        from apps.domains.transfer_requirements import validate_transfer_code, validate_transfer_nameservers
+        validate_transfer_code(tld_for_domain(domain_name), auth_code)
+        validate_transfer_nameservers(domain_name, nameservers)
         data = {
             "domain-name": domain_name,
             "customer-id": customer_id,

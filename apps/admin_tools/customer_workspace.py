@@ -171,8 +171,9 @@ def workspace_context(request, customer, form=None):
                 item["description"] = record.subject
             if key == "domains":
                 item["verification"] = registrar_email_summary(record)
-                from apps.domains.validation_summary import domain_eligibility_summary
+                from apps.domains.validation_summary import domain_eligibility_summary, domain_workstream_summary
                 item["eligibility"] = domain_eligibility_summary(record)
+                item["workstreams"] = domain_workstream_summary(record)
             items.append(item)
         panels.append({"key": key, "label": label, "count": page.paginator.count, "items": items,
                        "page": page if section == key else None})

@@ -99,6 +99,8 @@ def reconcile_registrant_verification(order_id, customer_id, *, client):
     from apps.domains.registrar_policy import tld_for_domain
     if tld_for_domain(order.domain_name) != order.tld:
         raise ValidationError("The domain extension does not match the stored order.")
+    if order.tld not in email_workstream_tlds():
+        raise ValidationError("This extension does not use the reviewed ICANN RAA verification workstream.")
     from apps.domains.contact_bindings import provider_scope
     if order.registrar_contact_ids.get("_scope") and order.registrar_contact_ids["_scope"] != provider_scope(client):
         raise ValidationError("The registrar environment changed. Reconcile the order before verification.")

@@ -191,7 +191,8 @@
                     </div>
                     <div>
                         <label for="shop-field-10-{{ forloop.counter|default:'single' }}" class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">EPP / auth code</label>
-                        <input id="shop-field-10-{{ forloop.counter|default:'single' }}" type="text" name="auth_code" placeholder="Optional if supplied later" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                        <input id="shop-field-10-{{ forloop.counter|default:'single' }}" type="password" name="auth_code" maxlength="255" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="shop-auth-code-help" placeholder="Optional if supplied later" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                        <p id="shop-auth-code-help" class="mt-2 text-sm text-slate-700">For supported transfer profiles, you may supply the code during registrar approval. Any code supplied now must meet the extension's requirements.</p>
                     </div>
                     <div>
                         <label for="shop-field-11-{{ forloop.counter|default:'single' }}" class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">Registrant contact</label>

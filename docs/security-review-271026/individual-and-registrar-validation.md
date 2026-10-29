@@ -206,3 +206,5 @@ Structural parsing now recognizes .me.uk even outside the advertised catalogue a
 ## Workstream organisation (28 October 2026)
 
 The current implementation direction groups shared contact accuracy, identity/business assurance, registry eligibility, registrar verification, publication/privacy and domain operations. See [validation-workstreams.md](validation-workstreams.md) for TLD membership, exceptions and rollout gates. A TLD mapping selects applicable checks; it does not create another independent identity review.
+
+The 29 October consolidation moves payload contact types and provider bounds into shared profiles, separates publication and contact-change authorization membership, and uses the same captured-contact renewal validation for applicable profiles and the `.me.uk` personal-namespace exception. The former `.me.uk` legacy path no longer accepts missing capture digests or unaccepted submission evidence. Unreviewed renewal policies stop before invoice admission. These are local association/declaration checks, not new external eligibility approvals.

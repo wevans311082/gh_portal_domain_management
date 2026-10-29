@@ -39,9 +39,10 @@ def resellerclub_contact_payload(contact, customer_id, tld=""):
         return value
 
     extension = str(tld or "").strip().lower().lstrip(".")
-    eu = extension == "eu"
-    name = field("name", 50 if eu else 255)
-    company = field("company", 100 if eu else 255, required=False)
+    from apps.domains.registrar_policy import contact_payload_policy
+    policy = contact_payload_policy(extension)
+    name = field("name", policy.contact_name_max)
+    company = field("company", policy.contact_company_max, required=False)
     email = field("email", 254)
     try:
         validate_email(email)
@@ -70,15 +71,15 @@ def resellerclub_contact_payload(contact, customer_id, tld=""):
         errors["customer_id"] = "A valid registrar customer ID is required."
     payload = {
         "customer-id": identifier,
-        "type": contact.contact_type_for_tld(extension),
+        "type": policy.contact_type,
         "name": name,
-        "company": company or ("NA" if eu else "N/A"),
+        "company": company or policy.empty_company_value,
         "email": email,
         "address-line-1": field("address_line1", 64),
         "address-line-2": field("address_line2", 64, required=False),
         "city": field("city", 64),
         "state": field("state", 64),
-        "zipcode": field("postcode", 16 if eu else 10),
+        "zipcode": field("postcode", policy.contact_postcode_max),
         "country": country,
         "phone-cc": phone_cc,
         "phone": phone,

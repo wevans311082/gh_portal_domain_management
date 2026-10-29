@@ -370,6 +370,13 @@ def manual_domain_register(request):
     except Exception as exc:
         logger.exception("Manual domain registration failed for %s", domain_name)
         order.refresh_from_db()
+        if isinstance(exc, ValidationError) and not order.agreement_acceptance_id:
+            messages.warning(request,
+                "The request is saved but has not been registered. The customer must sign in and open "
+                "My domains > Request agreements to review and accept the applicable terms. "
+                "Staff can then process this same order. Any requested hosting or invoice has not been created; "
+                "arrange those follow-up items after registration.")
+            return redirect("admin_tools:domain_order_detail", pk=order.pk)
         messages.error(
             request,
             f"Domain registration failed: {order.last_error or exc}. "

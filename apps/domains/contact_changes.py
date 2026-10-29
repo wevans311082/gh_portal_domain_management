@@ -286,7 +286,7 @@ def observe_contact_change(change_id, *, client):
     """
     from datetime import timedelta
     from apps.domains.contact_change_confirmation import ContactChangeAction, irtp_state
-    from apps.domains.publication_consent import REVIEWED_GTLDS
+    from apps.domains.registrar_policy import workstream_tlds
 
     identity = DomainContactChange.objects.values("user_id", "domain_id").get(pk=change_id)
     with transaction.atomic(durable=True):
@@ -307,7 +307,7 @@ def observe_contact_change(change_id, *, client):
                 or action.order_id != change.registrar_order_id or action.action_id != change.action_id):
             raise ValidationError("The registrar action could not be matched.")
         state = "not_applicable"
-        if tld_for_domain(change.domain_name) in REVIEWED_GTLDS:
+        if tld_for_domain(change.domain_name) in workstream_tlds("contact_change", "icann_irtp"):
             state = irtp_state(client.get_irtp_status(change.registrar_order_id),
                                order_id=change.registrar_order_id, domain_name=change.domain_name)
         payload = client.get_registration_reconciliation_details(change.registrar_order_id)

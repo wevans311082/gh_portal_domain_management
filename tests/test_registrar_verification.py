@@ -168,16 +168,19 @@ def test_deleted_order_retains_history_without_current_verification(order):
     assert not result.is_current
 
 
-def test_cc_tld_does_not_receive_universal_fifteen_day_deadline(order):
-    order.domain_name = "example.io"
-    order.tld = "io"
+@pytest.mark.parametrize("extension", ["io", "uk", "co.uk", "me.uk", "us", "eu", "unknown"])
+def test_non_raa_profile_cannot_acquire_raa_evidence_or_deadline(order, extension):
+    order.domain_name = "example." + extension
+    order.tld = extension
     order.save()
-    result = reconcile_registrant_verification(order.pk, "999", client=provider(
-        order, domainname="example.io", raaVerificationStatus="Pending",
+    client = provider(
+        order, domainname=order.domain_name, raaVerificationStatus="Pending",
         raaVerificationStartTime=str(int(timezone.now().timestamp()) - 3600),
-    ))
-    assert result.provider_started_at is not None
-    assert result.action_due_at is None
+    )
+    with pytest.raises(ValidationError, match="workstream"):
+        reconcile_registrant_verification(order.pk, "999", client=client)
+    client.get_registrant_verification_details.assert_not_called()
+    assert not ContactVerification.objects.exists()
 
 
 def test_provider_failure_is_not_replaced_with_local_approval(order):

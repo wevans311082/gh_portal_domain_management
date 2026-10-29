@@ -35,6 +35,7 @@ POLICIES = {
     "admin_tools:customer_note_add": PublicPolicy(frozenset({"POST"}), 64 * 1024, 10, 60, 100),
     "admin_tools:customer_note_redact": PublicPolicy(frozenset({"POST"}), FORM, 10, 60, 100),
     "admin_tools:identity_review": PublicPolicy(frozenset({"POST"}), FORM, 10, 600, 100),
+    "admin_tools:registrar_agreements": PublicPolicy(frozenset({"POST"}), 256 * 1024, 10, 600, 100),
     "core:contact": PublicPolicy(frozenset({"POST"}), FORM, 5, 600, 100, 3),
     "billing_public:quote_submit": PublicPolicy(frozenset({"POST"}), 64 * 1024, 5, 600, 100, 3),
     "billing_public:quote_public_pdf": PublicPolicy(frozenset({"GET"}), 0, 5, 600, 30),
@@ -60,6 +61,8 @@ POLICIES = {
     "domains:whois": PublicPolicy(frozenset({"GET"}), 0, 10, 60, 100),
     "domains:verification_action": PublicPolicy(frozenset({"POST"}), FORM, 10, 600, 100),
     "domains:contact_change": PublicPolicy(frozenset({"POST"}), FORM, 10, 600, 100),
+    "domains:cart_agreements": PublicPolicy(frozenset({"POST"}), FORM, 10, 600, 100),
+    "domains:request_agreements": PublicPolicy(frozenset({"POST"}), FORM, 10, 600, 100),
     "domains:publication_withdraw": PublicPolicy(frozenset({"POST"}), FORM, 10, 600, 100),
     "domains:search": PublicPolicy(frozenset({"GET"}), 0, 20, 60, 600),
 }

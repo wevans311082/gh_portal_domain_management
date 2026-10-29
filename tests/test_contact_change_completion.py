@@ -62,6 +62,18 @@ def test_attestation_cannot_override_incomplete_irtp(current, completed_provider
     assert current[1].registrar_contact_ids["reg"] == "201"
 
 
+def test_publication_profile_change_cannot_skip_transfer_authorization(current, completed_provider, owner, monkeypatch):
+    from dataclasses import replace
+    from apps.domains.registrar_policy import POLICIES
+    monkeypatch.setitem(POLICIES, "com", replace(POLICIES["com"], publication_workstream="registry_specific"))
+    completed_provider[1].get_irtp_status.return_value["irtp-status"]["task-status"] = "PENDING"
+    with pytest.raises(ValidationError, match="authorization"):
+        confirm(completed_provider, owner)
+    completed_provider[1].get_irtp_status.assert_called_once_with("501")
+    current[1].refresh_from_db()
+    assert current[1].registrar_contact_ids["reg"] == "201"
+
+
 @pytest.mark.parametrize("timestamp", ["", "1", "9999999999999999999"])
 def test_attestation_cannot_override_missing_or_unrelated_completion_time(completed_provider, owner, timestamp):
     api = completed_provider[1]

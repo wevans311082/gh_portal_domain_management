@@ -12,14 +12,14 @@ import re
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_domain_name
 
-from apps.domains.registrar_policy import UK_NAMESPACES, policy_for, tld_for_domain
+from apps.domains.registrar_policy import UK_NAMESPACES, policy_for, tld_for_domain, registry_exception_for, renewal_review_label, workstream_tlds
 
-UK_EXTENSIONS = frozenset({"uk", "co.uk", "org.uk", "me.uk"})
+UK_EXTENSIONS = frozenset(workstream_tlds("eligibility", "uk_accuracy"))
 POLICY_VERSION = "reviewed-2026-10-28"
 
 
 def validate_uk_registrant(contact, tld):
-    if tld not in UK_EXTENSIONS:
+    if tld not in workstream_tlds("eligibility", "uk_accuracy"):
         return
     identity = (contact.name if contact.registrant_type == "individual" else contact.company).strip()
     if len(identity) < 4 or sum(character.isalpha() for character in identity) < 3:
@@ -28,7 +28,7 @@ def validate_uk_registrant(contact, tld):
     street = contact.address_line1.strip()
     if street and all(character.isdecimal() or character.isspace() for character in street):
         raise ValidationError({"address_line1": "UK registry contact data needs non-numeric street information, not only a house number. Supply the actual address."})
-    if tld == "me.uk" and contact.registrant_type != "individual":
+    if registry_exception_for(tld).natural_person_required and contact.registrant_type != "individual":
         raise ValidationError({"registrant_type": ".me.uk is a personal namespace and requires an individual registrant. Organizations and exceptional court/dispute cases need registrar review; choose a suitable extension or an accurate individual contact."})
 
 
@@ -37,13 +37,13 @@ def validate_registration(domain_name, contact=None, years=1):
     if domain_name in UK_NAMESPACES:
         raise ValidationError("This name is a UK registry namespace, not a registrable customer domain.")
     extension = tld_for_domain(domain_name)
-    policy_for(extension)
+    policy = policy_for(extension)
     if type(years) is not int or not 1 <= years <= 10:
         raise ValidationError("Choose a registration term from one to ten years.")
     label = domain_name[:-(len(extension) + 1)]
     if not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", label, flags=re.ASCII):
         raise ValidationError("Choose a single valid ASCII domain label of 1 to 63 characters before the extension.")
-    if extension in UK_EXTENSIONS:
+    if policy.eligibility_workstream == "uk_accuracy":
         if len(domain_name) > 64:
             raise ValidationError("UK names exceeding the registrar's documented 64-character total limit need support review before ordering. This does not invalidate existing registrations.")
         reserved = {"ac", "co", "gov", "ltd", "me", "mil", "mod", "net", "nhs", "nic", "org", "plc", "police", "sch", "com", "uk"}
@@ -55,13 +55,13 @@ def validate_registration(domain_name, contact=None, years=1):
             validate_uk_registrant(contact, extension)
     elif label.startswith("xn--"):
         raise ValidationError("IDN registration requires a reviewed language-specific workflow. Contact support before ordering.")
-    if extension == "us":
+    if policy.eligibility_workstream == "us_nexus":
         if len(label) < 3:
             raise ValidationError("US names shorter than three characters require reserved/premium-name review before ordering.")
         if contact is not None:
             from apps.domains.us_registry import us_contact_attributes
             us_contact_attributes(contact)
-    if extension == "eu":
+    if policy.eligibility_workstream == "eu_presence":
         from apps.domains.contact_codes import COUNTRY_CODES
         if len(label) < 2 or len(label) >= 4 and label[2:4] == "--":
             raise ValidationError("EU labels need 2-63 ASCII characters and cannot have hyphens in both the third and fourth positions.")
@@ -81,14 +81,19 @@ def capabilities(domain_name):
     except ValidationError:
         return {"reviewed": False, "lock": False, "auth_code": False, "max_nameservers": None, "uk_domain": False}
     return {"reviewed": True, "lock": policy.lock_supported, "auth_code": policy.auth_code_supported,
-            "min_nameservers": policy.min_nameservers, "max_nameservers": policy.max_nameservers, "uk_domain": tld_for_domain(domain_name) in UK_EXTENSIONS}
+            "min_nameservers": policy.min_nameservers, "max_nameservers": policy.max_nameservers, "uk_domain": policy.eligibility_workstream == "uk_accuracy"}
 
 
 def policy_snapshot(domain_name):
     extension = tld_for_domain(domain_name)
     policy = policy_for(extension)
     return {"version": POLICY_VERSION, "extension": extension, "contact_type": policy.contact_type,
-        "natural_person_required": extension == "me.uk", "min_nameservers": policy.min_nameservers, "max_nameservers": policy.max_nameservers,
+        "natural_person_required": registry_exception_for(extension).natural_person_required, "min_nameservers": policy.min_nameservers, "max_nameservers": policy.max_nameservers,
+        "workstreams": {"eligibility": policy.eligibility_workstream, "email": policy.email_workstream,
+            "publication": policy.publication_workstream, "contact_change": policy.contact_change_workstream,
+            "transfer": policy.transfer_workstream},
+        "transfer_auth_limits": {"min": policy.transfer_auth_min, "max": policy.transfer_auth_max,
+            "no_spaces": policy.transfer_auth_no_spaces, "optional_at_submission": policy.transfer_auth_optional},
         "scope": "local_requirements_only"}
 
 
@@ -107,38 +112,12 @@ def validate_nameservers(domain_name, nameservers):
 
 
 def validate_renewal_registrant(domain):
-    """Exceptional .me.uk legacy ownership must be reviewed, not silently renewed."""
-    if tld_for_domain(domain.name) == "us":
-        from apps.domains.us_registry import validate_us_renewal
-        validate_us_renewal(domain)
-        return
-    if tld_for_domain(domain.name) == "eu":
+    """Dispatch the shared captured-contact check from the reviewed profile."""
+    extension = tld_for_domain(domain.name)
+    label = renewal_review_label(extension)
+    if label:
         from apps.domains.registrant_renewal import validate_declared_renewal
-        validate_declared_renewal(domain, "eu")
-        return
-    if tld_for_domain(domain.name) != "me.uk":
-        return
-    from apps.domains.models import DomainOrder
-    order = DomainOrder.objects.select_related("registration_contact").filter(domain=domain, user_id=domain.user_id,
-        domain_name=domain.name, registrar_order_id=domain.registrar_id).first()
-    if order is None or order.registration_contact.user_id != domain.user_id:
-        raise ValidationError("The .me.uk registrant association needs review before renewal. Contact support to confirm the actual individual or a documented registry exception.")
-    validate_uk_registrant(order.registration_contact, "me.uk")
-    from apps.domains.models import DomainContactChange, ContactVerification
-    confirmed = DomainContactChange.objects.filter(domain=domain, user_id=domain.user_id,
-        domain_name=domain.name, registrar_order_id=domain.registrar_id, status="confirmed").order_by("-confirmed_at", "-pk").first()
-    if confirmed:
-        if (confirmed.subject.get("source_kind") != "registration" or confirmed.subject.get("source_id") != order.pk
-                or confirmed.registration_contact_id != order.registration_contact_id
-                or confirmed.role_ids != order.registrar_contact_ids
-                or confirmed.subject.get("contact_digests", {}).get("registration_contact") != ContactVerification.digest_for(order.registration_contact)):
-            raise ValidationError("The .me.uk contact changed since registrar confirmation. Contact support before renewal.")
-        return
-    attempt = getattr(order, "registration_attempt", None)
-    if attempt and attempt.subject.get("contacts"):
-        digest = attempt.subject["contacts"].get(str(order.registration_contact_id))
-        if digest != ContactVerification.digest_for(order.registration_contact):
-            raise ValidationError("The .me.uk contact changed since registration. Contact support to confirm current registrar eligibility before renewal.")
+        validate_declared_renewal(domain, extension)
 
 
 def operation_response(request, domain, operation):

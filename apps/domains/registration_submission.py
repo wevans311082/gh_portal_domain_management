@@ -36,7 +36,7 @@ def _audit(attempt, action):
     AuditLog.objects.create(action=action, model_name="DomainOrder", object_id=str(attempt.order_id), data={"registration_attempt_id": attempt.pk})
 
 
-def _locked_subject(order_id, customer_id, *, allow_existing=False):
+def _locked_subject(order_id, customer_id, *, allow_existing=False, admitted_agreement=None, admitted_at=None):
     order = DomainOrder.objects.select_for_update().get(pk=order_id)
     owner = User.objects.select_for_update().get(pk=order.user_id)
     if not owner.is_active or owner.is_staff or owner.is_superuser:
@@ -76,6 +76,16 @@ def _locked_subject(order_id, customer_id, *, allow_existing=False):
     subject["publication"] = publication
     from apps.domains.registry_requirements import policy_snapshot
     subject["registry_policy"] = policy_snapshot(order.domain_name)
+    from apps.domains.agreements import assert_acceptance_current, assert_acceptance_frozen
+    if admitted_at is None:
+        subject["agreement"] = assert_acceptance_current(receipt_id=order.agreement_acceptance_id,
+            customer_id=owner.pk, contact_id=order.registration_contact_id, domain_name=order.domain_name,
+            operation="registration")
+    else:
+        subject["agreement"] = assert_acceptance_frozen(snapshot=admitted_agreement,
+            receipt_id=order.agreement_acceptance_id, customer_id=owner.pk, contact=order.registration_contact,
+            domain_name=order.domain_name, operation="registration", admitted_at=admitted_at)
+    subject["order"]["agreement_acceptance_id"] = order.agreement_acceptance_id
     if order.publication_decision_id:
         subject["order"]["publication_decision_id"] = order.publication_decision_id
     if order.invoice_id:
@@ -192,8 +202,12 @@ def submit_registration(order_id, customer_id, nameservers, *, client):
             current.save(update_fields=["registrar_contact_ids", "updated_at"])
             _audit(active, "domain.registration.submitting")
         with transaction.atomic(durable=True):
-            current, contacts, subject = _locked_subject(order_id, customer_id)
+            DomainOrder.objects.select_for_update().get(pk=order_id)
             active = DomainRegistrationAttempt.objects.select_for_update().get(pk=attempt.pk)
+            if active.submitted_at is None:
+                raise ValidationError("The durable registration admission marker is missing. Registrar review is required.")
+            current, contacts, subject = _locked_subject(order_id, customer_id,
+                admitted_agreement=active.subject.get("agreement"), admitted_at=active.submitted_at)
             subject["nameservers"] = list(nameservers)
             if active.status != "submitting" or active.token != token or subject != attempt.subject:
                 raise ValidationError("The registration details changed before provider submission. Registrar review is required.")

@@ -1,3 +1,4 @@
+from tests.agreement_helpers import attach_agreement
 from decimal import Decimal
 
 import pytest
@@ -144,6 +145,7 @@ def test_register_domain_order_creates_domain_and_cloudflare_records(settings, d
     monkeypatch.setattr("apps.domains.tasks.ResellerClubClient", lambda: FakeResellerClubClient())
     monkeypatch.setattr("apps.domains.tasks.CloudflareService", lambda: FakeCloudflareService())
 
+    attach_agreement(order)
     result = register_domain_order.apply(args=[order.id]).get()
 
     order.refresh_from_db()

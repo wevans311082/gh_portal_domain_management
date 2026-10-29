@@ -1,3 +1,4 @@
+from tests.agreement_helpers import attach_agreement
 from unittest.mock import Mock, patch
 
 import pytest
@@ -20,6 +21,7 @@ pytestmark = pytest.mark.django_db
 def test_individual_uk_registration_needs_no_company_number_and_uses_only_registrant(order, provider, extension):
     order.domain_name, order.tld = "personal." + extension, extension
     order.save()
+    attach_agreement(order)
     assert submit_registration(order.pk, "999", NS, client=provider) == "501"
     args = provider.register_domain.call_args.kwargs
     assert args["reg_contact_id"] == "201"
@@ -177,9 +179,15 @@ def test_registry_namespaces_are_not_registrable_customer_labels():
         validate_registration("co.uk")
 
 
-def test_me_uk_existing_renewal_cart_is_rechecked_after_registrant_becomes_organization(order):
+def test_me_uk_existing_renewal_cart_is_rechecked_after_registrant_becomes_organization(order, provider):
+    order.domain_name, order.tld = "personal.me.uk", "me.uk"
+    order.save()
+    attach_agreement(order)
+    submit_registration(order.pk, "999", NS, client=provider)
+    order.refresh_from_db()
     domain = Domain.objects.create(user=order.user, name="personal.me.uk", tld="me.uk", status="active", registrar_id="501")
     order.domain, order.domain_name, order.tld, order.registrar_order_id = domain, domain.name, "me.uk", "501"
+    order.status = "completed"
     order.save()
     TLDPricing.objects.create(tld="me.uk", renewal_cost=10)
     item = add_domain_renewal_item(user=order.user, domain_id=domain.pk)

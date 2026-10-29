@@ -1,3 +1,4 @@
+from tests.agreement_helpers import attach_agreement
 import pytest
 from django.core.exceptions import ValidationError
 
@@ -107,10 +108,12 @@ def test_eu_preparation_uses_only_registrant_and_one_to_nine_nameservers(order, 
     from apps.domains.registration_submission import submit_registration
     from apps.domains.registry_requirements import validate_nameservers
     monkeypatch.setitem(registrar_policy.POLICIES, "eu", registrar_policy.EU)
+    monkeypatch.setitem(registrar_policy.PROFILE_TLDS, "eu_presence", (registrar_policy.EU, ("eu",)))
     contact = declare(order, basis="citizen", country="GB", citizenship="IE")
     contact.save()
     order.domain_name, order.tld = "registrant-only.eu", "eu"
     order.save()
+    attach_agreement(order)
     assert submit_registration(order.pk, "999", ["ns1.example.com"], client=provider) == "501"
     payload = provider.create_contact.call_args.args[0]
     assert payload["type"] == "EuContact" and payload["attr-value1"] == "IE"
@@ -193,10 +196,12 @@ def test_eu_renewal_uses_current_eligibility_and_rejects_unsynchronized_edits(or
     from apps.domains.registration_submission import submit_registration
     from apps.domains.registry_requirements import validate_renewal_registrant
     monkeypatch.setitem(registrar_policy.POLICIES, "eu", registrar_policy.EU)
+    monkeypatch.setitem(registrar_policy.PROFILE_TLDS, "eu_presence", (registrar_policy.EU, ("eu",)))
     contact = declare(order, basis="citizen", country="GB", citizenship="IE")
     contact.save()
     order.domain_name, order.tld = "renewal-eligibility.eu", "eu"
     order.save()
+    attach_agreement(order)
     submit_registration(order.pk, "999", ["ns1.example.com"], client=provider)
     order.refresh_from_db()
     domain = Domain.objects.create(user=order.user, name=order.domain_name, tld="eu", registrar_id="501", status="active")

@@ -1,0 +1,38 @@
+{% extends "base_admin.html" %}
+{% block title %}Registrar agreements - {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Registrar agreements{% endblock %}
+{% block content %}
+{% include "admin_tools/components/page_header.html" with heading="Registrar agreements" description="Review exact text and assign one version to shared extension groups." %}
+<section class="admin-card p-5 mb-5 space-y-3" aria-labelledby="agreement-scope-heading">
+  <h2 id="agreement-scope-heading" class="text-lg font-semibold">Publication and customer acceptance are separate</h2>
+  <p>Only publish text that has been approved for the selected extension groups and operations. Earlier versions remain available as history. Publishing never invents customer acceptance or enables an unsupported domain workflow.</p>
+  <p>Customers can review cart and direct-request agreements. New paid registration and transfer submissions require current acceptance and retain the admitted versions. Invoice and quote conversion checks remain in progress; publishing here does not yet protect those checkout paths.</p>
+</section>
+{% if preview %}<section class="admin-card p-5 mb-5 space-y-3" aria-labelledby="agreement-preview-heading" data-agreement-preview>
+  <h2 id="agreement-preview-heading" class="text-lg font-semibold">Review the exact publication</h2>
+  <dl class="admin-workspace-verification"><div><dt>Agreement</dt><dd>{{ preview.title }} — {{ preview.agreement_key }}, {{ preview.version }}</dd></div>
+  <div><dt>Shared extension groups</dt><dd>{% for group in preview_groups %}<p>{{ group }}</p>{% endfor %}</dd></div>
+  <div><dt>Operations</dt><dd>{% for operation in preview.operations %}{{ operation|title }}{% if not forloop.last %}, {% endif %}{% endfor %}</dd></div>
+  {% if preview.source_url %}<div><dt>Source reference</dt><dd><a href="{{ preview.source_url }}" rel="noopener noreferrer" target="_blank">{{ preview.source_url }}</a></dd></div>{% endif %}</dl>
+  <div class="admin-agreement-text">{{ preview.body }}</div>
+  <p>If you edit the text, version or scope below, preview it again before publishing. Approval is unchecked after every new preview.</p>
+</section>{% endif %}
+<section class="admin-card p-5 mb-5 space-y-3" aria-labelledby="agreement-form-heading">
+  <h2 id="agreement-form-heading" class="text-lg font-semibold">Prepare a new version</h2>
+  <form method="post" class="space-y-4" data-no-form-card data-no-field-hints>
+    {% csrf_token %}{% include "admin_tools/components/error_summary.html" %}
+    {% for field in form %}{% include "admin_tools/components/field.html" with field=field %}{% endfor %}
+    <div class="admin-action-bar"><button type="submit" name="action" value="preview" class="admin-button admin-button-secondary">Preview agreement</button>
+    {% if preview %}<button type="submit" name="action" value="publish" class="admin-button admin-button-primary">Publish reviewed agreement</button>{% endif %}</div>
+  </form>
+</section>
+<section class="admin-card p-5 space-y-3" aria-labelledby="agreement-history-heading">
+  <h2 id="agreement-history-heading" class="text-lg font-semibold">Published versions</h2>
+  <ul class="admin-workspace-list">{% for row in history_rows %}<li>
+    <h3><a href="{% url 'admin_tools:registrar_agreement_detail' row.document.pk %}">{{ row.document.title }} — {{ row.document.version }}</a></h3>
+    <p>{{ row.document.agreement_key }}; published {{ row.document.published_at|date:"d M Y H:i T" }} by {{ row.document.publisher.get_full_name|default:row.document.publisher.email }}.</p>
+    <ul>{% for binding in row.bindings %}<li>{{ binding.profile }}: {{ binding.operation }}</li>{% empty %}<li>No current assignments; retained history.</li>{% endfor %}</ul>
+  </li>{% empty %}<li>No agreement versions have been published. No default agreement or historical customer acceptance is inferred.</li>{% endfor %}</ul>
+  {% if page_obj.has_other_pages %}<nav class="admin-pagination" aria-label="Agreement history pages">{% if page_obj.has_previous %}<a href="?page={{ page_obj.previous_page_number }}">Previous</a>{% endif %}<span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>{% if page_obj.has_next %}<a href="?page={{ page_obj.next_page_number }}">Next</a>{% endif %}</nav>{% endif %}
+</section>
+{% endblock %}

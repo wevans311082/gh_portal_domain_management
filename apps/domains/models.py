@@ -12,6 +12,74 @@ def _default_supported_tlds():
     return ["co.uk", "com", "uk", "org", "net", "io", "org.uk"]
 
 
+class ImmutableAgreementRecord(TimeStampedModel):
+    class Meta:
+        abstract = True
+
+    def save(self, *args, **kwargs):
+        if self.pk and type(self).objects.filter(pk=self.pk).exists():
+            from django.core.exceptions import ValidationError
+            raise ValidationError("Published agreements and acceptance records cannot be edited. Record a new version.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        from django.core.exceptions import ValidationError
+        raise ValidationError("Agreement history must be retained.")
+
+
+class RegistrarAgreementVersion(ImmutableAgreementRecord):
+    agreement_key = models.SlugField(max_length=80)
+    version = models.CharField(max_length=80)
+    title = models.CharField(max_length=200)
+    body = models.TextField()
+    source_url = models.URLField(max_length=500, blank=True)
+    profile_keys = models.JSONField(default=list)
+    operations = models.JSONField(default=list)
+    document_digest = models.CharField(max_length=64)
+    publisher = models.ForeignKey(User, on_delete=models.PROTECT, related_name="published_registrar_agreements")
+    published_at = models.DateTimeField()
+    submission_key = models.UUIDField(unique=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["agreement_key", "version"], name="unique_registrar_agreement_version")]
+        ordering = ["-published_at", "-pk"]
+
+
+class RegistrarAgreementBinding(TimeStampedModel):
+    agreement_key = models.SlugField(max_length=80)
+    profile_key = models.CharField(max_length=80)
+    operation = models.CharField(max_length=16)
+    document = models.ForeignKey(RegistrarAgreementVersion, on_delete=models.PROTECT, related_name="current_bindings")
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["agreement_key", "profile_key", "operation"], name="unique_registrar_agreement_scope")]
+
+
+class RegistrarAgreementCatalogue(models.Model):
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
+    revision = models.PositiveBigIntegerField(default=0)
+
+
+class DomainAgreementAcceptance(ImmutableAgreementRecord):
+    key = models.UUIDField(unique=True)
+    customer = models.ForeignKey(User, on_delete=models.PROTECT, related_name="domain_agreement_acceptances")
+    contact = models.ForeignKey("DomainContact", on_delete=models.PROTECT, related_name="agreement_acceptances")
+    domain_name = models.CharField(max_length=255)
+    operation = models.CharField(max_length=16)
+    subject_digest = models.CharField(max_length=64)
+    plan_digest = models.CharField(max_length=64)
+    accepted_at = models.DateTimeField()
+
+
+class DomainAgreementAcceptanceDocument(ImmutableAgreementRecord):
+    acceptance = models.ForeignKey(DomainAgreementAcceptance, on_delete=models.PROTECT, related_name="documents")
+    document = models.ForeignKey(RegistrarAgreementVersion, on_delete=models.PROTECT, related_name="acceptance_documents")
+    document_digest = models.CharField(max_length=64)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["acceptance", "document"], name="unique_domain_accepted_document")]
+
+
 class Domain(TimeStampedModel):
     STATUS_PENDING = "pending"
     STATUS_ACTIVE = "active"
@@ -246,18 +314,8 @@ class DomainContact(TimeStampedModel):
 
     def contact_type_for_tld(self, tld: str = "") -> str:
         """LogicBoxes contact type — required by contacts/add.json."""
-        tld = (tld or "").strip().lower().lstrip(".")
-        if tld in {"uk", "co.uk", "org.uk", "me.uk", "ltd.uk", "plc.uk"}:
-            return "UkContact"
-        if tld == "ca":
-            return "CaContact"
-        if tld == "eu":
-            return "EuContact"
-        if tld == "de":
-            return "DeContact"
-        if tld == "us":
-            return "Contact"
-        return "Contact"
+        from apps.domains.registrar_policy import contact_payload_policy
+        return contact_payload_policy(tld).contact_type
 
     def as_resellerclub_payload(self, customer_id: str, tld: str = "") -> dict:
         """Build a contact payload without inventing or truncating registrant data.
@@ -518,6 +576,7 @@ class DomainRegistrationAttempt(TimeStampedModel):
 
 
 class DomainOrder(TimeStampedModel):
+    agreement_acceptance = models.ForeignKey("domains.DomainAgreementAcceptance", on_delete=models.PROTECT, null=True, blank=True)
     publication_decision = models.ForeignKey(RegistrantPublicationDecision, on_delete=models.PROTECT, null=True, blank=True)
     STATUS_DRAFT = "draft"
     STATUS_PENDING_PAYMENT = "pending_payment"
@@ -653,6 +712,7 @@ class DomainTransferAttempt(TimeStampedModel):
 
 
 class DomainTransfer(TimeStampedModel):
+    agreement_acceptance = models.ForeignKey("domains.DomainAgreementAcceptance", on_delete=models.PROTECT, null=True, blank=True)
     publication_decision = models.ForeignKey(RegistrantPublicationDecision, on_delete=models.PROTECT, null=True, blank=True)
     STATUS_PENDING_PAYMENT = "pending_payment"
     STATUS_PAID = "paid"

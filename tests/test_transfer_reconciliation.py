@@ -1,3 +1,4 @@
+from tests.agreement_helpers import attach_agreement
 from datetime import timedelta
 from importlib import import_module
 from io import StringIO
@@ -66,6 +67,7 @@ def test_consistent_completed_asset_is_preserved_but_inconsistent_link_is_quaran
 
 
 def test_modern_attempt_is_preserved_by_historical_scan(transfer, provider):
+    attach_agreement(transfer)
     submit(transfer, provider)
     seed()
     assert transfer.submission_attempt.status == "accepted" and not transfer.submission_attempt.legacy_review_required
@@ -77,6 +79,7 @@ def test_no_order_confirmation_releases_only_unlinked_historical_request(transfe
     attempt = DomainTransferAttempt.objects.get()
     assert attempt.status == "aborted" and not attempt.legacy_review_required
     assert AuditLog.objects.filter(action="domain.transfer.reconciled", user=owner).exists()
+    attach_agreement(transfer)
     assert submit(transfer, provider) == "501"
 
 
@@ -109,6 +112,7 @@ def test_historical_adoption_is_readonly_and_still_does_not_complete_transfer(tr
 @pytest.mark.parametrize("changes", [{"customerid": "888"}, {"domainname": "other.com"}, {"orderid": "502"}, {"billingcontactid": "999"}])
 def test_modern_uncertain_link_requires_exact_provider_identity_and_roles(transfer, owner, provider, changes):
     provider.transfer_domain.side_effect = RuntimeError("connection lost")
+    attach_agreement(transfer)
     with pytest.raises(RuntimeError):
         submit(transfer, provider)
     provider.get_registration_reconciliation_details.return_value = payload(transfer, **changes)
@@ -119,6 +123,7 @@ def test_modern_uncertain_link_requires_exact_provider_identity_and_roles(transf
 
 def test_modern_link_saves_confirmed_order_without_purchase_or_local_activation(transfer, owner, provider):
     provider.transfer_domain.side_effect = RuntimeError("connection lost")
+    attach_agreement(transfer)
     with pytest.raises(RuntimeError):
         submit(transfer, provider)
     provider.get_registration_reconciliation_details.return_value = payload(transfer)

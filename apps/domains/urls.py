@@ -2,10 +2,14 @@ from django.urls import path
 from . import views
 from . import publication_views
 from . import contact_change_views
+from . import agreement_views
 
 app_name = "domains"
 
 urlpatterns = [
+    path("agreements/", agreement_views.request_list, name="agreement_requests"),
+    path("agreements/cart/<int:pk>/", agreement_views.cart_agreements, name="cart_agreements"),
+    path("agreements/<str:kind>/<int:pk>/", agreement_views.cart_agreements, name="request_agreements"),
     path("publication/", publication_views.decisions, name="publication_decisions"),
     path("publication/<int:pk>/withdraw/", publication_views.withdraw, name="publication_withdraw"),
     path("", views.domain_search, name="search"),

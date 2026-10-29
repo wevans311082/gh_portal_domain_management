@@ -33,6 +33,7 @@
                         {% if item.registration_years and item.item_type == 'domain_registration' %}<p>Years: {{ item.registration_years }}</p>{% endif %}
                         {% if item.registration_years and item.item_type == 'domain_renewal' %}<p>Renewal years: {{ item.registration_years }}</p>{% endif %}
                         {% if item.transfer_auth_code and item.item_type == 'domain_transfer' %}<p>Auth code captured</p>{% endif %}
+                        {% if item.item_type == 'domain_registration' or item.item_type == 'domain_transfer' %}<p><a class="font-semibold text-blue-800 underline" href="{% url 'domains:cart_agreements' item.pk %}">Review agreements for {{ item.domain_name }}</a></p>{% endif %}
                         {% if item.item_type == 'domain_registration' or item.item_type == 'domain_transfer' %}<p>Organization publication: {% if item.publication_decision_id and not item.publication_decision.withdrawn_at %}explicit consent recorded; current details rechecked at checkout{% else %}no publication consent{% endif %}.</p>{% endif %}
                         {% if item.publication_decision_id %}<p>Remove and re-add this item to choose redaction or reconfirm changed details. For submitted orders, contact support to change publication.</p>{% endif %}
                     </div>

@@ -15,9 +15,10 @@ from apps.billing.models import Invoice
 from apps.domains.contact_bindings import provider_scope
 from apps.domains.contact_validation import validate_order_contacts
 from apps.domains.models import ContactVerification, Domain, DomainContact, DomainOrder, DomainTransfer, DomainTransferAttempt
-from apps.domains.registrar_policy import ALL_ROLES, policy_for
+from apps.domains.registrar_policy import ALL_ROLES
 from apps.domains.registration_submission import _check_bindings, _identifier
 from apps.domains.services import DomainContactService
+from apps.domains.transfer_requirements import transfer_policy_for, validate_transfer_code, validate_transfer_nameservers
 
 
 class TransferReviewRequired(ValueError):
@@ -41,6 +42,8 @@ def _identity(transfer):
             "auth_digest": hashlib.sha256(transfer.auth_code.encode()).hexdigest()}
     if transfer.publication_decision_id:
         result["transfer"]["publication_decision_id"] = transfer.publication_decision_id
+    if transfer.agreement_acceptance_id:
+        result["transfer"]["agreement_acceptance_id"] = transfer.agreement_acceptance_id
     return result
 
 
@@ -51,7 +54,7 @@ def _same_transfer(attempt, transfer):
             and _identifier(transfer.registrar_order_id) == attempt.remote_order_id)
 
 
-def _locked_subject(transfer_id, customer_id):
+def _locked_subject(transfer_id, customer_id, *, admitted_agreement=None, admitted_at=None):
     transfer = DomainTransfer.objects.select_for_update().get(pk=transfer_id)
     owner = User.objects.select_for_update().get(pk=transfer.user_id)
     if not owner.is_active or owner.is_staff or owner.is_superuser:
@@ -68,8 +71,7 @@ def _locked_subject(transfer_id, customer_id):
     if (transfer.domain_name != transfer.domain_name.strip().lower().rstrip(".")
             or transfer.tld != transfer.tld.strip().lower().lstrip(".")):
         raise ValidationError("Normalize the domain and extension before transfer.")
-    if policy_for(transfer.tld).roles != ALL_ROLES:
-        raise ValidationError("This extension requires a registrar-specific transfer workflow. Contact support before submitting a transfer.")
+    transfer_policy_for(transfer.tld)
     contacts = {contact.pk: contact for contact in DomainContact.objects.select_for_update().filter(
         pk__in={getattr(transfer, role + "_id") for role in ALL_ROLES}).order_by("pk")}
     for role in ALL_ROLES:
@@ -77,17 +79,24 @@ def _locked_subject(transfer_id, customer_id):
     validate_order_contacts(transfer, customer_id, transfer.tld)
     from apps.domains.publication_consent import publication_snapshot
     publication = publication_snapshot(transfer, transfer.registration_contact)
-    if len(transfer.auth_code) > 255 or any(ord(char) < 32 or ord(char) == 127 for char in transfer.auth_code):
-        raise ValidationError("The transfer authorization code contains unsupported characters.")
-    if transfer.tld == "us":
-        from apps.domains.us_registry import validate_us_transfer_code
-        validate_us_transfer_code(transfer.auth_code)
+    validate_transfer_code(transfer.tld, transfer.auth_code)
     if transfer.domain_id or Domain.objects.filter(name__iexact=transfer.domain_name).exists():
         raise ValidationError("This domain already has a local record. Reconcile its association before submitting a transfer.")
     if DomainOrder.objects.filter(domain_name__iexact=transfer.domain_name).exists():
         raise ValidationError("A registration request exists for this domain. Review both workflows before submitting a transfer.")
     subject = _identity(transfer)
     subject["publication"] = publication
+    from apps.domains.registry_requirements import policy_snapshot
+    subject["registry_policy"] = policy_snapshot(transfer.domain_name)
+    from apps.domains.agreements import assert_acceptance_current, assert_acceptance_frozen
+    if admitted_at is None:
+        subject["agreement"] = assert_acceptance_current(receipt_id=transfer.agreement_acceptance_id,
+            customer_id=owner.pk, contact_id=transfer.registration_contact_id, domain_name=transfer.domain_name,
+            operation="transfer")
+    else:
+        subject["agreement"] = assert_acceptance_frozen(snapshot=admitted_agreement,
+            receipt_id=transfer.agreement_acceptance_id, customer_id=owner.pk, contact=transfer.registration_contact,
+            domain_name=transfer.domain_name, operation="transfer", admitted_at=admitted_at)
     subject["contacts"] = {str(pk): ContactVerification.digest_for(contact) for pk, contact in contacts.items()}
     if transfer.invoice_id:
         subject["invoice"] = {"pk": invoice.pk, "user_id": invoice.user_id, "total": str(invoice.total),
@@ -119,12 +128,7 @@ def _claim(transfer_id, customer_id, nameservers, client):
             _audit(attempt, "historical_review_required")
             return attempt
         transfer, contacts, subject = _locked_subject(transfer_id, customer_id)
-        if not 2 <= len(nameservers) <= 13 or len(set(nameservers)) != len(nameservers):
-            raise ValidationError("Choose 2 to 13 distinct nameservers before transfer.")
-        for name in nameservers:
-            validate_domain_name(name)
-            if name != name.strip().lower().rstrip("."):
-                raise ValidationError("Normalize nameservers before transfer.")
+        validate_transfer_nameservers(transfer.domain_name, nameservers)
         subject["nameservers"] = list(nameservers)
         if not isinstance(transfer.registrar_contact_ids, dict):
             raise TransferReviewRequired("The retained transfer contact snapshot requires owner review.")
@@ -174,8 +178,12 @@ def submit_transfer(transfer_id, customer_id, nameservers, *, client):
             current.save(update_fields=["registrar_contact_ids", "updated_at"])
             _audit(active, "submitting")
         with transaction.atomic(durable=True):
-            current, contacts, subject = _locked_subject(transfer_id, customer_id)
+            DomainTransfer.objects.select_for_update().get(pk=transfer_id)
             active = DomainTransferAttempt.objects.select_for_update().get(pk=attempt.pk)
+            if active.submitted_at is None:
+                raise TransferReviewRequired("The durable transfer admission marker is missing. Owner review is required.")
+            current, contacts, subject = _locked_subject(transfer_id, customer_id,
+                admitted_agreement=active.subject.get("agreement"), admitted_at=active.submitted_at)
             subject["nameservers"] = list(nameservers)
             if (active.status != "submitting" or active.token != token or subject != attempt.subject
                     or provider_scope(client) != attempt.provider_scope):

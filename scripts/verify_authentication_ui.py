@@ -192,7 +192,7 @@ def main():
         fixtures["/admin-identity-review"] = identity_form.content
         fixtures["/admin-identity-review-invalid"] = client.post(identity_url, {}).content
         identity_post = {"key": str(uuid.uuid4()), "subject_digest": ContactVerification.digest_for(search_contact),
-            "status": "verified", "policy_reference": "LOCAL-IDENTITY-POLICY-v1", "evidence_reference": "REVIEW-CASE-100",
+            "status": "verified", "check_kind": "identity", "policy_reference": "LOCAL-IDENTITY-POLICY-v1", "evidence_reference": "REVIEW-CASE-100",
             "valid_days": "90", "policy_reviewed": "on"}
         assert client.post(identity_url, identity_post).status_code == 302
         fixtures["/admin-identity-review-recorded"] = client.get(identity_url).content
@@ -202,11 +202,106 @@ def main():
         fixtures["/admin-identity-review-stale"] = client.post(identity_url, identity_post).content
         search_contact.name = "Global Search"
         search_contact.save()
+        agreement_url = reverse("admin_tools:registrar_agreements")
+        fixtures["/admin-agreements-empty"] = client.get(agreement_url).content
+        fixtures["/admin-agreements-invalid"] = client.post(agreement_url, {}).content
+        agreement_data = {"submission_key": str(uuid.uuid4()), "agreement_key": "domain-service", "version": "ui-test-v1",
+            "title": "Approved test agreement for shared registrant requirements", "body": "Test fixture text only.\n<script>window.agreementPreviewExecuted = true</script>\n\n" + "LongAgreementText" * 24,
+            "source_url": "https://example.test/approved-terms", "profile_keys": ["general_raa", "general_registry", "uk_accuracy", "us_nexus"],
+            "operations": ["registration", "transfer"], "action": "preview", "reviewed": "on"}
+        agreement_preview = client.post(agreement_url, agreement_data)
+        assert agreement_preview.status_code == 200
+        fixtures["/admin-agreements-preview"] = agreement_preview.content
+        import re
+        agreement_token = re.search(rb'name="preview_token" value="([^"]+)"', agreement_preview.content).group(1).decode("ascii")
+        agreement_post = dict(agreement_data, action="publish", preview_token=agreement_token, reviewed="")
+        fixtures["/admin-agreements-unapproved"] = client.post(agreement_url, agreement_post).content
+        agreement_post["reviewed"] = "on"
+        published_agreement = client.post(agreement_url, agreement_post)
+        assert published_agreement.status_code == 302
+        fixtures["/admin-agreement-detail"] = client.get(published_agreement.url).content
+        from apps.domains.agreements import publish_agreement
+        from apps.domains.models import RegistrarAgreementVersion
+        old_agreement = RegistrarAgreementVersion.objects.get(version="ui-test-v1")
+        new_agreement = publish_agreement(actor=user, submission_key=uuid.uuid4(), agreement_key="domain-service", version="ui-test-v2",
+            title=agreement_data["title"], body=agreement_data["body"], source_url=agreement_data["source_url"],
+            profile_keys=agreement_data["profile_keys"], operations=agreement_data["operations"], reviewed=True)
+        fixtures["/admin-agreement-retained"] = client.get(reverse("admin_tools:registrar_agreement_detail", args=[old_agreement.pk])).content
+        RegistrarAgreementVersion.objects.filter(pk=new_agreement.pk).update(source_url="javascript:alert('invalid-fixture-reference')")
+        fixtures["/admin-agreement-integrity"] = client.get(reverse("admin_tools:registrar_agreement_detail", args=[new_agreement.pk])).content
+        RegistrarAgreementVersion.objects.filter(pk=new_agreement.pk).update(source_url=agreement_data["source_url"])
         search_customer.email = "customer-" + "x" * 110 + "@example.test"
+        from apps.portal.models import PortalCart, PortalCartItem
+        agreement_customer = get_user_model().objects.create_user(email="agreement-ui@example.test", password="fixture-password")
+        agreement_contact = DomainContact.objects.create(user=agreement_customer, registrant_type="individual",
+            name="Jane Agreement", email=agreement_customer.email, address_line1="1 High Street", city="London",
+            state="London", postcode="SW1A 1AA", country="GB", phone_country_code="44", phone="07700900000")
+        agreement_cart = PortalCart.objects.create(user=agreement_customer)
+        agreement_item = PortalCartItem.objects.create(cart=agreement_cart, item_type="domain_registration",
+            domain_name="agreement-ui.com", domain_contact=agreement_contact, description="Agreement test", unit_price="12")
+        agreement_client = Client()
+        agreement_client.force_login(agreement_customer)
+        customer_agreement_url = reverse("domains:cart_agreements", args=[agreement_item.pk])
+        customer_review = agreement_client.get(customer_agreement_url)
+        assert customer_review.status_code == 200 and b"id_accepted" in customer_review.content
+        fixtures["/portal-agreements-review"] = customer_review.content
+        customer_review_token = re.search(rb'name="review" value="([^"]+)"', customer_review.content).group(1).decode("ascii")
+        customer_error = agreement_client.post(customer_agreement_url, {"review": customer_review_token})
+        assert customer_error.status_code == 400
+        fixtures["/portal-agreements-error"] = customer_error.content
+        assert agreement_client.post(customer_agreement_url, {"review": customer_review_token, "accepted": "on"}).status_code == 302
+        fixtures["/portal-agreements-recorded"] = agreement_client.get(customer_agreement_url).content
+        agreement_cart.status = "invoiced"
+        agreement_cart.save(update_fields=["status"])
+        fixtures["/portal-agreements-closed"] = agreement_client.get(customer_agreement_url).content
+        from apps.domains.models import DomainTransfer, DomainRegistrationAttempt
+        fixtures["/portal-request-agreements-empty"] = agreement_client.get(reverse("domains:agreement_requests")).content
+        agreement_order = DomainOrder.objects.create(user=agreement_customer, domain_name="direct-" + "r" * 50 + ".com",
+            tld="com", status="pending_payment", registration_contact=agreement_contact, admin_contact=agreement_contact,
+            tech_contact=agreement_contact, billing_contact=agreement_contact)
+        agreement_transfer = DomainTransfer.objects.create(user=agreement_customer, domain_name="direct-transfer-ui.com",
+            tld="com", status="pending_payment", auth_code="PRIVATE-DIRECT-TRANSFER-CODE", registration_contact=agreement_contact,
+            admin_contact=agreement_contact, tech_contact=agreement_contact, billing_contact=agreement_contact)
+        fixtures["/portal-request-agreements-list"] = agreement_client.get(reverse("domains:agreement_requests")).content
+        for agreement_kind, agreement_target in (("registration", agreement_order), ("transfer", agreement_transfer)):
+            request_url = reverse("domains:request_agreements", kwargs={"kind": agreement_kind, "pk": agreement_target.pk})
+            request_review = agreement_client.get(request_url)
+            assert request_review.status_code == 200 and b"PRIVATE-DIRECT-TRANSFER-CODE" not in request_review.content
+            fixtures[f"/portal-request-agreements-{agreement_kind}"] = request_review.content
+            request_token = re.search(rb'name="review" value="([^"]+)"', request_review.content).group(1).decode("ascii")
+            if agreement_kind == "registration":
+                request_error = agreement_client.post(request_url, {"review": request_token})
+                assert request_error.status_code == 400
+                fixtures["/portal-request-agreements-error"] = request_error.content
+            assert agreement_client.post(request_url, {"review": request_token, "accepted": "on"}).status_code == 302
+        fixtures["/portal-request-agreements-recorded"] = agreement_client.get(request_url).content
+        DomainRegistrationAttempt.objects.create(order=agreement_order, status="unknown", submitted_at=timezone.now())
+        fixtures["/portal-request-agreements-held"] = agreement_client.get(reverse("domains:request_agreements",
+            kwargs={"kind": "registration", "pk": agreement_order.pk})).content
+        from django.test import override_settings
+        with override_settings(RESELLERCLUB_CUSTOMER_ID="999"), \
+                patch("apps.domains.tasks.ResellerClubClient") as held_provider, \
+                patch("apps.domains.tasks._build_nameservers", return_value=["ns1.example.com", "ns2.example.com"]), \
+                patch("apps.admin_tools.manual_order_views._load_whm_hosting_packages", return_value=([], "fixture")):
+            manual_held = client.post(reverse("admin_tools:manual_domain_register"), {
+                "domain_name": "manual-agreement-ui.com", "user_id": agreement_customer.pk,
+                "years": "1", "contact_id": agreement_contact.pk})
+            assert manual_held.status_code == 302
+            held_provider.return_value.create_contact.assert_not_called()
+            held_provider.return_value.register_domain.assert_not_called()
+            fixtures["/admin-manual-agreement-held"] = client.get(manual_held.url).content
         org_user = get_user_model().objects.create_user(email="publication-ui@example.test", password="fixture-password")
         org_contact = DomainContact.objects.create(user=org_user, registrant_type="organisation", label="Organization registrant",
             name="Jane Smith", company="Example Customer Ltd", email=org_user.email, address_line1="1 High Street",
             city="London", state="London", postcode="SW1A 1AA", country="GB", phone_country_code="44", phone="07700900000", is_default=True)
+        business_url = reverse("admin_tools:identity_review", args=[org_user.pk, org_contact.pk])
+        fixtures["/admin-business-review"] = client.get(business_url).content
+        fixtures["/admin-business-review-invalid"] = client.post(business_url, {"check_kind": "business"}).content
+        business_post = {"key": str(uuid.uuid4()), "subject_digest": ContactVerification.digest_for(org_contact),
+            "check_kind": "business", "status": "verified", "policy_reference": "LOCAL-BUSINESS-v2",
+            "evidence_reference": "BUSINESS-CASE-101", "valid_days": "30", "policy_reviewed": "on"}
+        assert client.post(business_url, business_post).status_code == 302
+        fixtures["/admin-business-review-recorded"] = client.get(business_url).content
         org_client = Client()
         org_client.force_login(org_user)
         fixtures["/publication-registration"] = org_client.get(reverse("domains:register"), {"domain": "publication-ui.com"}).content
@@ -304,10 +399,16 @@ def main():
         fixtures["/portal-contact-change-review"] = contact_client.get(contact_url).content
         search_customer.save(update_fields=["email"])
         CustomerNote.objects.create(customer=search_customer, author=user, body="Staff service context.\n" + "long-note-" * 45 + "\n<script>Escaped note text</script>", submission_key=uuid.uuid4())
+        Domain.objects.create(user=search_customer, name="shared-workstream.us", tld="us", status="active")
+        Domain.objects.create(user=search_customer, name="shared-workstream.me.uk", tld="me.uk", status="active")
         workspace_url = reverse("admin_tools:customer_workspace", args=[search_customer.pk])
         response = client.get(workspace_url)
         assert response.status_code == 200
         fixtures["/admin-customer-workspace"] = response.content
+        fixtures["/admin-customer-workspace-workstreams"] = response.content
+        transfer_cart = client.get(reverse("admin_tools:cart_builder"), {"user_id": search_customer.pk})
+        assert transfer_cart.status_code == 200
+        fixtures["/admin-transfer-cart"] = transfer_cart.content
         fixtures["/admin-customer-workspace-loading"] = response.content
         fixtures["/admin-customer-workspace-invalid"] = client.post(reverse("admin_tools:customer_note_add", args=[search_customer.pk]), {"submission_key": str(uuid.uuid4()), "body": ""}).content
         empty_customer = get_user_model().objects.create_user(email="workspace-empty@example.test", password="fixture-password")
@@ -479,7 +580,7 @@ def main():
             page.on("pageerror", lambda error: errors.append(str(error)))
             for width in (1440, 390):
                 page.set_viewport_size({"width": width, "height": 960})
-                for name in ("registrant-eu-declaration", "registrant-eu-declaration-invalid", "registrant-us-registration", "registrant-us-registration-invalid", "registrant-us-declaration", "registrant-us-declaration-invalid", "admin-identity-review", "admin-identity-review-invalid", "admin-identity-review-recorded", "admin-identity-review-stale", "publication-redaction-review", "publication-redaction-unknown", "publication-redaction-awaiting", "publication-redaction-confirmed", "portal-contact-change-form", "portal-contact-change-invalid", "portal-contact-change-queued", "portal-contact-change-awaiting", "portal-contact-change-unknown", "portal-contact-change-confirmed", "portal-contact-change-review", "registry-me-registration", "registry-me-invalid", "registry-uk-domain", "registry-uk-operation", "registry-me-renewal-review", "registry-me-held-domain", "registry-me-domain-list", "publication-registration", "publication-empty", "publication-shop", "publication-cart", "publication-active", "publication-stale-cart", "publication-withdrawn", "publication-provider-pending", "admin-registrar-diagnostic", "admin-registrar-diagnostic-failed", "admin-transfer-preparing", "admin-transfer-submitting", "admin-transfer-unknown", "admin-transfer-accepted", "admin-transfer-aborted", "admin-transfer-historical", "admin-transfers", "admin-transfers-empty", "admin-transfers-invalid", "portal-transfer-review", "portal-historical-domain", "portal-historical-action-held", "portal-historical-review", "admin-historical-review", "admin-historical-list", "admin-historical-pending", "admin-historical-suspended", "admin-registration-preparing", "admin-registration-submitting", "admin-registration-unknown", "admin-registration-accepted", "admin-registration-aborted", "admin-customer-workspace", "admin-customer-workspace-loading", "admin-customer-workspace-invalid", "admin-customer-workspace-empty", "admin-customer-workspace-support", "admin-customer-workspace-billing", "admin-customer-note-redacted", "portal-cart-empty", "portal-cart", "public-cart-review", "registrant-verification-automatic", "registrant-verification-queued", "registrant-verification-error", "registrant-verification-review", "registrant-verification-verified", "registrant-verification-pending", "registrant-verification-suspended", "registrant-verification-unknown", "registrant-domain-uk", "registrant-domain-review", "admin-manual-domain", "admin-manual-domain-invalid", "registrant-contact", "registrant-contact-invalid", "mfa", "mfa-invalid", "reauthenticate", "reauth-required", "staff-roles", "staff-roles-invalid", "staff-workspace", "staff-customers", "branding", "branding-invalid", "configuration", "configuration-invalid", "deliveries", "deliveries-invalid", "public-contact", "public-contact-invalid", "public-error-413", "public-error-429", "public-error-503", "public-quote", "public-domain-error", "public-acceptance", "public-acceptance-unavailable", "public-acceptance-expired", "public-mail-reset", "public-mail-verification", "admin-customers", "admin-customers-empty", "admin-customers-loading", "admin-user-invalid", "admin-invoices", "admin-invoices-empty", "admin-search", "admin-search-start", "admin-search-suggestions-error", "admin-search-empty", "admin-search-invalid", "admin-search-pagination", "admin-search-support", "admin-search-record"):
+                for name in ("admin-manual-agreement-held", "portal-request-agreements-empty", "portal-request-agreements-list", "portal-request-agreements-registration", "portal-request-agreements-transfer", "portal-request-agreements-error", "portal-request-agreements-recorded", "portal-request-agreements-held", "portal-agreements-review", "portal-agreements-error", "portal-agreements-recorded", "portal-agreements-closed", "admin-agreements-empty", "admin-agreements-invalid", "admin-agreements-preview", "admin-agreements-unapproved", "admin-agreement-detail", "admin-agreement-retained", "admin-agreement-integrity", "admin-transfer-cart", "admin-customer-workspace-workstreams", "admin-business-review", "admin-business-review-invalid", "admin-business-review-recorded", "registrant-eu-declaration", "registrant-eu-declaration-invalid", "registrant-us-registration", "registrant-us-registration-invalid", "registrant-us-declaration", "registrant-us-declaration-invalid", "admin-identity-review", "admin-identity-review-invalid", "admin-identity-review-recorded", "admin-identity-review-stale", "publication-redaction-review", "publication-redaction-unknown", "publication-redaction-awaiting", "publication-redaction-confirmed", "portal-contact-change-form", "portal-contact-change-invalid", "portal-contact-change-queued", "portal-contact-change-awaiting", "portal-contact-change-unknown", "portal-contact-change-confirmed", "portal-contact-change-review", "registry-me-registration", "registry-me-invalid", "registry-uk-domain", "registry-uk-operation", "registry-me-renewal-review", "registry-me-held-domain", "registry-me-domain-list", "publication-registration", "publication-empty", "publication-shop", "publication-cart", "publication-active", "publication-stale-cart", "publication-withdrawn", "publication-provider-pending", "admin-registrar-diagnostic", "admin-registrar-diagnostic-failed", "admin-transfer-preparing", "admin-transfer-submitting", "admin-transfer-unknown", "admin-transfer-accepted", "admin-transfer-aborted", "admin-transfer-historical", "admin-transfers", "admin-transfers-empty", "admin-transfers-invalid", "portal-transfer-review", "portal-historical-domain", "portal-historical-action-held", "portal-historical-review", "admin-historical-review", "admin-historical-list", "admin-historical-pending", "admin-historical-suspended", "admin-registration-preparing", "admin-registration-submitting", "admin-registration-unknown", "admin-registration-accepted", "admin-registration-aborted", "admin-customer-workspace", "admin-customer-workspace-loading", "admin-customer-workspace-invalid", "admin-customer-workspace-empty", "admin-customer-workspace-support", "admin-customer-workspace-billing", "admin-customer-note-redacted", "portal-cart-empty", "portal-cart", "public-cart-review", "registrant-verification-automatic", "registrant-verification-queued", "registrant-verification-error", "registrant-verification-review", "registrant-verification-verified", "registrant-verification-pending", "registrant-verification-suspended", "registrant-verification-unknown", "registrant-domain-uk", "registrant-domain-review", "admin-manual-domain", "admin-manual-domain-invalid", "registrant-contact", "registrant-contact-invalid", "mfa", "mfa-invalid", "reauthenticate", "reauth-required", "staff-roles", "staff-roles-invalid", "staff-workspace", "staff-customers", "branding", "branding-invalid", "configuration", "configuration-invalid", "deliveries", "deliveries-invalid", "public-contact", "public-contact-invalid", "public-error-413", "public-error-429", "public-error-503", "public-quote", "public-domain-error", "public-acceptance", "public-acceptance-unavailable", "public-acceptance-expired", "public-mail-reset", "public-mail-verification", "admin-customers", "admin-customers-empty", "admin-customers-loading", "admin-user-invalid", "admin-invoices", "admin-invoices-empty", "admin-search", "admin-search-start", "admin-search-suggestions-error", "admin-search-empty", "admin-search-invalid", "admin-search-pagination", "admin-search-support", "admin-search-record"):
                     if args.pages and name not in args.pages:
                         continue
                     pending_routes = []
@@ -596,6 +697,61 @@ def main():
                     if name == "deliveries":
                         page.get_by_text("Review a delivery", exact=True).click()
                     page.add_script_tag(path=str(args.axe.resolve()))
+                    if name.startswith(('portal-agreements-', 'portal-request-agreements-')):
+                        assert page.evaluate('window.agreementPreviewExecuted') is None
+                        if name not in {'portal-agreements-closed', 'portal-request-agreements-empty', 'portal-request-agreements-list', 'portal-request-agreements-held'}:
+                            accepted = page.locator('#id_accepted')
+                            assert not accepted.is_checked()
+                            accepted.focus()
+                            page.keyboard.press('Space')
+                            assert accepted.is_checked()
+                    if name.startswith(('admin-agreements-', 'admin-agreement-')):
+                        assert page.evaluate('window.agreementPreviewExecuted') is None
+                        assert page.locator('.admin-agreement-text script').count() == 0
+                        if name == 'admin-agreements-preview':
+                            reviewed = page.locator('#id_reviewed')
+                            assert not reviewed.is_checked()
+                            reviewed.focus()
+                            page.keyboard.press('Space')
+                            assert reviewed.is_checked()
+                            page.keyboard.press('Space')
+                            assert not reviewed.is_checked()
+                            assert page.get_by_role('button', name='Publish reviewed agreement', exact=True).count() == 1
+                        if name == 'admin-agreements-unapproved':
+                            page.locator('[data-admin-error-summary] a[href="#id_reviewed"]').click()
+                            assert page.locator('#id_reviewed').evaluate('el => el === document.activeElement')
+                        if name == 'admin-agreement-retained':
+                            assert page.get_by_text('No current assignments; retained history.', exact=True).count() == 1
+                        if name == 'admin-agreement-integrity':
+                            assert page.get_by_role('heading', name='Agreement record needs review', exact=True).count() == 1
+                            assert page.locator('a[href^="javascript:"]').count() == 0
+                        text = page.locator('.admin-agreement-text')
+                        if text.count():
+                            text.first.screenshot(path=str(args.output_dir / f"{name}-text-{width}.png"))
+                    if name in {"admin-transfer-cart", "publication-shop"}:
+                        secret = page.locator('input[name="auth_code"]')
+                        assert secret.get_attribute('type') == 'password'
+                        assert secret.get_attribute('maxlength') == '255'
+                        assert secret.get_attribute('autocomplete') == 'off'
+                        secret.fill('PRIVATE-FIXTURE-CODE')
+                        assert 'PRIVATE-FIXTURE-CODE' not in page.locator('body').inner_text()
+                        secret.locator('..').screenshot(path=str(args.output_dir / f"{name}-authorization-{width}.png"))
+                    if name == "admin-customer-workspace-workstreams":
+                        disclosures = page.locator('[data-workstream-summary]')
+                        assert disclosures.count() >= 3
+                        for disclosure in disclosures.all():
+                            summary = disclosure.locator('summary')
+                            summary.focus()
+                            page.keyboard.press('Enter')
+                            assert disclosure.evaluate('el => el.open')
+                            page.keyboard.press('Space')
+                            assert not disclosure.evaluate('el => el.open')
+                            page.keyboard.press('Enter')
+                            assert disclosure.evaluate('el => el.open')
+                            assert summary.evaluate('el => el === document.activeElement')
+                        assert page.get_by_text('US nexus declaration', exact=True).is_visible()
+                        assert page.get_by_text('This namespace requires an individual registrant.', exact=False).is_visible()
+                        disclosures.first.screenshot(path=str(args.output_dir / f"{name}-detail-{width}.png"))
                     result = page.evaluate("""async () => await axe.run(document.querySelector('.auth-shell, .admin-shell, main') || document.body, {
                         runOnly: {type: 'rule', values: ['color-contrast', 'label', 'button-name', 'link-name', 'aria-valid-attr-value']}
                     })""")
@@ -722,6 +878,16 @@ def main():
                         page.keyboard.press('ArrowRight')
                         page.wait_for_function("document.querySelector('.admin-table-scroll').scrollLeft > 0")
                     page.screenshot(path=str(args.output_dir / f"{name}-{width}.png"), full_page=True)
+                    if name.startswith(('portal-agreements-', 'portal-request-agreements-')) and name not in {'portal-agreements-closed', 'portal-request-agreements-empty', 'portal-request-agreements-list', 'portal-request-agreements-held'}:
+                        accept_button = page.get_by_role('button', name='Record my acceptance', exact=True)
+                        accept_button.scroll_into_view_if_needed()
+                        assert accept_button.evaluate("el => { const banner = document.getElementById('cookie-banner'); return !banner || !banner.getClientRects().length || el.getBoundingClientRect().bottom <= banner.getBoundingClientRect().top; }")
+                        page.locator('form').filter(has=accept_button).screenshot(path=str(args.output_dir / f"{name}-acceptance-{width}.png"))
+                    if name in {'admin-agreements-preview', 'admin-agreements-unapproved'}:
+                        publish_button = page.get_by_role('button', name='Publish reviewed agreement', exact=True)
+                        publish_button.scroll_into_view_if_needed()
+                        assert publish_button.evaluate("el => { const banner = document.getElementById('cookie-banner'); return !banner || !banner.getClientRects().length || el.getBoundingClientRect().bottom <= banner.getBoundingClientRect().top; }")
+                        page.locator('label[for="id_reviewed"]').locator('..').screenshot(path=str(args.output_dir / f"{name}-approval-{width}.png"))
                     if name == "admin-customer-workspace":
                         page.locator('#contact-checks').scroll_into_view_if_needed()
                         page.screenshot(path=str(args.output_dir / f"{name}-validation-{width}.png"), full_page=True)

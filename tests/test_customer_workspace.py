@@ -76,6 +76,21 @@ def test_billing_workspace_respects_role_and_keeps_currency_balances_separate(cl
     html = response.content.decode()
     assert "secret-domain.example" not in html and "Add internal note" not in html
     assert "Contact validation" not in html and "Multi-factor authentication" not in html
+    assert "data-workstream-summary" not in html
+
+
+def test_workspace_explains_shared_requirements_without_provider_calls_or_approval(client, customer, staff):
+    Domain.objects.create(user=customer, name="profile-details.us", tld="com", status="active")
+    Domain.objects.create(user=customer, name="profile-details.unreviewed", tld="unreviewed", status="active")
+    with patch("apps.domains.resellerclub_client.ResellerClubClient") as provider:
+        response = client.get(workspace(customer))
+    provider.assert_not_called()
+    html = response.content.decode()
+    assert html.count("data-workstream-summary") == 2
+    assert "US nexus declaration" in html and "Registrar policy review required" in html
+    assert "not confirmation that checks have passed" in html
+    assert "No independent eligibility result recorded" in html
+    assert "Optional privacy service is not supported" in html
 
 
 def test_unauthorized_customer_and_privileged_accounts_cannot_be_opened(client, customer, staff, django_user_model):

@@ -1,0 +1,35 @@
+{% extends "base_portal.html" %}
+{% block title %}Request agreements - {{ SITE_NAME }}{% endblock %}
+{% block page_title %}Request agreements{% endblock %}
+{% block content %}
+<div class="mx-auto max-w-3xl space-y-6 text-slate-900">
+  <header>
+    <h1 class="text-2xl font-bold">Request agreements</h1>
+    <p class="mt-3 text-sm">Review agreements for registration and transfer requests that have not been admitted to the registrar. Acceptance applies to the registrant details and document versions you review. It does not submit or pay for a domain.</p>
+    <a class="mt-3 inline-block font-semibold text-blue-800 underline" href="{% url 'domains:my_domains' %}">Back to my domains</a>
+    <a class="mt-3 ml-4 inline-block font-semibold text-blue-800 underline" href="{% url 'portal:cart' %}">Review cart items</a>
+  </header>
+  {% for group in request_pages %}
+  <section class="rounded-lg border border-slate-300 bg-white p-5" aria-labelledby="{{ group.kind }}-heading">
+    <h2 id="{{ group.kind }}-heading" class="text-lg font-semibold">{% if group.kind == 'registration' %}Registration requests{% else %}Transfer requests{% endif %}</h2>
+    <ul class="mt-4 space-y-4">
+    {% for item in group.page %}
+      <li class="break-words">
+        <p class="font-semibold">{{ item.domain_name }}</p>
+        <p class="mt-1 text-sm">{{ item.get_status_display }}. {% if item.agreement_acceptance_id %}Earlier acceptance retained; current details and versions may require review.{% else %}No agreement acceptance attached.{% endif %}</p>
+        <a class="mt-2 inline-block font-semibold text-blue-800 underline" href="{% url 'domains:request_agreements' kind=group.kind pk=item.pk %}">Review agreements for {{ item.domain_name }}</a>
+      </li>
+    {% empty %}<li class="text-sm">No {{ group.kind }} requests awaiting agreement review. Already admitted or closed requests retain their earlier history.</li>{% endfor %}
+    </ul>
+    {% if group.page.has_other_pages %}
+    <nav class="mt-5 flex flex-wrap items-center gap-4" aria-label="{{ group.kind|capfirst }} request pages">
+      {% if group.page.has_previous %}<a class="font-semibold text-blue-800 underline" href="?{{ group.kind }}_page={{ group.page.previous_page_number }}">Previous</a>{% endif %}
+      <span class="text-sm">Page {{ group.page.number }} of {{ group.page.paginator.num_pages }}</span>
+      {% if group.page.has_next %}<a class="font-semibold text-blue-800 underline" href="?{{ group.kind }}_page={{ group.page.next_page_number }}">Next</a>{% endif %}
+    </nav>
+    {% endif %}
+  </section>
+  {% endfor %}
+  <p class="text-sm">A request needing registry or registrar review may be held even when its agreements are available. <a class="font-semibold text-blue-800 underline" href="{% url 'support:create' %}">Contact support</a> about requests that cannot proceed.</p>
+</div>
+{% endblock %}

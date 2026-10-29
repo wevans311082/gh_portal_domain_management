@@ -17,7 +17,7 @@ from apps.domains.models import DomainTransfer, DomainTransferAttempt
 from apps.domains.registration_submission import _identifier
 from apps.domains.resellerclub_client import ResellerClubClient
 from apps.domains.transfer_submission import _identity
-from apps.domains.registrar_policy import ALL_ROLES, policy_for
+from apps.domains.transfer_requirements import transfer_policy_for
 
 
 class Command(BaseCommand):
@@ -64,8 +64,7 @@ class Command(BaseCommand):
                     raise CommandError("Choose an uncertain transfer and a valid provider order ID.")
                 if attempt.status == "submitting" and attempt.submitted_at and attempt.submitted_at > timezone.now() - timedelta(minutes=15):
                     raise CommandError("The paid submission may still be running. Stop/review its worker and wait at least 15 minutes.")
-                if policy_for(attempt.transfer.tld).roles != ALL_ROLES:
-                    raise CommandError("This extension needs its registrar-specific transfer workflow.")
+                transfer_policy_for(attempt.transfer.tld)
                 customer_id = _identifier(options["customer_id"]) if legacy else attempt.customer_id
                 if not customer_id:
                     raise CommandError("Supply the provider customer ID for historical adoption.")

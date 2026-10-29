@@ -1,3 +1,4 @@
+from tests.agreement_helpers import attach_agreement
 import pytest
 from django.core.exceptions import ValidationError
 
@@ -84,6 +85,7 @@ def test_preparation_creates_distinct_nexus_and_service_bindings_for_same_contac
     order.domain_name, order.tld, order.privacy_enabled = "prepared-person.us", "us", False
     order.save()
     provider.create_contact.side_effect = ["201", "202"]
+    attach_agreement(order)
     assert submit_registration(order.pk, "999", NS, client=provider) == "501"
     first, second = [call.args[0] for call in provider.create_contact.call_args_list]
     assert first["attr-name2"] == "category" and first["attr-value2"] == "C11"
@@ -117,6 +119,7 @@ def test_us_renewal_requires_retained_current_nexus_snapshot(order, provider):
     order.domain_name, order.tld = "renewal-nexus.us", "us"
     order.save()
     provider.create_contact.side_effect = ["201", "202"]
+    attach_agreement(order)
     submit_registration(order.pk, "999", NS, client=provider)
     order.refresh_from_db()
     domain = Domain.objects.create(user=order.user, name=order.domain_name, tld="us", registrar_id="501", status="active")
@@ -129,7 +132,7 @@ def test_us_renewal_requires_retained_current_nexus_snapshot(order, provider):
         validate_renewal_registrant(domain)
 
 
-@pytest.mark.parametrize("code", ["", "abcde", "a" * 17, "abcdef ", "abc\ndef"])
+@pytest.mark.parametrize("code", ["abcde", "a" * 17, "abcdef ", "abc\ndef", "abc\u00a0def"])
 def test_invalid_us_transfer_code_stops_before_provider(code):
     from unittest.mock import Mock
     from apps.domains.resellerclub_client import ResellerClubClient

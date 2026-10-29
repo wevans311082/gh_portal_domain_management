@@ -1,3 +1,4 @@
+from tests.agreement_helpers import attach_agreement
 from unittest.mock import Mock, patch
 
 import pytest
@@ -29,6 +30,7 @@ def decision(order):
 
 
 def test_individual_is_valid_without_company_and_defaults_to_no_publication(order, provider):
+    attach_agreement(order)
     submit_registration(order.pk, "999", NS, client=provider)
     assert provider.register_domain.call_args.kwargs["registrant_org_consent"] is False
     assert not RegistrantPublicationDecision.objects.exists()
@@ -37,6 +39,7 @@ def test_individual_is_valid_without_company_and_defaults_to_no_publication(orde
 def test_explicit_request_consent_is_bound_and_audited_before_purchase(order, provider):
     order.publication_decision = decision(order)
     order.save()
+    attach_agreement(order)
     submit_registration(order.pk, "999", NS, client=provider)
     assert provider.register_domain.call_args.kwargs["registrant_org_consent"] is True
     assert AuditLog.objects.filter(action="domain.publication.consent_captured", user=order.user).count() == 1
@@ -73,6 +76,7 @@ def test_consent_change_during_preparation_aborts_before_paid_post(order, provid
         RegistrantPublicationDecision.objects.filter(pk=evidence.pk).update(withdrawn_at=timezone.now())
         return "201"
     provider.create_contact.side_effect = create
+    attach_agreement(order)
     with pytest.raises(ValidationError, match="details changed"):
         submit_registration(order.pk, "999", NS, client=provider)
     provider.register_domain.assert_not_called()
@@ -127,6 +131,8 @@ def test_cart_retains_consent_through_checkout_and_paid_submission(order, provid
     TLDPricing.objects.create(tld="com", registration_cost=12, transfer_cost=12)
     add = add_domain_transfer_item if transfer else add_domain_registration_item
     item = add(user=order.user, domain_name=name, domain_contact_id=contact.pk, publication_choice="publish")
+    from tests.agreement_helpers import accept_cart_item
+    accept_cart_item(item)
     invoice = create_invoice_from_cart(item.cart, send_email=False)
     invoice.status, invoice.amount_paid = "paid", invoice.total
     invoice.save()
@@ -167,6 +173,7 @@ def test_withdrawal_is_idempotent_and_future_submission_uses_false(order, provid
     first = withdraw_decision(order.user, order.publication_decision_id)
     second = withdraw_decision(order.user, first.pk)
     assert first.withdrawn_at == second.withdrawn_at and second.withdrawal_ticket_id is None
+    attach_agreement(order)
     submit_registration(order.pk, "999", NS, client=provider)
     assert provider.register_domain.call_args.kwargs["registrant_org_consent"] is False
     assert AuditLog.objects.filter(action="domain.publication.consent_withdrawn").count() == 1
@@ -177,6 +184,7 @@ def test_accepted_order_withdrawal_creates_one_tracked_provider_redaction_reques
     from apps.support.models import SupportTicket
     order.publication_decision = decision(order)
     order.save()
+    attach_agreement(order)
     submit_registration(order.pk, "999", NS, client=provider)
     first = withdraw_decision(order.user, order.publication_decision_id)
     second = withdraw_decision(order.user, first.pk)
@@ -190,6 +198,7 @@ def test_withdrawal_audit_failure_rolls_back_ticket_and_decision(order, provider
     from apps.support.models import SupportTicket
     order.publication_decision = decision(order)
     order.save()
+    attach_agreement(order)
     submit_registration(order.pk, "999", NS, client=provider)
     with patch.object(AuditLog.objects, "create", side_effect=DatabaseError("failed")), pytest.raises(DatabaseError):
         withdraw_decision(order.user, order.publication_decision_id)

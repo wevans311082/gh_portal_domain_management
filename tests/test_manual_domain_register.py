@@ -1,3 +1,4 @@
+from tests.agreement_helpers import attach_agreement
 import pytest
 from tests.security_helpers import login_owner
 from decimal import Decimal
@@ -39,7 +40,7 @@ def test_manual_register_whm_package_dropdown_uses_snapshot(client, django_user_
 
 
 @pytest.mark.django_db
-def test_manual_register_creates_domain_without_invoice(client, django_user_model, monkeypatch, settings):
+def test_manual_register_waits_for_actual_customer_acceptance_without_provider_submission(client, django_user_model, monkeypatch, settings):
     staff = django_user_model.objects.create_user(email="admin@example.com", password="x", is_staff=True)
     customer = django_user_model.objects.create_user(email="buyer@example.com", password="x")
     login_owner(client, staff)
@@ -68,14 +69,17 @@ def test_manual_register_creates_domain_without_invoice(client, django_user_mode
         is_default=True,
     )
 
+    provider_calls = []
     class FakeRC:
         def create_contact(self, payload):
+            provider_calls.append("contact")
             return {"contact_id": 9}
 
         def update_contact(self, contact_id, payload):
             return {"contact_id": contact_id}
 
         def register_domain(self, **kwargs):
+            provider_calls.append("register")
             return {"entityid": "999"}
 
         def modify_nameservers(self, order_id, nameservers):
@@ -96,8 +100,26 @@ def test_manual_register_creates_domain_without_invoice(client, django_user_mode
     assert resp.status_code == 302
     order = DomainOrder.objects.get(domain_name="cashsale.com")
     assert order.invoice_id is None
-    assert order.status == DomainOrder.STATUS_COMPLETED
+    assert order.status == DomainOrder.STATUS_FAILED
+    assert not order.agreement_acceptance_id
+    assert not Domain.objects.filter(name="cashsale.com", user=customer).exists()
+    assert not provider_calls
+    # The real customer reviews the exact terms; staff can then process the
+    # retained offline-paid request without fabricating an acceptance receipt.
+    from tests.agreement_helpers import publish_test_agreement
+    from django.test import Client
+    publish_test_agreement()
+    customer_client = Client()
+    customer_client.force_login(customer)
+    review_url = reverse("domains:request_agreements", kwargs={"kind": "registration", "pk": order.pk})
+    token = customer_client.get(review_url).context["form"].initial["review"]
+    assert customer_client.post(review_url, {"review": token, "accepted": "on"}).status_code == 302
+    result = client.post(reverse("admin_tools:domain_order_action", kwargs={"pk": order.pk, "action": "process"}))
+    assert result.status_code == 302
+    order.refresh_from_db()
+    assert order.status == DomainOrder.STATUS_COMPLETED and order.invoice_id is None
     assert Domain.objects.filter(name="cashsale.com", user=customer).exists()
+    assert provider_calls == ["contact", "register"]
 
 
 @pytest.mark.django_db
@@ -195,6 +217,7 @@ def test_register_domain_order_allows_manual_paid_without_invoice(settings, djan
             return {}
 
     monkeypatch.setattr("apps.domains.tasks.ResellerClubClient", lambda: FakeRC())
+    attach_agreement(order)
     domain_id = register_domain_order.apply(args=[order.id]).get()
     order.refresh_from_db()
     assert order.status == DomainOrder.STATUS_COMPLETED

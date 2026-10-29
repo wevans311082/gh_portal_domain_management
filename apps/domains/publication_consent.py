@@ -4,10 +4,9 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 
 from apps.domains.models import ContactVerification, DomainContact, RegistrantPublicationDecision
-from apps.domains.registrar_policy import tld_for_domain
+from apps.domains.registrar_policy import tld_for_domain, workstream_tlds
 
 POLICY_VERSION = "rdds-org-2026-10-28"
-REVIEWED_GTLDS = frozenset({"com", "net", "org"})
 CHOICES = [("redact", "Keep organization redacted (default)"), ("publish", "Publish organization for this request")]
 DISCLOSURE = ("For supported generic domains, an organization name is redacted from public WHOIS/RDAP by default. "
     "Choose Publish only if you are authorized to consent to public disclosure of the registrant organization's name. "
@@ -18,7 +17,7 @@ def validate_choice(choice, contact, domain_name):
     if not isinstance(choice, str) or choice not in {"redact", "publish"}:
         raise ValidationError("Choose whether to keep the organization redacted or explicitly publish it.")
     if choice == "publish" and (contact is None or contact.registrant_type != "organisation" or not contact.company.strip()
-            or tld_for_domain(domain_name) not in REVIEWED_GTLDS):
+            or tld_for_domain(domain_name) not in workstream_tlds("publication", "organisation_consent")):
         raise ValidationError("Organization publication is available only for an organization contact on a reviewed generic extension (.com, .net or .org).")
 
 
@@ -73,7 +72,7 @@ def publication_attributes(domain_name, consent):
     """Only reviewed gTLDs use this attribute; default false never implies opt-in."""
     if type(consent) is not bool:
         raise ValidationError("Organization publication consent must be an explicit boolean.")
-    if tld_for_domain(domain_name) not in REVIEWED_GTLDS:
+    if tld_for_domain(domain_name) not in workstream_tlds("publication", "organisation_consent"):
         if consent:
             raise ValidationError("Organization publication is not supported for this extension.")
         return {}

@@ -2,7 +2,7 @@ import pytest
 from django.utils import timezone
 
 from apps.domains.models import ContactVerification
-from apps.domains.validation_summary import contact_validation_summary, domain_eligibility_summary
+from apps.domains.validation_summary import contact_validation_summary, domain_eligibility_summary, domain_workstream_summary
 from tests.test_contact_change_admission import current
 from tests.test_registration_submission import order
 
@@ -63,3 +63,29 @@ def test_many_eligibility_scopes_are_explicitly_truncated(order):
         evidence(order.registration_contact, "eligibility", tld=f"scope{index}")
     summary = contact_validation_summary(order.registration_contact)
     assert len(summary["eligibility"]) == 3 and summary["eligibility_truncated"]
+
+
+def test_workstream_requirements_never_claim_missing_evidence_has_passed(current):
+    domain, source = current
+    summary = domain_workstream_summary(domain)
+    assert summary["reviewed"] and summary["requirements"] == "Standard registrant contact details"
+    assert summary["shared_tlds"] == ".com, .io, .net, .org"
+    assert domain_eligibility_summary(domain) == "No independent eligibility result recorded"
+    assert not ContactVerification.objects.exists()
+
+
+def test_requirement_summary_uses_actual_suffix_and_preserves_the_personal_exception(current):
+    domain, source = current
+    domain.name, domain.tld = "personal.me.uk", "com"
+    summary = domain_workstream_summary(domain)
+    assert summary["individual_required"]
+    assert "does not apply" in summary["email_process"]
+    assert "not supported" in summary["privacy"]
+    assert summary["shared_tlds"] == ".co.uk, .me.uk, .org.uk, .uk"
+
+
+@pytest.mark.parametrize("extension", ["eu", "unknown", "ltd.uk"])
+def test_requirement_summary_does_not_present_prepared_or_unreviewed_profiles_as_enabled(current, extension):
+    domain, source = current
+    domain.name = "requires-review." + extension
+    assert domain_workstream_summary(domain) == {"reviewed": False, "requirements": "Registrar policy review required"}

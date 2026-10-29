@@ -12,8 +12,8 @@ POLICY_VERSION = "us-nexus-2026-10-28"
 
 
 def validate_us_transfer_code(code):
-    if not isinstance(code, str) or not 6 <= len(code) <= 16 or any(ord(char) < 33 or ord(char) == 127 for char in code):
-        raise ValidationError("US transfers require the registrar authorization code of 6-16 characters, without spaces or control characters.")
+    from apps.domains.transfer_requirements import validate_transfer_code
+    return validate_transfer_code("us", code)
 
 
 def validate_us_declaration(contact):

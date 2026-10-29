@@ -44,6 +44,21 @@
       {% if item.verification.checked_at %}<div><dt>Last checked</dt><dd>{{ item.verification.checked_at|date:"d M Y H:i T" }}</dd></div>{% endif %}
       {% if item.verification.action_due_at %}<div><dt>Action due</dt><dd>{{ item.verification.action_due_at|date:"d M Y H:i T" }}</dd></div>{% endif %}
       <div><dt>TLD eligibility</dt><dd>{{ item.eligibility }}</dd></div></dl>{% endif %}
+    {% if item.workstreams %}<details class="admin-workstream-summary" data-workstream-summary>
+      <summary>Requirements for {{ item.title }}</summary>
+      <p>These are applicable steps, not confirmation that checks have passed. Local identity and business reviews remain separate.</p>
+      <dl class="admin-workspace-verification"><div><dt>Registry requirements</dt><dd>{{ item.workstreams.requirements }}</dd></div>
+      {% if item.workstreams.reviewed %}
+        <div><dt>Shared requirement group</dt><dd>{{ item.workstreams.shared_tlds }}{% if item.workstreams.members_truncated %} (first 20 extensions shown){% endif %}</dd></div>
+        {% if item.workstreams.individual_required %}<div><dt>Namespace exception</dt><dd>This namespace requires an individual registrant. Exceptional registry cases need support review.</dd></div>{% endif %}
+        <div><dt>Email process</dt><dd>{{ item.workstreams.email_process }}</dd></div>
+        <div><dt>Contact replacement</dt><dd>{{ item.workstreams.contact_changes }}</dd></div>
+        <div><dt>Incoming transfer</dt><dd>{{ item.workstreams.incoming_transfer }}</dd></div>
+        <div><dt>Organisation publication</dt><dd>{{ item.workstreams.publication }}</dd></div>
+        <div><dt>Privacy service</dt><dd>{{ item.workstreams.privacy }}</dd></div>
+      {% else %}<div><dt>Next step</dt><dd>Review the registrar policy before submitting domain operations. No supported workflow is inferred from the extension.</dd></div>{% endif %}
+      </dl>
+    </details>{% endif %}
   </li>{% empty %}<li>No {{ panel.label|lower }} records for this customer.</li>{% endfor %}
   </ul>
   {% if panel.page %}<nav class="admin-pagination" aria-label="{{ panel.label }} pages"><p>Page {{ panel.page.number }} of {{ panel.page.paginator.num_pages }}</p><div>
@@ -61,7 +76,7 @@
     <div><dt>Registrant type</dt><dd>{{ contact.kind }}</dd></div><div><dt>Local contact data</dt><dd>{{ contact.data }}</dd></div><div><dt>Identity review</dt><dd>{{ contact.identity }}</dd></div><div><dt>Business check</dt><dd>{{ contact.business }}</dd></div>
     {% for evidence in contact.eligibility %}<div><dt>Eligibility: .{{ evidence.tld }}</dt><dd>{{ evidence.label }}{% if evidence.domain %} for {{ evidence.domain }}{% else %} (contact-level evidence; no domain association confirmed){% endif %}</dd></div>{% empty %}<div><dt>TLD eligibility</dt><dd>Not confirmed</dd></div>{% endfor %}
     {% if contact.eligibility_truncated %}<div><dt>Other eligibility checks</dt><dd>Showing three recent scopes; this is not a complete compliance assessment.</dd></div>{% endif %}
-  </dl>{% if contact.review_url %}<a href="{{ contact.review_url }}">Record local identity review</a>{% endif %}</li>{% empty %}<li>No saved domain contacts. Registrant type and contact details still need confirmation before ordering.</li>{% endfor %}</ul>
+  </dl>{% if contact.review_url %}<a href="{{ contact.review_url }}">Record local contact review</a>{% endif %}</li>{% empty %}<li>No saved domain contacts. Registrant type and contact details still need confirmation before ordering.</li>{% endfor %}</ul>
   {% if contacts_truncated %}<p>Showing five recently updated contacts. This is not a compliance summary for every contact or domain.</p>{% endif %}
 </section>
 {% endif %}

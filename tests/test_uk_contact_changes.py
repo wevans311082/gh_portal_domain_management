@@ -127,7 +127,7 @@ def test_confirmed_me_uk_update_becomes_current_renewal_snapshot(uk, owner):
     attempt.save()
     contact.address_line1 = "2 Updated Street"
     contact.save()
-    with pytest.raises(ValidationError, match="changed since registration"):
+    with pytest.raises(ValidationError, match="changed since registrar submission"):
         validate_renewal_registrant(domain)
     change = request(current, contacts=roles(source))
     submit_contact_change(change.pk, client=api)

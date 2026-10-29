@@ -88,6 +88,7 @@ _routes("customer_workspace customer_note", RoutePolicy("view_customers"))
 _routes("customer_note_add", RoutePolicy(write="manage_customer_notes"))
 _routes("customer_note_redact", OWNER)
 _routes("identity_review", OWNER)
+_routes("registrar_agreements registrar_agreement_detail", OWNER)
 _routes("invoices invoice_list invoice_pdf quote_list quote_pdf payments_list", RoutePolicy("view_billing"))
 _routes("invoice_create invoice_edit invoice_action quote_create quote_edit quote_action "
         "payments_create payments_edit payments_delete cart_builder cart_builder_add_hosting "

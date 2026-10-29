@@ -1,3 +1,4 @@
+from tests.agreement_helpers import attach_agreement
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -17,6 +18,38 @@ def test_shared_profile_membership_and_independent_email_workstream():
     assert policy_for("com").email_workstream == "icann_raa"
     assert policy_for("io").email_workstream == "registry_specific"
     assert policy_for("us").eligibility_workstream == "us_nexus"
+
+
+def test_publication_membership_does_not_select_email_or_contact_change_workflows(monkeypatch):
+    from dataclasses import replace
+    from apps.domains.registrar_policy import GENERAL, POLICIES, workstream_tlds
+    from apps.domains.publication_consent import publication_attributes
+    monkeypatch.setitem(POLICIES, "com", replace(GENERAL, publication_workstream="registry_specific"))
+    assert publication_attributes("example.com", False) == {}
+    assert "com" in workstream_tlds("email", "icann_raa")
+    assert "com" in workstream_tlds("contact_change", "icann_irtp")
+    with pytest.raises(ValidationError):
+        publication_attributes("example.com", True)
+
+
+def test_prepared_payload_profile_never_enables_ordering_and_enabled_profile_takes_precedence(monkeypatch):
+    from dataclasses import replace
+    from apps.domains.registrar_policy import EU, POLICIES, contact_payload_policy
+    assert contact_payload_policy(".EU") is EU
+    with pytest.raises(ValidationError):
+        policy_for("eu")
+    reviewed = replace(EU, contact_name_max=49)
+    monkeypatch.setitem(POLICIES, "eu", reviewed)
+    assert contact_payload_policy(".EU") is reviewed
+
+
+def test_personal_namespace_exception_does_not_duplicate_the_uk_profile():
+    from apps.domains.registrar_policy import registry_exception_for, renewal_review_label
+    assert policy_for("me.uk") is policy_for("co.uk")
+    assert registry_exception_for(".ME.UK").natural_person_required
+    assert not registry_exception_for("co.uk").natural_person_required
+    assert renewal_review_label("me.uk") == ".me.uk"
+    assert renewal_review_label("co.uk") == ""
 
 
 def test_duplicate_tld_assignment_cannot_silently_replace_a_profile():
@@ -175,6 +208,7 @@ def test_uk_worker_does_not_validate_or_send_unused_contact_roles(registrant, se
     provider = Mock()
     provider.create_contact.return_value = {"contact_id": "123"}
     provider.register_domain.return_value = {"entityid": "456"}
+    attach_agreement(order)
     with patch("apps.domains.tasks.ResellerClubClient", return_value=provider), patch(
         "apps.domains.tasks._build_nameservers", return_value=["ns1.example.com", "ns2.example.com"]
     ):
