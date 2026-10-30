@@ -1,13 +1,50 @@
 from django.contrib import admin
+from django.contrib.admin.utils import unquote
+from django.core.exceptions import ValidationError
+from django.db import transaction
+from django.shortcuts import redirect
+from apps.accounts.models import User
+from apps.admin_tools.forms import DomainForm
 from .models import Domain, DomainContact, DomainOrder, DomainPricingSettings, TLDPricing
 
 
 @admin.register(Domain)
 class DomainAdmin(admin.ModelAdmin):
+    form = DomainForm
     list_display = ["name", "user", "status", "expires_at", "auto_renew", "dns_provider"]
     list_filter = ["status", "dns_provider", "auto_renew"]
     search_fields = ["name", "user__email"]
     raw_id_fields = ["user"]
+
+    def get_form(self, request, obj=None, **kwargs):
+        base_form = super().get_form(request, obj, **kwargs)
+
+        class ActorForm(base_form):
+            def __init__(self, *args, **form_kwargs):
+                super().__init__(*args, actor=request.user, **form_kwargs)
+
+        return ActorForm
+
+    def changeform_view(self, request, object_id=None, form_url="", extra_context=None):
+        if request.method != "POST" or object_id is None:
+            return super().changeform_view(request, object_id, form_url, extra_context)
+        obj = self.get_object(request, unquote(object_id))
+        if obj is None or not self.has_change_permission(request, obj):
+            return super().changeform_view(request, object_id, form_url, extra_context)
+        from .bulk_reservations import assert_local_domain_editable
+        with transaction.atomic():
+            User.objects.select_for_update().get(pk=obj.user_id)
+            current = Domain.objects.select_for_update().filter(pk=obj.pk).first()
+            try:
+                if current is None or current.user_id != obj.user_id:
+                    raise ValidationError("This domain's ownership changed. Reload before editing the local record.")
+                assert_local_domain_editable(current)
+            except ValidationError as exc:
+                self.message_user(request, " ".join(exc.messages), level="warning")
+                return redirect(request.path)
+            # Keep the locks through Django's validation, save, related saves and
+            # admin log entry, rather than checking only a stale form instance.
+            return super().changeform_view(request, object_id, form_url, extra_context)
 
 
 @admin.register(TLDPricing)

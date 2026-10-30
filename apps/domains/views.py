@@ -566,7 +566,7 @@ def my_domains(request):
 
 
 @login_required
-def domain_detail(request, pk):
+def domain_detail(request, pk, *, nameserver_form=None):
     """Domain detail and management page."""
     domain = get_object_or_404(
         Domain.objects.select_related("order__registration_contact"),
@@ -593,6 +593,10 @@ def domain_detail(request, pk):
         .first()
     )
     pricing = TLDPricing.objects.filter(tld=domain.tld, is_active=True).first()
+    from apps.domains.forms import DomainNameserverForm
+    if nameserver_form is None:
+        nameserver_form = DomainNameserverForm(domain_name=domain.name,
+            initial={"nameservers": "\n".join(domain.cached_nameservers)})
     whm_nameservers = []
     try:
         from apps.provisioning.whm_client import WHMClient
@@ -615,6 +619,7 @@ def domain_detail(request, pk):
             "hosting": hosting,
             "pricing": pricing,
             "whm_nameservers": whm_nameservers,
+            "nameserver_form": nameserver_form,
             "upgrade_packages": Package.objects.filter(is_active=True).order_by("price_monthly"),
         },
     )
@@ -985,7 +990,23 @@ def domain_update_nameservers(request, pk):
         except WHMClientError as exc:
             messages.error(request, f"Could not load WHM nameservers: {exc}")
             return redirect("domains:detail", pk=pk)
+    elif "nameservers" in request.POST:
+        from apps.domains.forms import DomainNameserverForm
+        form = DomainNameserverForm(request.POST, domain_name=domain.name)
+        valid = form.is_valid()
+        if len(request.POST.getlist("nameservers")) != 1:
+            form.add_error("nameservers", "Submit one complete nameserver list.")
+            valid = False
+        if not valid:
+            response = domain_detail(request, pk, nameserver_form=form)
+            response.status_code = 400
+            response["Cache-Control"] = "no-store"
+            return response
+        ns_list = form.cleaned_data["nameservers"]
     else:
+        if len(domain.cached_nameservers) > 4:
+            messages.error(request, "Reload this page and submit the complete nameserver list so no hosts are omitted.")
+            return redirect("domains:detail", pk=pk)
         for field in ("nameserver1", "nameserver2", "nameserver3", "nameserver4"):
             val = (request.POST.get(field) or "").strip().lower()
             if val:
@@ -1008,11 +1029,8 @@ def domain_update_nameservers(request, pk):
                 messages.error(request, " ".join(exc.messages))
                 return redirect("domains:detail", pk=pk)
         client.modify_nameservers(domain.registrar_id, ns_list)
-        domain.nameserver1 = ns_list[0] if len(ns_list) > 0 else ""
-        domain.nameserver2 = ns_list[1] if len(ns_list) > 1 else ""
-        domain.nameserver3 = ns_list[2] if len(ns_list) > 2 else ""
-        domain.nameserver4 = ns_list[3] if len(ns_list) > 3 else ""
-        domain.save(update_fields=["nameserver1", "nameserver2", "nameserver3", "nameserver4", "updated_at"])
+        domain.set_nameserver_cache(ns_list)
+        domain.save(update_fields=["registrar_nameservers", "nameserver1", "nameserver2", "nameserver3", "nameserver4", "updated_at"])
         messages.success(request, f"Nameservers updated at the registrar for {domain.name}.")
     except ResellerClubError as exc:
         messages.error(request, f"Could not update registrar nameservers: {exc}")

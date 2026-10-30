@@ -4,6 +4,8 @@ from __future__ import annotations
 from datetime import datetime, timezone as dt_timezone
 
 from django.contrib import messages
+from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.dateparse import parse_date
 
@@ -257,7 +259,8 @@ def _enrich_order(order: dict, order_id: str, domain_name: str) -> dict:
             details = client.get_order_details_by_name(domain_name) or {}
     except ResellerClubError:
         details = {}
-    merged = {**(order or {}), **(details or {})}
+    from apps.domains.resellerclub_client import merge_order_details
+    merged = merge_order_details(order or {}, details or {})
     return client._normalize_order_record(merged) if merged else {}
 
 
@@ -287,13 +290,45 @@ def _resolve_user(order: dict, domain_name: str, explicit_user_id=None) -> User 
     return None
 
 
-def _upsert_domain(order: dict, user: User) -> tuple[Domain, bool]:
-    domain_name = (order.get("domainname") or order.get("domain") or "").strip().lower()
-    order_id = str(order.get("orderid") or "").strip()
+def _lock_inventory_users(domain_name, target_user_id):
+    current_user_id = Domain.objects.filter(name=domain_name).values_list("user_id", flat=True).first()
+    ids = {target_user_id}
+    if current_user_id is not None:
+        ids.add(current_user_id)
+    locked = list(User.objects.select_for_update().filter(pk__in=ids).order_by("pk"))
+    if len(locked) != len(ids):
+        raise ValidationError("The inventory ownership changed. Reload before updating this domain.")
+    return ids
+
+
+def _inventory_identity(order):
+    from django.core.validators import validate_domain_name
+    from apps.domains.contact_change_confirmation import identifier
+    if type(order) is not dict:
+        raise ValidationError("The registrar inventory identity requires review.")
+    name = order.get("domainname") or order.get("domain")
+    order_id = identifier(order.get("orderid"))
+    if type(name) is not str or not order_id:
+        raise ValidationError("The registrar inventory identity requires review.")
+    name = name.strip().lower().rstrip(".")
+    validate_domain_name(name)
+    if order.get("domain") and (type(order["domain"]) is not str or order["domain"].strip().lower().rstrip(".") != name):
+        raise ValidationError("The registrar inventory names conflict. Reload before updating this domain.")
+    return name, order_id
+
+
+def _inventory_association(domain):
+    return (domain.pk, domain.user_id, domain.name, domain.registrar_id)
+
+
+@transaction.atomic
+def _upsert_domain(order: dict, user: User, *, allow_reassignment=False, expected_association=None) -> tuple[Domain, bool]:
+    domain_name, order_id = _inventory_identity(order)
     tld = domain_name.split(".", 1)[1] if "." in domain_name else ""
     expires = _parse_epoch_or_iso(order.get("expiry_date") or order.get("endtime"))
     registered = _parse_epoch_or_iso(order.get("creation_date") or order.get("creationtime"))
-    domain, created = Domain.objects.get_or_create(
+    locked_users = _lock_inventory_users(domain_name, user.pk)
+    domain, created = Domain.objects.select_for_update().get_or_create(
         name=domain_name,
         defaults={
             "user": user,
@@ -304,7 +339,15 @@ def _upsert_domain(order: dict, user: User) -> tuple[Domain, bool]:
             "registered_at": registered,
         },
     )
+    if expected_association is not None and (created or _inventory_association(domain) != expected_association):
+        raise ValidationError("The local domain association changed. Reload before syncing this domain.")
     if not created:
+        if domain.user_id not in locked_users:
+            raise ValidationError("The inventory ownership changed. Reload before updating this domain.")
+        from apps.domains.bulk_reservations import assert_local_domain_editable
+        assert_local_domain_editable(domain)
+        if domain.user_id != user.pk and not allow_reassignment:
+            raise ValidationError("Automatic inventory sync cannot reassign this domain. Review its current owner.")
         domain.user = user
         if order_id:
             domain.registrar_id = order_id
@@ -315,7 +358,6 @@ def _upsert_domain(order: dict, user: User) -> tuple[Domain, bool]:
             domain.registered_at = registered
         domain.save()
     _apply_nameservers_from_order(domain, order)
-    domain.save()
     return domain, created
 
 
@@ -333,8 +375,14 @@ def _import_order(request, orders):
     if not domain_name or "." not in domain_name:
         messages.error(request, "Could not determine the domain name for this order.")
         return redirect("admin_tools:resellerclub_hub")
-    order.setdefault("domainname", domain_name)
-    domain, created = _upsert_domain(order, user)
+    try:
+        observed_name, observed_id = _inventory_identity(order)
+        if observed_name != domain_name or (order_id and observed_id != order_id):
+            raise ValidationError("The registrar response does not match the selected domain and order. Reload before importing.")
+        domain, created = _upsert_domain(order, user, allow_reassignment=bool(request.POST.get("user_id")))
+    except ValidationError as exc:
+        messages.warning(request, " ".join(exc.messages))
+        return redirect("admin_tools:resellerclub_hub")
     messages.success(request, f"{'Imported' if created else 'Updated'} {domain.name} for {user.email}.")
     return redirect("admin_tools:resellerclub_hub")
 
@@ -342,6 +390,7 @@ def _import_order(request, orders):
 def _sync_order(request, orders):
     domain_id = request.POST.get("domain_id")
     domain = get_object_or_404(Domain, pk=domain_id)
+    expected_association = _inventory_association(domain)
     order_id = domain.registrar_id or (request.POST.get("order_id") or "").strip()
     order = _find_order(orders, order_id, domain.name) or {}
     try:
@@ -352,7 +401,14 @@ def _sync_order(request, orders):
     if not order:
         messages.error(request, f"No ResellerClub record found for {domain.name}.")
         return redirect("admin_tools:resellerclub_hub")
-    _upsert_domain(order, domain.user)
+    try:
+        observed_name, observed_id = _inventory_identity(order)
+        if observed_name != domain.name or (order_id and observed_id != order_id):
+            raise ValidationError("The registrar response does not match this domain and order. Reload before syncing.")
+        _upsert_domain(order, domain.user, expected_association=expected_association)
+    except ValidationError as exc:
+        messages.warning(request, " ".join(exc.messages))
+        return redirect("admin_tools:resellerclub_hub")
     messages.success(request, f"Synced {domain.name} from ResellerClub.")
     return redirect("admin_tools:resellerclub_hub")
 
@@ -386,6 +442,9 @@ def _sync_inventory(request, orders):
             payload = order
             if not order.get("expiry_date") or not (order.get("ns1") or order.get("nameservers")):
                 payload = _enrich_order(order, str(order.get("orderid") or ""), domain_name) or order
+            observed_name, observed_id = _inventory_identity(payload)
+            if observed_name != domain_name or (order.get("orderid") and observed_id != str(order["orderid"])):
+                raise ValidationError("The enriched inventory identity changed.")
             _domain, was_created = _upsert_domain(payload, user)
         except Exception:
             skipped += 1
@@ -397,16 +456,27 @@ def _sync_inventory(request, orders):
 
     messages.success(
         request,
-        f"{whm_message} Registrar sync: {created} imported, {updated} updated, {skipped} unmatched (need a portal user).",
+        f"{whm_message} Registrar sync: {created} imported, {updated} updated, {skipped} skipped (unmatched, held or unavailable).",
     )
     return redirect("admin_tools:resellerclub_hub")
 
 
+@transaction.atomic
 def _link_user(request):
     domain_id = request.POST.get("domain_id")
     user_id = request.POST.get("user_id")
     domain = get_object_or_404(Domain, pk=domain_id)
     user = get_object_or_404(User, pk=user_id)
+    try:
+        locked_users = _lock_inventory_users(domain.name, user.pk)
+        domain = get_object_or_404(Domain.objects.select_for_update(), pk=domain.pk)
+        if domain.user_id not in locked_users:
+            raise ValidationError("The inventory ownership changed. Reload before updating this domain.")
+        from apps.domains.bulk_reservations import assert_local_domain_editable
+        assert_local_domain_editable(domain)
+    except ValidationError as exc:
+        messages.warning(request, " ".join(exc.messages))
+        return redirect("admin_tools:resellerclub_hub")
     domain.user = user
     domain.save(update_fields=["user", "updated_at"])
     service_id = request.POST.get("service_id")
@@ -427,6 +497,8 @@ def _apply_nameservers_from_order(domain: Domain, order: dict):
     # Inventory prefixes and undocumented aliases cannot establish a complete set.
     # Preserve existing cache when the response is absent, partial or conflicting.
     if type(order) is not dict or len(order) > 200:
+        return False
+    if order.get("_nameserver_set_complete") is False:
         return False
     details = dict(order)
     if "nameservers" in details:

@@ -1,6 +1,7 @@
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db.models import Q
+from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -50,11 +51,29 @@ def domains_create(request):
 def domains_edit(request, pk):
     obj = get_object_or_404(Domain, pk=pk)
     if request.method == "POST":
-        form = DomainForm(request.POST, instance=obj, actor=request.user)
-        if form.is_valid():
-            form.save()
-            messages.success(request, f"Domain {obj.name} updated.")
-            return redirect("admin_tools:domains_edit", pk=obj.pk)
+        from apps.accounts.models import User
+        from django.core.exceptions import ValidationError
+        from apps.domains.bulk_reservations import assert_local_domain_editable
+        with transaction.atomic():
+            # Match admission's customer -> domain order so a new reservation
+            # cannot appear between this check and the local edit.
+            User.objects.select_for_update().get(pk=obj.user_id)
+            current = get_object_or_404(Domain.objects.select_for_update(), pk=pk)
+            owner_changed = current.user_id != obj.user_id
+            obj = current
+            form = DomainForm(request.POST, instance=obj, actor=request.user)
+            valid = form.is_valid()
+            try:
+                assert_local_domain_editable(current)
+                active_work = False
+            except ValidationError:
+                active_work = True
+            if owner_changed or active_work:
+                form.add_error(None, "This domain changed ownership or has an operation in progress. Finish its review before editing the local record.")
+            elif valid:
+                form.save()
+                messages.success(request, f"Domain {obj.name} updated.")
+                return redirect("admin_tools:domains_edit", pk=obj.pk)
     else:
         form = DomainForm(instance=obj, actor=request.user)
     return render(request, "admin_tools/ops/domain_form.html", {"form": form, "mode": "edit", "obj": obj})

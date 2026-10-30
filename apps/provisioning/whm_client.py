@@ -143,6 +143,26 @@ class WHMClient:
                     records.append(item)
         return records
 
+    def parse_dns_zone(self, domain: str) -> dict:
+        """Read the lossless WHM API 1 zone representation without fallbacks."""
+        from django.core.validators import validate_domain_name
+        validate_domain_name(domain)
+        try:
+            response = self.session.get(f"{self.base_url}/parse_dns_zone",
+                params={"api.version": 1, "zone": domain}, timeout=(10, 30), allow_redirects=False)
+            if not 200 <= response.status_code < 300:
+                raise WHMClientError("WHM DNS inventory could not be read.")
+            payload = response.json()
+        except (requests.RequestException, ValueError):
+            raise WHMClientError("WHM DNS inventory could not be read.") from None
+        if type(payload) is not dict:
+            raise WHMClientError("WHM DNS inventory response requires review.")
+        metadata = payload.get("metadata")
+        if (type(metadata) is not dict or type(metadata.get("result")) is not int or metadata["result"] != 1
+                or metadata.get("command") != "parse_dns_zone" or type(metadata.get("version")) is not int or metadata["version"] != 1):
+            raise WHMClientError("WHM DNS inventory response requires review.")
+        return payload
+
     def modify_account_nameservers(self, username: str, nameservers: list[str]) -> dict:
         """Best-effort update of account nameserver fields via modifyacct."""
         params = {"user": username}

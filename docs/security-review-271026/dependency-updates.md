@@ -83,3 +83,9 @@ Tests ran on Windows/Python 3.13 with SQLite. Linux/PostgreSQL, external service
 ## Contact-code dataset dependencies - 28 October 2026
 
 Added pycountry 26.2.16 and phonenumbers 9.0.42 for offline assigned country/calling-code validation. Published wheels were installed into the existing local virtual environment; pip check passes. The packages add no transitive requirements in the observed resolution. Full production/development resolutions and advisory scans were rerun, saved in dependency-audit/contact-validation-production and dependency-audit/contact-validation-development. They cover 59 and 90 packages respectively, with zero skips. Neither added package has a reported advisory in these scans; the same pdfkit advisory/aliases remain visible and the audit exits nonzero for that existing exception. A transient PyPI metadata response interrupted the first production resolution; its completed retry produced the saved report. No package exceptions were hidden or deployment changes performed.
+
+## Offline DNS record planning - 30 October 2026
+
+Added `dnspython==2.9.0` for typed RDATA parsing and canonical wire comparisons. The planner uses no resolver or network queries. This package adds no dependencies without optional extras. A targeted `pip-audit` scan of this exact added pin reports no known vulnerabilities; the retained input and JSON result are in [dependency-audit/dns-record-planning](dependency-audit/dns-record-planning/). This is a scan of the new dependency, not a renewed clean audit of the entire application. The existing PDF exception remains unresolved.
+
+Reproduce the targeted scan with `.venv/Scripts/python.exe -m pip_audit -r docs/security-review-271026/dependency-audit/dns-record-planning/resolved-pins.txt --no-deps --disable-pip --progress-spinner off -f json -o docs/security-review-271026/dependency-audit/dns-record-planning/audit.json`.

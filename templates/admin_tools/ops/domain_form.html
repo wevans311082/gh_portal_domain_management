@@ -2,5 +2,12 @@
 {% block title %}Domain · {{ SITE_NAME }}{% endblock %}
 {% block page_title %}{% if mode == 'create' %}Create Domain{% else %}Edit Domain{% endif %}{% endblock %}
 {% block content %}
-<form method="post" class="bg-white border rounded-xl p-6 max-w-5xl">{% csrf_token %}{{ form.as_p }}<button class="admin-button-primary px-4 py-2 text-white rounded text-sm">Save</button>{% if obj %}<a href="{% url 'admin_tools:domains_list' %}" class="ml-3 text-sm text-slate-500">Back</a>{% endif %}</form>
+<form method="post" class="fluent-card p-6 max-w-5xl space-y-4">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <div class="flex flex-wrap gap-3">
+        <button class="btn-primary" type="submit">Save local record</button>
+        <a href="{% url 'admin_tools:domains_list' %}" class="btn-secondary">Back to domains</a>
+    </div>
+</form>
 {% endblock %}

@@ -41,8 +41,9 @@ _add("DEFAULT_FROM_EMAIL CLOUDFLARE_EMAIL M365_GRAPH_DEFAULT_MAILBOX M365_GRAPH_
      "M365_GRAPH_SUPPORT_MAILBOX M365_GRAPH_DOMAINS_MAILBOX M365_GRAPH_NOTIFICATIONS_MAILBOX", "email", limit=254)
 _add("GOCARDLESS_ENVIRONMENT", "environment", limit=7)
 _add("RESELLERCLUB_RESELLER_ID RESELLERCLUB_CUSTOMER_ID", "identifier", limit=50)
+_add("CLOUDFLARE_ACCOUNT_ID", "cloudflare_account", limit=32)
 _add("RESELLERCLUB_API_URL", "url", limit=2048)
-_add("WHM_NAMESERVERS", "hosts", limit=2048)
+_add("WHM_NAMESERVERS", "hosts", limit=3400)
 _add("REGISTRAR_LOW_BALANCE_THRESHOLD", "money", limit=20)
 _add("M365_GRAPH_TIMEOUT_SECONDS", "timeout", limit=3)
 
@@ -85,7 +86,7 @@ def validate_setting(key, value):
             _hostname(value)
         elif kind == "hosts":
             hosts = value.split(",")
-            if not 1 <= len(hosts) <= 8 or len(set(host.strip().lower() for host in hosts)) != len(hosts):
+            if not 1 <= len(hosts) <= 13 or len(set(host.strip().lower() for host in hosts)) != len(hosts):
                 raise ValueError
             for host in hosts:
                 _hostname(host.strip())
@@ -98,6 +99,8 @@ def validate_setting(key, value):
         elif kind == "slug" and not re.fullmatch(r"[A-Za-z0-9_-]+/", value):
             raise ValueError
         elif kind == "identifier" and (not value.isascii() or not value.isdecimal()):
+            raise ValueError
+        elif kind == "cloudflare_account" and not re.fullmatch(r"[a-fA-F0-9]{32}", value):
             raise ValueError
         elif kind == "url":
             parsed = urlsplit(value)

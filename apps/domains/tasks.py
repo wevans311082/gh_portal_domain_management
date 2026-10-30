@@ -68,6 +68,11 @@ def _ensure_cloudflare_zone(domain, order, registrar_client):
     zone_data = zone_response.get("result", {})
     zone_id = zone_data.get("id", "")
     assigned_nameservers = zone_data.get("name_servers", [])
+    if assigned_nameservers:
+        # Validate the whole delegation before changing registrar state. Keep the
+        # current cache intact if the provider call fails or is uncertain.
+        from apps.domains.registry_requirements import validate_nameservers
+        validate_nameservers(domain.name, assigned_nameservers)
 
     domain.cloudflare_zone_id = zone_id
     domain.save(update_fields=["cloudflare_zone_id", "updated_at"])
@@ -102,9 +107,8 @@ def _ensure_cloudflare_zone(domain, order, registrar_client):
     )
     if assigned_nameservers:
         registrar_client.modify_nameservers(order.registrar_order_id, assigned_nameservers)
-        domain.nameserver1 = assigned_nameservers[0]
-        domain.nameserver2 = assigned_nameservers[1] if len(assigned_nameservers) > 1 else ""
-        domain.save(update_fields=["nameserver1", "nameserver2", "updated_at"])
+        domain.set_nameserver_cache(assigned_nameservers)
+        domain.save(update_fields=["registrar_nameservers", "nameserver1", "nameserver2", "nameserver3", "nameserver4", "updated_at"])
 
 
 def _normalize_ns_list(values) -> list[str]:

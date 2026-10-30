@@ -13,6 +13,23 @@ _INPUT = "block w-full rounded-md border-gray-300 shadow-sm focus:border-sky-500
 _SELECT = _INPUT
 
 
+class DomainNameserverForm(forms.Form):
+    nameservers = forms.CharField(max_length=3400, widget=forms.Textarea(attrs={
+        "rows": 5, "class": "font-mono", "spellcheck": "false",
+        "data-no-field-hints": "", "placeholder": "ns1.example.com\nns2.example.com",
+    }), help_text="Enter one hostname per line. The complete list replaces the current delegation; the registry limit applies (maximum 13).")
+
+    def __init__(self, *args, domain_name, **kwargs):
+        self.domain_name = domain_name
+        super().__init__(*args, **kwargs)
+
+    def clean_nameservers(self):
+        from apps.domains.registry_requirements import validate_nameservers
+        hosts = [line.strip().lower().rstrip(".") for line in self.cleaned_data["nameservers"].splitlines() if line.strip()]
+        validate_nameservers(self.domain_name, hosts)
+        return hosts
+
+
 class VerificationActionForm(forms.Form):
     key = forms.UUIDField()
     kind = forms.ChoiceField(choices=[("refresh", "Refresh"), ("resend", "Resend")])

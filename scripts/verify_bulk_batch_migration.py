@@ -105,7 +105,34 @@ def main():
     final = executor.loader.project_state(after).apps
     retained_item = final.get_model("domains", "BulkDomainItem").objects.get(pk=item.pk)
     assert retained_item.status == "unknown" and retained_item.registrar_completed_at is None and retained_item.hosting_status == ""
-    print("Bulk upgrades passed: domain/order and uncertain item retained; no inferred requests/reservations; unrelated status choices unchanged.")
+    executor = MigrationExecutor(connection)
+    after = [("domains", "0038_dns_switch_requests")]
+    executor.migrate(after)
+    final = executor.loader.project_state(after).apps
+    assert final.get_model("domains", "DomainDNSChange").objects.count() == 0
+    assert final.get_model("domains", "DomainDNSReservation").objects.count() == 0
+    assert final.get_model("domains", "BulkDomainItem").objects.get(pk=item.pk).status == "unknown"
+    dns_change = final.get_model("domains", "DomainDNSChange").objects.create(domain_id=domain.pk, user_id=user.pk,
+        requested_by_id=user.pk, target_provider="cloudflare", provider_scope="c" * 64, source={"retained": True},
+        request_digest="d" * 64, manifest_digest="e" * 64, expires_at=timezone.now(), status="review",
+        zone_submitted_at=timezone.now(), zone_id="retained-zone")
+    executor = MigrationExecutor(connection)
+    after = [("domains", "0039_dns_inventory_receipts")]
+    executor.migrate(after)
+    final = executor.loader.project_state(after).apps
+    retained_dns = final.get_model("domains", "DomainDNSChange").objects.get(pk=dns_change.pk)
+    assert retained_dns.status == "review" and retained_dns.zone_submitted_at is not None and retained_dns.zone_id == "retained-zone"
+    assert retained_dns.inventory_receipt == {} and retained_dns.inventory_digest == "" and retained_dns.inventory_observed_at is None
+    assert retained_dns.inventory_token is None and retained_dns.inventory_lease_until is None
+    assert final.get_model("domains", "BulkDomainItem").objects.get(pk=item.pk).status == "unknown"
+    executor = MigrationExecutor(connection)
+    after = [("domains", "0040_dns_record_plans")]
+    executor.migrate(after)
+    final = executor.loader.project_state(after).apps
+    assert final.get_model("domains", "DomainDNSRecordPlan").objects.count() == 0
+    retained_dns = final.get_model("domains", "DomainDNSChange").objects.get(pk=dns_change.pk)
+    assert retained_dns.approved_record_plan_id is None and retained_dns.zone_id == "retained-zone" and retained_dns.zone_submitted_at is not None
+    print("Bulk/DNS upgrades passed through 0040: historical data and uncertain markers retained; no inferred inventory evidence, record plans or approvals; unrelated status choices unchanged.")
     connection.close()
 
 

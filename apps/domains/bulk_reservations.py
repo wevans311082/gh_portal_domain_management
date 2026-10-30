@@ -9,12 +9,30 @@ class BulkOperationPaused(ValidationError):
     pass
 
 
-def assert_no_bulk_operation(domain, *, item_id=None):
+def assert_no_bulk_operation(domain, *, item_id=None, dns_change_id=None):
+    from .models import DomainDNSReservation
+    dns_slots = DomainDNSReservation.objects.filter(domain_id=domain.pk)
+    if dns_change_id is not None:
+        dns_slots = dns_slots.exclude(change_id=dns_change_id)
+    if dns_slots.exists():
+        raise ValidationError("A DNS provider switch is reserved for this domain. Review its progress before editing or starting another operation.")
     reservations = DomainOperationReservation.objects.filter(domain_id=domain.pk)
     if item_id is not None:
         reservations = reservations.exclude(item_id=item_id)
     if reservations.exists():
         raise ValidationError("A bulk operation is already reserved for this domain. Review its progress before starting another operation.")
+
+
+def assert_local_domain_editable(domain, *, dns_change_id=None):
+    """Caller holds customer -> domain locks until its local edit commits."""
+    from django.db.models import Q
+    assert_no_bulk_operation(domain, dns_change_id=dns_change_id)
+    changes = DomainContactChange.objects.filter(domain_id=domain.pk).filter(
+        Q(status__in=["queued", "preparing", "submitting", "awaiting", "unknown"])
+        | Q(submitted_at__isnull=False)
+    ).exclude(status="confirmed", confirmed_at__isnull=False)
+    if changes.exists():
+        raise ValidationError("A contact operation is in progress or requires review before this local record can change.")
 
 
 def reserve_item(item):

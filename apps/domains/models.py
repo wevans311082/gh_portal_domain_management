@@ -815,6 +815,95 @@ class DomainOperationReservation(TimeStampedModel):
     item = models.OneToOneField(BulkDomainItem, on_delete=models.PROTECT, related_name="reservation")
 
 
+class DomainDNSChange(TimeStampedModel):
+    """Retained provider-switch intent; submission markers never imply failure."""
+    key = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    domain = models.ForeignKey(Domain, on_delete=models.PROTECT, related_name="dns_changes")
+    user = models.ForeignKey(User, on_delete=models.PROTECT, related_name="dns_changes")
+    requested_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="requested_dns_changes")
+    target_provider = models.CharField(max_length=16)
+    provider_scope = models.CharField(max_length=64)
+    source = models.JSONField(default=dict)
+    request_digest = models.CharField(max_length=64)
+    manifest_digest = models.CharField(max_length=64)
+    expires_at = models.DateTimeField()
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+    status = models.CharField(max_length=16, default="draft")
+    zone_submitted_at = models.DateTimeField(null=True, blank=True)
+    zone_id = models.CharField(max_length=255, blank=True)
+    zone_observation = models.JSONField(default=dict, blank=True)
+    inventory_receipt = models.JSONField(default=dict, blank=True)
+    inventory_digest = models.CharField(max_length=64, blank=True)
+    inventory_observed_at = models.DateTimeField(null=True, blank=True)
+    inventory_token = models.UUIDField(null=True, blank=True, editable=False)
+    inventory_lease_until = models.DateTimeField(null=True, blank=True)
+    inventory_message = models.CharField(max_length=500, blank=True)
+    approved_record_plan = models.ForeignKey("DomainDNSRecordPlan", on_delete=models.PROTECT, null=True, blank=True, related_name="approved_changes")
+    completed_at = models.DateTimeField(null=True, blank=True)
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+    cancelled_by = models.ForeignKey(User, on_delete=models.PROTECT, null=True, blank=True, related_name="cancelled_dns_changes")
+    cancellation_reason = models.CharField(max_length=32, blank=True)
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            fields = ("key", "domain_id", "user_id", "requested_by_id", "target_provider", "provider_scope",
+                      "source", "request_digest", "manifest_digest", "expires_at")
+            prior = type(self).objects.filter(pk=self.pk).values(*fields, "confirmed_at", "zone_submitted_at", "zone_id",
+                "inventory_digest", "inventory_receipt", "inventory_observed_at", "approved_record_plan_id",
+                "status", "cancelled_at", "cancelled_by_id", "cancellation_reason").first()
+            from django.core.exceptions import ValidationError
+            if prior and any(prior[field] != getattr(self, field) for field in fields):
+                raise ValidationError("Retain the DNS switch preview. Review a new request for changed choices.")
+            if prior and prior["confirmed_at"] is not None and prior["confirmed_at"] != self.confirmed_at:
+                raise ValidationError("Retain the original DNS switch confirmation.")
+            if prior and prior["zone_submitted_at"] is not None and prior["zone_submitted_at"] != self.zone_submitted_at:
+                raise ValidationError("Retain the DNS provider submission marker for reconciliation.")
+            if prior and prior["zone_id"] and prior["zone_id"] != self.zone_id:
+                raise ValidationError("Retain the DNS provider zone association for reconciliation.")
+            if prior and prior["inventory_digest"] and any(prior[field] != getattr(self, field)
+                    for field in ("inventory_digest", "inventory_receipt", "inventory_observed_at")):
+                raise ValidationError("Retain the DNS inventory receipt. Review a new request for changed evidence.")
+            if prior and prior["approved_record_plan_id"] is not None and prior["approved_record_plan_id"] != self.approved_record_plan_id:
+                raise ValidationError("Retain the approved DNS record plan association.")
+            if prior and prior["cancelled_at"] is not None and any(prior[field] != getattr(self, field)
+                    for field in ("status", "cancelled_at", "cancelled_by_id", "cancellation_reason")):
+                raise ValidationError("Retain the cancelled DNS request and its original attribution.")
+        if self.approved_record_plan_id is not None and not DomainDNSRecordPlan.objects.filter(
+                pk=self.approved_record_plan_id, change_id=self.pk, approved_at__isnull=False, approved_by__isnull=False).exists():
+            from django.core.exceptions import ValidationError
+            raise ValidationError("Choose an approved record plan belonging to this DNS request.")
+        super().save(*args, **kwargs)
+
+
+class DomainDNSReservation(TimeStampedModel):
+    domain = models.OneToOneField(Domain, on_delete=models.PROTECT, related_name="dns_reservation")
+    change = models.OneToOneField(DomainDNSChange, on_delete=models.PROTECT, related_name="reservation")
+
+
+class DomainDNSRecordPlan(TimeStampedModel):
+    change = models.ForeignKey(DomainDNSChange, on_delete=models.PROTECT, related_name="record_plans")
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="created_dns_record_plans")
+    plan = models.JSONField(default=dict)
+    digest = models.CharField(max_length=64)
+    expires_at = models.DateTimeField()
+    approved_at = models.DateTimeField(null=True, blank=True)
+    approved_by = models.ForeignKey(User, on_delete=models.PROTECT, null=True, blank=True, related_name="approved_dns_record_plans")
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=("change", "digest"), name="dns_record_plan_digest_once")]
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            fields = ("change_id", "created_by_id", "plan", "digest", "expires_at")
+            previous = type(self).objects.filter(pk=self.pk).values(*fields, "approved_at", "approved_by_id").first()
+            from django.core.exceptions import ValidationError
+            if previous and any(previous[field] != getattr(self, field) for field in fields):
+                raise ValidationError("Retain the DNS record plan. Review a new revision for changed choices.")
+            if previous and previous["approved_at"] is not None and (previous["approved_at"] != self.approved_at or previous["approved_by_id"] != self.approved_by_id):
+                raise ValidationError("Retain the original DNS record plan approval.")
+        super().save(*args, **kwargs)
+
+
 class DomainTransfer(TimeStampedModel):
     agreement_acceptance = models.ForeignKey("domains.DomainAgreementAcceptance", on_delete=models.PROTECT, null=True, blank=True)
     publication_decision = models.ForeignKey(RegistrantPublicationDecision, on_delete=models.PROTECT, null=True, blank=True)

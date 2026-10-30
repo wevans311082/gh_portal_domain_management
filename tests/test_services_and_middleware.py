@@ -107,6 +107,7 @@ def test_cloudflare_create_zone_calls_api():
     from apps.cloudflare_integration.services import CloudflareService
 
     mock_resp = MagicMock()
+    mock_resp.status_code = 200
     mock_resp.json.return_value = {"result": {"id": "zone123", "name_servers": []}, "success": True}
     mock_resp.raise_for_status = MagicMock()
 
@@ -125,6 +126,7 @@ def test_cloudflare_create_dns_record():
     from apps.cloudflare_integration.services import CloudflareService
 
     mock_resp = MagicMock()
+    mock_resp.status_code = 200
     mock_resp.json.return_value = {"result": {"id": "rec456"}, "success": True}
     mock_resp.raise_for_status = MagicMock()
 
@@ -142,6 +144,7 @@ def test_cloudflare_delete_dns_record():
     from apps.cloudflare_integration.services import CloudflareService
 
     mock_resp = MagicMock()
+    mock_resp.status_code = 200
     mock_resp.json.return_value = {"success": True}
     mock_resp.raise_for_status = MagicMock()
 
@@ -154,17 +157,18 @@ def test_cloudflare_delete_dns_record():
 
 
 @override_settings(CLOUDFLARE_API_TOKEN="test-token")
-def test_cloudflare_http_error_propagates():
-    from apps.cloudflare_integration.services import CloudflareService
-    import requests as req_lib
+def test_cloudflare_http_error_is_sanitized():
+    from apps.cloudflare_integration.services import CloudflareService, CloudflareError
 
     mock_resp = MagicMock()
-    mock_resp.raise_for_status.side_effect = req_lib.HTTPError("403 Forbidden")
+    mock_resp.status_code = 403
+    mock_resp.json.return_value = {"success": False, "errors": ["PRIVATE PROVIDER RESPONSE"]}
 
     with patch("apps.cloudflare_integration.services.requests.request", return_value=mock_resp):
         svc = CloudflareService()
-        with pytest.raises(req_lib.HTTPError):
+        with pytest.raises(CloudflareError) as failure:
             svc.get_zone("bad-zone")
+    assert "PRIVATE" not in str(failure.value)
 
 
 # ─────────────────────────────────────────────

@@ -22,6 +22,18 @@ class ResellerClubError(Exception):
     pass
 
 
+def merge_order_details(inventory, details):
+    """A fresh delegation response replaces old transport fields, never unions them."""
+    def delegation_key(key):
+        return type(key) is str and (key in {"nameservers", "ns", "nserver", "noOfNameServers"}
+            or re.fullmatch(r"(?:ns|nameserver)[0-9]+", key) is not None)
+    base = dict(inventory)
+    if any(delegation_key(key) for key in details):
+        base = {key: value for key, value in base.items()
+                if not delegation_key(key) and key != "_nameserver_set_complete"}
+    return {**base, **details}
+
+
 def _build_session() -> requests.Session:
     """Build a requests Session with retry logic and sensible timeouts.
 
@@ -779,16 +791,22 @@ class ResellerClubClient:
                 host = entry.get("ns") if isinstance(entry, dict) else str(entry or "")
                 if host:
                     ns_list.append(host.strip().lower())
-        for idx in range(1, 5):
+        count = item.get("noOfNameServers")
+        counted = (type(count) in (int, str) and len(str(count)) <= 2 and str(count).isascii()
+                   and str(count).isdigit() and 1 <= int(count) <= 13)
+        explicit_array = isinstance(raw_ns, list)
+        for idx in range(1, (int(count) if counted else 4) + 1):
             host = self._first_text_from_order(item, f"ns{idx}", f"nameserver{idx}")
-            if host:
+            if host and not explicit_array:
                 ns_list.append(host.lower())
-            item[f"ns{idx}"] = host.lower() if host else item.get(f"ns{idx}", "")
-        seen = []
-        for host in ns_list:
-            if host and host not in seen:
-                seen.append(host)
-        item["nameservers"] = seen
+            if host:
+                item[f"ns{idx}"] = host.lower()
+            elif not explicit_array:
+                item[f"ns{idx}"] = item.get(f"ns{idx}", "")
+        # Keep duplicates/conflicts for the strict cache parser to reject. A
+        # synthesized inventory prefix is display data, not a complete set.
+        item["nameservers"] = ns_list
+        item["_nameserver_set_complete"] = (explicit_array and item.get("_nameserver_set_complete") is not False) or counted
         return item
 
     def list_domain_orders(
@@ -822,7 +840,7 @@ class ResellerClubClient:
                     item["order_details_error"] = str(exc)
                 if isinstance(details, dict):
                     item["order_details"] = details
-                    merged = self._normalize_order_record({**item, **details})
+                    merged = self._normalize_order_record(merge_order_details(item, details))
                     merged["order_details"] = details
                     item = merged
             normalized.append(item)

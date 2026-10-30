@@ -410,12 +410,42 @@ class SiteContentSettingsForm(forms.ModelForm):
 
 
 class DomainForm(forms.ModelForm):
+    nameservers = forms.CharField(
+        required=False, max_length=3400,
+        widget=forms.Textarea(attrs={"rows": 5, "class": "font-mono", "spellcheck": "false"}),
+        help_text="Local cache only. Enter one hostname per line, up to the registry limit (maximum 13). This does not change registrar or hosting settings.",
+    )
+
     def __init__(self, *args, actor=None, **kwargs):
         super().__init__(*args, **kwargs)
+        if self.instance.pk:
+            self.initial["nameservers"] = "\n".join(self.instance.cached_nameservers)
         if actor and not actor.is_superuser:
             self.fields["user"].queryset = User.objects.filter(is_staff=False, is_superuser=False)
             if self.instance.pk:
                 self.fields["user"].disabled = True
+
+    def clean(self):
+        data = super().clean()
+        from apps.domains.registry_requirements import validate_nameservers
+        hosts = [line.strip().lower().rstrip(".") for line in data.get("nameservers", "").splitlines() if line.strip()]
+        if hosts and data.get("name"):
+            try:
+                validate_nameservers(data["name"], hosts)
+            except forms.ValidationError as exc:
+                self.add_error("nameservers", exc)
+        self._nameservers = hosts
+        return data
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        instance.registrar_nameservers = list(self._nameservers)
+        for index in range(1, 5):
+            setattr(instance, f"nameserver{index}", self._nameservers[index - 1] if len(self._nameservers) >= index else "")
+        if commit:
+            instance.save()
+            self.save_m2m()
+        return instance
 
     class Meta:
         model = Domain
@@ -431,10 +461,7 @@ class DomainForm(forms.ModelForm):
             "is_locked",
             "dns_provider",
             "cloudflare_zone_id",
-            "nameserver1",
-            "nameserver2",
-            "nameserver3",
-            "nameserver4",
+            "nameservers",
             "epp_code",
         ]
 

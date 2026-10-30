@@ -71,21 +71,11 @@
             {% if domain.status == 'active' %}
             <form method="post" action="{% url 'domains:update_nameservers' pk=domain.pk %}" class="space-y-3"><fieldset class="contents" {% if registrar_review_required %}disabled{% endif %}>
                 {% csrf_token %}
+                {{ nameserver_form.nameservers.errors }}
                 <div>
-                    <label>Nameserver 1</label>
-                    <input type="text" name="nameserver1" value="{{ domain.nameserver1 }}" placeholder="ns1.example.com" class="font-mono">
-                </div>
-                <div>
-                    <label>Nameserver 2{% if registrar_capabilities.min_nameservers == 1 %} (optional){% endif %}</label>
-                    <input type="text" name="nameserver2" value="{{ domain.nameserver2 }}" placeholder="ns2.example.com" class="font-mono">
-                </div>
-                <div>
-                    <label>Nameserver 3 (optional)</label>
-                    <input type="text" name="nameserver3" value="{{ domain.nameserver3 }}" placeholder="ns3.example.com" class="font-mono">
-                </div>
-                <div>
-                    <label>Nameserver 4 (optional)</label>
-                    <input type="text" name="nameserver4" value="{{ domain.nameserver4 }}" placeholder="ns4.example.com" class="font-mono">
+                    <label for="{{ nameserver_form.nameservers.id_for_label }}">Complete nameserver list</label>
+                    {{ nameserver_form.nameservers }}
+                    <p class="text-sm text-fluent-muted mt-2" id="{{ nameserver_form.nameservers.auto_id }}_helptext">{{ nameserver_form.nameservers.help_text }}</p>
                 </div>
                 <div class="flex flex-wrap gap-2">
                     <button {% if registrar_review_required %}disabled{% endif %} type="submit" class="btn-primary text-xs">Save nameservers</button>

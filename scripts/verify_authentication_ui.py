@@ -622,6 +622,43 @@ def main():
         response = client.post(reverse("admin_tools:saved_view_action", args=["customers"]), {"action": "save", "name": "", "q": "retained"})
         assert response.status_code == 400
         fixtures["/saved-list-save-error"] = response.content
+        from tests.security_helpers import login_owner
+        editor_client = Client()
+        editor_owner = get_user_model().objects.create_user(email="domain-editor-ui@example.test", password="fixture")
+        login_owner(editor_client, editor_owner)
+        editor_domain = Domain.objects.create(user=search_customer, name="complete-cache-ui.com", tld="com", status="active", registrar_id="501")
+        editor_domain.set_nameserver_cache([f"ns{i}.example.test" for i in range(1, 14)])
+        editor_domain.save()
+        editor_url = reverse("admin_tools:domains_edit", args=[editor_domain.pk])
+        response = editor_client.get(editor_url)
+        assert response.status_code == 200
+        fixtures["/admin-domain-cache"] = response.content
+        response = editor_client.post(editor_url, {"user": search_customer.pk, "name": editor_domain.name,
+            "tld": "com", "status": "active", "dns_provider": editor_domain.dns_provider,
+            "nameservers": "invalid host\nns2.example.test"})
+        assert response.status_code == 200 and b"errorlist" in response.content
+        fixtures["/admin-domain-cache-invalid"] = response.content
+        django_editor_url = reverse("admin:domains_domain_change", args=[editor_domain.pk])
+        response = editor_client.get(django_editor_url)
+        assert response.status_code == 200
+        fixtures["/django-domain-cache"] = response.content
+        response = editor_client.post(django_editor_url, {"user": search_customer.pk, "name": editor_domain.name,
+            "tld": "com", "status": "active", "dns_provider": editor_domain.dns_provider,
+            "nameservers": "invalid host\nns2.example.test", "_save": "Save"})
+        assert response.status_code == 200 and b"errorlist" in response.content
+        fixtures["/django-domain-cache-invalid"] = response.content
+        fixtures[reverse("admin:jsi18n")] = editor_client.get(reverse("admin:jsi18n")).content
+        cache_customer_client = Client()
+        cache_customer_client.force_login(search_customer)
+        with patch("apps.provisioning.whm_client.WHMClient") as cache_whm:
+            cache_whm.return_value.get_nameservers.return_value = []
+            response = cache_customer_client.get(reverse("domains:detail", args=[editor_domain.pk]))
+            assert response.status_code == 200
+            fixtures["/portal-domain-cache"] = response.content
+            response = cache_customer_client.post(reverse("domains:update_nameservers", args=[editor_domain.pk]),
+                {"nameservers": "invalid host\nns2.example.test"})
+            assert response.status_code == 400
+            fixtures["/portal-domain-cache-invalid"] = response.content
         client.force_login(agent)
         fixtures["/admin-search-support"] = client.get(reverse("admin_tools:search"), {"q": "global"}).content
         long_search_domain = Domain.objects.create(user=search_customer, name='globalsearch.' + ('a' * 60 + '.') * 3 + 'example', tld='example', epp_code='NOT-FOR-SEARCH')
@@ -648,11 +685,21 @@ def main():
         def do_GET(self):
             if self.path in fixtures:
                 self.send_response(200)
-                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Type", "application/javascript" if self.path.endswith("/jsi18n/") else "text/html; charset=utf-8")
                 self.end_headers()
                 self.wfile.write(fixtures[self.path])
             elif self.path.startswith("/static/"):
-                super().do_GET()
+                from django.contrib.staticfiles.finders import find
+                from urllib.parse import urlsplit, unquote
+                import mimetypes
+                asset = find(unquote(urlsplit(self.path).path)[len("/static/"):])
+                if asset and Path(asset).is_file():
+                    self.send_response(200)
+                    self.send_header("Content-Type", mimetypes.guess_type(asset)[0] or "application/octet-stream")
+                    self.end_headers()
+                    self.wfile.write(Path(asset).read_bytes())
+                else:
+                    self.send_error(404)
             else:
                 self.send_error(404)
 
@@ -671,11 +718,49 @@ def main():
             page.on("pageerror", lambda error: errors.append(str(error)))
             for width in (1440, 390):
                 page.set_viewport_size({"width": width, "height": 960})
-                for name in ("saved-list-invalid", "saved-list-save-error", "saved-list-customers", "saved-list-domains", "saved-list-invoices", "saved-list-tickets", "admin-manual-followup-waiting", "admin-manual-followup-delivery-review", "admin-manual-followup-ready", "admin-manual-followup-integrity", "admin-manual-followup-domain-only", "portal-registration-draft", "portal-registration-invoice-ready", "portal-registration-invoiced", "public-agreement-quote-held", "portal-agreements-quoted", "admin-manual-agreement-held", "portal-request-agreements-empty", "portal-request-agreements-list", "portal-request-agreements-registration", "portal-request-agreements-transfer", "portal-request-agreements-error", "portal-request-agreements-recorded", "portal-request-agreements-held", "portal-agreements-review", "portal-agreements-error", "portal-agreements-recorded", "portal-agreements-closed", "admin-agreements-empty", "admin-agreements-invalid", "admin-agreements-preview", "admin-agreements-unapproved", "admin-agreement-detail", "admin-agreement-retained", "admin-agreement-integrity", "admin-transfer-cart", "admin-customer-workspace-workstreams", "admin-business-review", "admin-business-review-invalid", "admin-business-review-recorded", "registrant-eu-declaration", "registrant-eu-declaration-invalid", "registrant-us-registration", "registrant-us-registration-invalid", "registrant-us-declaration", "registrant-us-declaration-invalid", "admin-identity-review", "admin-identity-review-invalid", "admin-identity-review-recorded", "admin-identity-review-stale", "publication-redaction-review", "publication-redaction-unknown", "publication-redaction-awaiting", "publication-redaction-confirmed", "portal-contact-change-form", "portal-contact-change-invalid", "portal-contact-change-queued", "portal-contact-change-awaiting", "portal-contact-change-unknown", "portal-contact-change-confirmed", "portal-contact-change-review", "registry-me-registration", "registry-me-invalid", "registry-uk-domain", "registry-uk-operation", "registry-me-renewal-review", "registry-me-held-domain", "registry-me-domain-list", "publication-registration", "publication-empty", "publication-shop", "publication-cart", "publication-active", "publication-stale-cart", "publication-withdrawn", "publication-provider-pending", "admin-registrar-diagnostic", "admin-registrar-diagnostic-failed", "admin-transfer-preparing", "admin-transfer-submitting", "admin-transfer-unknown", "admin-transfer-accepted", "admin-transfer-aborted", "admin-transfer-historical", "admin-transfers", "admin-transfers-empty", "admin-transfers-invalid", "portal-transfer-review", "portal-historical-domain", "portal-historical-action-held", "portal-historical-review", "admin-historical-review", "admin-historical-list", "admin-historical-pending", "admin-historical-suspended", "admin-registration-preparing", "admin-registration-submitting", "admin-registration-unknown", "admin-registration-accepted", "admin-registration-aborted", "admin-customer-workspace", "admin-customer-workspace-loading", "admin-customer-workspace-invalid", "admin-customer-workspace-empty", "admin-customer-workspace-support", "admin-customer-workspace-billing", "admin-customer-note-redacted", "portal-cart-empty", "portal-cart", "public-cart-review", "registrant-verification-automatic", "registrant-verification-queued", "registrant-verification-error", "registrant-verification-review", "registrant-verification-verified", "registrant-verification-pending", "registrant-verification-suspended", "registrant-verification-unknown", "registrant-domain-uk", "registrant-domain-review", "admin-manual-domain", "admin-manual-domain-invalid", "registrant-contact", "registrant-contact-invalid", "mfa", "mfa-invalid", "reauthenticate", "reauth-required", "staff-roles", "staff-roles-invalid", "staff-workspace", "staff-customers", "branding", "branding-invalid", "configuration", "configuration-invalid", "deliveries", "deliveries-invalid", "public-contact", "public-contact-invalid", "public-error-413", "public-error-429", "public-error-503", "public-quote", "public-domain-error", "public-acceptance", "public-acceptance-unavailable", "public-acceptance-expired", "public-mail-reset", "public-mail-verification", "admin-customers", "admin-customers-empty", "admin-customers-loading", "admin-user-invalid", "admin-invoices", "admin-invoices-empty", "admin-search", "admin-search-start", "admin-search-suggestions-error", "admin-search-empty", "admin-search-invalid", "admin-search-pagination", "admin-search-support", "admin-search-record"):
+                for name in ("django-domain-cache", "django-domain-cache-invalid", "portal-domain-cache", "portal-domain-cache-invalid", "admin-domain-cache", "admin-domain-cache-invalid", "saved-list-invalid", "saved-list-save-error", "saved-list-customers", "saved-list-domains", "saved-list-invoices", "saved-list-tickets", "admin-manual-followup-waiting", "admin-manual-followup-delivery-review", "admin-manual-followup-ready", "admin-manual-followup-integrity", "admin-manual-followup-domain-only", "portal-registration-draft", "portal-registration-invoice-ready", "portal-registration-invoiced", "public-agreement-quote-held", "portal-agreements-quoted", "admin-manual-agreement-held", "portal-request-agreements-empty", "portal-request-agreements-list", "portal-request-agreements-registration", "portal-request-agreements-transfer", "portal-request-agreements-error", "portal-request-agreements-recorded", "portal-request-agreements-held", "portal-agreements-review", "portal-agreements-error", "portal-agreements-recorded", "portal-agreements-closed", "admin-agreements-empty", "admin-agreements-invalid", "admin-agreements-preview", "admin-agreements-unapproved", "admin-agreement-detail", "admin-agreement-retained", "admin-agreement-integrity", "admin-transfer-cart", "admin-customer-workspace-workstreams", "admin-business-review", "admin-business-review-invalid", "admin-business-review-recorded", "registrant-eu-declaration", "registrant-eu-declaration-invalid", "registrant-us-registration", "registrant-us-registration-invalid", "registrant-us-declaration", "registrant-us-declaration-invalid", "admin-identity-review", "admin-identity-review-invalid", "admin-identity-review-recorded", "admin-identity-review-stale", "publication-redaction-review", "publication-redaction-unknown", "publication-redaction-awaiting", "publication-redaction-confirmed", "portal-contact-change-form", "portal-contact-change-invalid", "portal-contact-change-queued", "portal-contact-change-awaiting", "portal-contact-change-unknown", "portal-contact-change-confirmed", "portal-contact-change-review", "registry-me-registration", "registry-me-invalid", "registry-uk-domain", "registry-uk-operation", "registry-me-renewal-review", "registry-me-held-domain", "registry-me-domain-list", "publication-registration", "publication-empty", "publication-shop", "publication-cart", "publication-active", "publication-stale-cart", "publication-withdrawn", "publication-provider-pending", "admin-registrar-diagnostic", "admin-registrar-diagnostic-failed", "admin-transfer-preparing", "admin-transfer-submitting", "admin-transfer-unknown", "admin-transfer-accepted", "admin-transfer-aborted", "admin-transfer-historical", "admin-transfers", "admin-transfers-empty", "admin-transfers-invalid", "portal-transfer-review", "portal-historical-domain", "portal-historical-action-held", "portal-historical-review", "admin-historical-review", "admin-historical-list", "admin-historical-pending", "admin-historical-suspended", "admin-registration-preparing", "admin-registration-submitting", "admin-registration-unknown", "admin-registration-accepted", "admin-registration-aborted", "admin-customer-workspace", "admin-customer-workspace-loading", "admin-customer-workspace-invalid", "admin-customer-workspace-empty", "admin-customer-workspace-support", "admin-customer-workspace-billing", "admin-customer-note-redacted", "portal-cart-empty", "portal-cart", "public-cart-review", "registrant-verification-automatic", "registrant-verification-queued", "registrant-verification-error", "registrant-verification-review", "registrant-verification-verified", "registrant-verification-pending", "registrant-verification-suspended", "registrant-verification-unknown", "registrant-domain-uk", "registrant-domain-review", "admin-manual-domain", "admin-manual-domain-invalid", "registrant-contact", "registrant-contact-invalid", "mfa", "mfa-invalid", "reauthenticate", "reauth-required", "staff-roles", "staff-roles-invalid", "staff-workspace", "staff-customers", "branding", "branding-invalid", "configuration", "configuration-invalid", "deliveries", "deliveries-invalid", "public-contact", "public-contact-invalid", "public-error-413", "public-error-429", "public-error-503", "public-quote", "public-domain-error", "public-acceptance", "public-acceptance-unavailable", "public-acceptance-expired", "public-mail-reset", "public-mail-verification", "admin-customers", "admin-customers-empty", "admin-customers-loading", "admin-user-invalid", "admin-invoices", "admin-invoices-empty", "admin-search", "admin-search-start", "admin-search-suggestions-error", "admin-search-empty", "admin-search-invalid", "admin-search-pagination", "admin-search-support", "admin-search-record"):
                     if args.pages and name not in args.pages:
                         continue
                     pending_routes = []
                     page.goto(f"http://127.0.0.1:{server.server_port}/{name}")
+                    if name in {"django-domain-cache", "django-domain-cache-invalid"}:
+                        field = page.get_by_label("Nameservers:", exact=True)
+                        if name == "django-domain-cache":
+                            assert len(field.input_value().splitlines()) == 13
+                        else:
+                            assert field.input_value() == "invalid host\nns2.example.test"
+                            assert page.locator('.errorlist').count() > 0
+                        field.focus()
+                        assert field.evaluate('el => el === document.activeElement')
+                        field.scroll_into_view_if_needed()
+                        assert page.evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth')
+                        page.screenshot(path=str(args.output_dir / f"{name}-field-{width}.png"))
+                    if name in {"portal-domain-cache", "portal-domain-cache-invalid"}:
+                        field = page.get_by_label("Complete nameserver list", exact=True)
+                        assert field.get_attribute("placeholder") == "ns1.example.com\nns2.example.com"
+                        assert field.locator('..').locator('.field-example-hint').count() == 0
+                        if name == "portal-domain-cache":
+                            assert len(field.input_value().splitlines()) == 13
+                        else:
+                            assert field.input_value() == "invalid host\nns2.example.test"
+                            assert page.locator('.errorlist').count() > 0
+                        field.focus()
+                        assert field.evaluate('el => el === document.activeElement')
+                        field.scroll_into_view_if_needed()
+                        assert page.evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth')
+                        page.screenshot(path=str(args.output_dir / f"{name}-field-{width}.png"))
+                    if name in {"admin-domain-cache", "admin-domain-cache-invalid"}:
+                        field = page.get_by_label("Nameservers:", exact=True)
+                        if name == "admin-domain-cache":
+                            assert len(field.input_value().splitlines()) == 13
+                        else:
+                            assert field.input_value() == "invalid host\nns2.example.test"
+                            assert page.locator('.errorlist').count() > 0
+                        field.focus()
+                        assert field.evaluate('el => el === document.activeElement')
+                        field.scroll_into_view_if_needed()
+                        assert page.evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth')
+                        page.screenshot(path=str(args.output_dir / f"{name}-field-{width}.png"))
                     if name in {"saved-list-customers", "saved-list-domains", "saved-list-invoices", "saved-list-tickets"}:
                         details = page.locator('details').filter(has=page.locator('#list-search'))
                         details.locator('summary').focus()
@@ -759,6 +844,8 @@ def main():
                         page.wait_for_function("getComputedStyle(document.querySelector('.request-error')).backgroundColor === 'rgb(255, 255, 255)'")
                     elif name.startswith(("public-", "registrant-", "portal-", "publication-", "registry-")):
                         page.wait_for_function("typeof tailwind !== 'undefined'")
+                    elif name.startswith("django-"):
+                        page.locator('#header').wait_for(state="visible")
                     else:
                         page.wait_for_function("getComputedStyle(document.querySelector('.auth-card, .admin-header')).backgroundColor === 'rgb(255, 255, 255)'")
                     if name == "publication-registration":
