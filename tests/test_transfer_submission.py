@@ -50,6 +50,27 @@ def drive(transfer, provider, settings):
         return execute_domain_transfer.run(transfer.pk)
 
 
+def test_transfer_handoff_retains_full_delegation_without_claiming_registry_completion(agreed_transfer, provider, settings):
+    settings.RESELLERCLUB_CUSTOMER_ID = "999"
+    hosts = [f"ns{i}.example.com" for i in range(1, 14)]
+    with patch("apps.domains.tasks.ResellerClubClient", return_value=provider), patch(
+        "apps.domains.tasks._build_nameservers", return_value=hosts
+    ):
+        execute_domain_transfer.run(agreed_transfer.pk)
+        agreed_transfer.refresh_from_db()
+        domain = agreed_transfer.domain
+        assert domain.cached_nameservers == hosts
+        assert [getattr(domain, f"nameserver{i}") for i in range(1, 5)] == hosts[:4]
+        assert domain.status == Domain.STATUS_PENDING
+        assert agreed_transfer.status == "processing" and agreed_transfer.completed_at is None
+        domain.set_nameserver_cache(["new1.example.com", "new2.example.com"])
+        domain.save()
+        execute_domain_transfer.run(agreed_transfer.pk)
+    domain.refresh_from_db()
+    assert domain.cached_nameservers == ["new1.example.com", "new2.example.com"]
+    assert provider.transfer_domain.call_count == 1
+
+
 def test_acknowledgement_is_retained_and_replay_uses_frozen_contacts_and_nameservers(agreed_transfer, provider):
     assert submit(agreed_transfer, provider) == "501"
     assert submit_transfer(agreed_transfer.pk, "999", ["changed1.example.com", "changed2.example.com"], client=provider) == "501"

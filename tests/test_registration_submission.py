@@ -43,6 +43,26 @@ def submit(order, provider):
     return submit_registration(order.pk, "999", NS, client=provider)
 
 
+def test_registration_handoff_retains_full_delegation_and_replay_preserves_later_cache(agreed_order, provider, settings):
+    from apps.domains.models import Domain
+    from apps.domains.tasks import register_domain_order
+    settings.RESELLERCLUB_CUSTOMER_ID = "999"
+    hosts = [f"ns{i}.example.com" for i in range(1, 14)]
+    with patch("apps.domains.tasks.ResellerClubClient", return_value=provider), patch(
+        "apps.domains.tasks._build_nameservers", return_value=hosts
+    ):
+        domain_id = register_domain_order.run(agreed_order.pk)
+        domain = Domain.objects.get(pk=domain_id)
+        assert domain.cached_nameservers == hosts
+        assert [getattr(domain, f"nameserver{i}") for i in range(1, 5)] == hosts[:4]
+        domain.set_nameserver_cache(["new1.example.com", "new2.example.com"])
+        domain.save()
+        assert register_domain_order.run(agreed_order.pk) == domain_id
+    domain.refresh_from_db()
+    assert domain.cached_nameservers == ["new1.example.com", "new2.example.com"]
+    assert provider.register_domain.call_count == 1
+
+
 def test_acknowledged_purchase_is_durable_and_replay_never_calls_registrar_again(agreed_order, provider):
     assert submit(agreed_order, provider) == "501"
     assert submit(agreed_order, provider) == "501"

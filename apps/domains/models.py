@@ -124,6 +124,7 @@ class Domain(TimeStampedModel):
     nameserver2 = models.CharField(max_length=255, blank=True)
     nameserver3 = models.CharField(max_length=255, blank=True)
     nameserver4 = models.CharField(max_length=255, blank=True)
+    registrar_nameservers = models.JSONField(default=list, blank=True)
     epp_code = models.CharField(max_length=255, blank=True)
 
     class Meta:
@@ -136,6 +137,26 @@ class Domain(TimeStampedModel):
 
     def __str__(self):
         return self.name
+
+    @property
+    def cached_nameservers(self):
+        """Complete cache when present; legacy fields remain an unverified fallback."""
+        if self.registrar_nameservers:
+            if (type(self.registrar_nameservers) is not list or len(self.registrar_nameservers) > 13
+                    or any(type(value) is not str for value in self.registrar_nameservers)):
+                from django.core.exceptions import ValidationError
+                raise ValidationError("The saved nameserver cache requires review.")
+            return list(self.registrar_nameservers)
+        return [getattr(self, f"nameserver{index}") for index in range(1, 5) if getattr(self, f"nameserver{index}")]
+
+    def set_nameserver_cache(self, nameservers):
+        """Retain every supported hostname and mirror the legacy first four fields."""
+        from .registry_requirements import validate_nameservers
+        validate_nameservers(self.name, nameservers)
+        values = [value.strip().lower().rstrip(".") for value in nameservers]
+        self.registrar_nameservers = values
+        for index in range(1, 5):
+            setattr(self, f"nameserver{index}", values[index - 1] if len(values) >= index else "")
 
     @property
     def registrant_validation_status(self) -> str:
@@ -709,6 +730,89 @@ class DomainTransferAttempt(TimeStampedModel):
     submitted_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     legacy_review_required = models.BooleanField(default=False)
+
+
+class BulkDomainBatch(TimeStampedModel):
+    """Retained preview/confirmation identity; never infer consent from an old job."""
+
+    key = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    user = models.ForeignKey(User, on_delete=models.PROTECT, related_name="bulk_domain_batches")
+    action = models.CharField(max_length=16)
+    target = models.JSONField()
+    request_digest = models.CharField(max_length=64)
+    manifest_digest = models.CharField(max_length=64)
+    expires_at = models.DateTimeField()
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+    retry_of = models.ForeignKey("self", on_delete=models.PROTECT, null=True, blank=True, related_name="retry_batches")
+    retry_item_ids = models.JSONField(default=list, blank=True)
+    retry_source_digest = models.CharField(max_length=64, blank=True)
+
+    class Meta:
+        ordering = ("-created_at", "-pk")
+        indexes = [models.Index(fields=("user", "-created_at", "-id"), name="bulk_batch_owner_created")]
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            fields = ("key", "user_id", "action", "target", "request_digest", "manifest_digest", "expires_at", "retry_of_id", "retry_item_ids", "retry_source_digest")
+            previous = type(self).objects.filter(pk=self.pk).values(*fields, "confirmed_at").first()
+            if previous and any(previous[field] != getattr(self, field) for field in fields):
+                from django.core.exceptions import ValidationError
+                raise ValidationError("Retain the bulk preview; create a new request for changed settings.")
+            if previous and previous["confirmed_at"] is not None and previous["confirmed_at"] != self.confirmed_at:
+                from django.core.exceptions import ValidationError
+                raise ValidationError("Retain the original bulk confirmation.")
+        super().save(*args, **kwargs)
+
+
+class BulkDomainItem(TimeStampedModel):
+    batch = models.ForeignKey(BulkDomainBatch, on_delete=models.PROTECT, related_name="items")
+    selected_id = models.PositiveBigIntegerField()
+    domain = models.ForeignKey(Domain, on_delete=models.PROTECT, null=True, blank=True, related_name="bulk_operation_items")
+    name = models.CharField(max_length=255)
+    preview_status = models.CharField(max_length=16)
+    snapshot = models.JSONField(default=dict)
+    preview_message = models.CharField(max_length=2000)
+    provider_action_id = models.CharField(max_length=20, blank=True)
+    observed_lock = models.BooleanField(null=True, blank=True)
+    observed_nameservers = models.JSONField(null=True, blank=True)
+    checked_at = models.DateTimeField(null=True, blank=True)
+    registrar_completed_at = models.DateTimeField(null=True, blank=True)
+    hosting_status = models.CharField(max_length=16, blank=True)
+    status = models.CharField(max_length=16)
+    message = models.CharField(max_length=2000, blank=True)
+    contact_change = models.OneToOneField("DomainContactChange", on_delete=models.PROTECT, null=True, blank=True, related_name="bulk_item")
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    available_at = models.DateTimeField(default=timezone.now)
+    lease_until = models.DateTimeField(null=True, blank=True)
+    dispatch_until = models.DateTimeField(null=True, blank=True)
+    dispatch_token = models.UUIDField(null=True, blank=True, editable=False)
+    dispatch_after = models.DateTimeField(default=timezone.now)
+    paused_at = models.DateTimeField(null=True, blank=True)
+    pause_token = models.UUIDField(null=True, blank=True, editable=False)
+    paused_by = models.ForeignKey(User, on_delete=models.PROTECT, null=True, blank=True, related_name="paused_bulk_domain_items")
+    token = models.UUIDField(default=uuid.uuid4, editable=False)
+
+    class Meta:
+        ordering = ("pk",)
+        constraints = [models.UniqueConstraint(fields=("batch", "selected_id"), name="bulk_item_selected_once")]
+        indexes = [models.Index(fields=("status", "available_at"), name="bulk_item_dispatch")]
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            fields = ("batch_id", "selected_id", "domain_id", "name", "preview_status", "snapshot", "preview_message")
+            previous = type(self).objects.filter(pk=self.pk).values(*fields).first()
+            if previous and any(previous[field] != getattr(self, field) for field in fields):
+                from django.core.exceptions import ValidationError
+                raise ValidationError("Bulk preview history cannot be rewritten.")
+        super().save(*args, **kwargs)
+
+
+class DomainOperationReservation(TimeStampedModel):
+    """An occupied domain slot has no automatic expiry after uncertain work."""
+
+    domain = models.OneToOneField(Domain, on_delete=models.PROTECT, related_name="operation_reservation")
+    item = models.OneToOneField(BulkDomainItem, on_delete=models.PROTECT, related_name="reservation")
 
 
 class DomainTransfer(TimeStampedModel):

@@ -8,7 +8,13 @@ from apps.domains.models import DomainOrder, DomainTransfer, DomainContactChange
 REVIEW_MESSAGE = "This domain's registrar association or contact change requires owner review before provider operations or renewal can continue."
 
 
-def registrar_review_required(domain):
+def registrar_review_required(domain, *, bulk_item_id=None):
+    from apps.domains.models import DomainOperationReservation
+    reservations = DomainOperationReservation.objects.filter(domain_id=domain.pk)
+    if bulk_item_id is not None:
+        reservations = reservations.exclude(item_id=bulk_item_id)
+    if reservations.exists():
+        return True
     if DomainContactChange.objects.filter(domain_id=domain.pk,
             status__in=["queued", "preparing", "submitting", "awaiting", "unknown"]).exists():
         return True
@@ -51,8 +57,8 @@ def registrar_review_required(domain):
     return False  # Older records without a captured scope need the separate legacy review policy.
 
 
-def assert_registrar_review_complete(domain):
-    if registrar_review_required(domain):
+def assert_registrar_review_complete(domain, *, bulk_item_id=None):
+    if registrar_review_required(domain, bulk_item_id=bulk_item_id):
         raise ValidationError(REVIEW_MESSAGE)
 
 

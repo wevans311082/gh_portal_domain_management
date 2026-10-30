@@ -421,25 +421,30 @@ def _link_user(request):
 
 
 def _apply_nameservers_from_order(domain: Domain, order: dict):
-    ns_values = list(order.get("nameservers") or [])
-    for key in ("ns1", "ns2", "ns3", "ns4", "nameserver1", "nameserver2"):
-        val = order.get(key)
-        if isinstance(val, str) and val.strip():
-            ns_values.append(val.strip().lower())
-    ns_list = order.get("ns") or order.get("nserver")
-    if isinstance(ns_list, list):
-        for item in ns_list:
-            host = item.get("ns") if isinstance(item, dict) else str(item or "")
-            if host:
-                ns_values.append(host.strip().lower())
-    seen = []
-    for host in ns_values:
-        host = str(host or "").strip().lower()
-        if host and host not in seen:
-            seen.append(host)
-    if seen:
-        domain.nameserver1 = seen[0] if len(seen) > 0 else ""
-        domain.nameserver2 = seen[1] if len(seen) > 1 else ""
-        domain.nameserver3 = seen[2] if len(seen) > 2 else ""
-        domain.nameserver4 = seen[3] if len(seen) > 3 else ""
-        domain.save(update_fields=["nameserver1", "nameserver2", "nameserver3", "nameserver4", "updated_at"])
+    from django.core.exceptions import ValidationError
+    from apps.domains.bulk_observation import complete_nameservers
+
+    # Inventory prefixes and undocumented aliases cannot establish a complete set.
+    # Preserve existing cache when the response is absent, partial or conflicting.
+    if type(order) is not dict or len(order) > 200:
+        return False
+    details = dict(order)
+    if "nameservers" in details:
+        hosts = details["nameservers"]
+        if type(hosts) is not list or not 1 <= len(hosts) <= 13 or any(type(host) is not str for host in hosts):
+            return False
+        details.setdefault("noOfNameServers", len(hosts))
+        for index, host in enumerate(hosts, 1):
+            key = f"ns{index}"
+            if key in details and details[key] != host:
+                return False
+            details[key] = host
+    try:
+        hosts = complete_nameservers(details, domain.name)
+        if "nameservers" in details and len(hosts) != len(details["nameservers"]):
+            return False
+        domain.set_nameserver_cache(hosts)
+    except ValidationError:
+        return False
+    domain.save(update_fields=["registrar_nameservers", "nameserver1", "nameserver2", "nameserver3", "nameserver4", "updated_at"])
+    return True

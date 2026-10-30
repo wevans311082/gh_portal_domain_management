@@ -16,6 +16,8 @@ def publish_contact_change(identifier):
     # Customer HTTP requests must never run provider work under eager settings.
     if settings.CELERY_TASK_ALWAYS_EAGER:
         return False
+    if DomainContactChange.objects.filter(pk=identifier, bulk_item__paused_at__isnull=False).exists():
+        return False
     try:
         run_contact_change.delay(identifier)
     except Exception:
@@ -31,6 +33,8 @@ def run_contact_change(identifier):
 
     with transaction.atomic():
         job = DomainContactChange.objects.select_for_update().get(pk=identifier)
+        if DomainContactChange.objects.filter(pk=identifier, bulk_item__paused_at__isnull=False).exists():
+            return
         now = timezone.now()
         if (job.available_at > now or job.lease_until is not None and job.lease_until > now
                 or job.status not in {"queued", "awaiting", "unknown"}
@@ -52,11 +56,13 @@ def run_contact_change(identifier):
             submit_contact_change(identifier, client=client)
         else:
             observe_contact_change(identifier, client=client)
-    except Exception:
+    except Exception as exc:
         # Validation/config failures before preparation cannot loop indefinitely.
         # Once a mutation marker exists, only explicit reconciliation may clear it.
         if operation == "submit":
-            DomainContactChange.objects.filter(pk=identifier, token=token, status="queued").update(status="failed")
+            from apps.domains.bulk_reservations import BulkOperationPaused
+            if not isinstance(exc, BulkOperationPaused):
+                DomainContactChange.objects.filter(pk=identifier, token=token, status="queued").update(status="failed")
             DomainContactChange.objects.filter(pk=identifier, token=token, status__in=["preparing", "submitting"]).update(status="unknown")
         DomainContactChange.objects.filter(pk=identifier, token=token).update(
             available_at=timezone.now() + timedelta(minutes=5))
@@ -69,14 +75,14 @@ def dispatch_contact_changes():
     now = timezone.now()
     deadline = monotonic() + 8
     # Never reclaim interrupted preparation or submission as a fresh mutation.
-    stale = list(DomainContactChange.objects.filter(status__in=["preparing", "submitting"],
+    stale = list(DomainContactChange.objects.exclude(bulk_item__paused_at__isnull=False).filter(status__in=["preparing", "submitting"],
         lease_until__lt=now).values_list("pk", flat=True)[:100])
     for identifier in stale:
         if monotonic() >= deadline:
             return
         DomainContactChange.objects.filter(pk=identifier, status__in=["preparing", "submitting"],
             lease_until__lt=now).update(status="unknown", lease_until=None)
-    due = DomainContactChange.objects.filter(available_at__lte=now).filter(
+    due = DomainContactChange.objects.exclude(bulk_item__paused_at__isnull=False).filter(available_at__lte=now).filter(
         Q(status__in=["queued", "awaiting"]) | Q(status="unknown") & ~Q(action_id="")
     ).filter(Q(lease_until__isnull=True) | Q(lease_until__lte=now)).order_by("available_at", "pk")
     for identifier in due.values_list("pk", flat=True)[:100]:

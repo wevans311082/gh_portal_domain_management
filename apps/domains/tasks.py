@@ -316,6 +316,7 @@ def register_domain_order(self, order_id):
                     "expires_at": expires_at,
                     "auto_renew": order.auto_renew,
                     "dns_provider": order.dns_provider,
+                    "registrar_nameservers": list(nameservers),
                     "nameserver1": nameservers[0] if nameservers else "",
                     "nameserver2": nameservers[1] if len(nameservers) > 1 else "",
                     "nameserver3": nameservers[2] if len(nameservers) > 2 else "",
@@ -326,9 +327,9 @@ def register_domain_order(self, order_id):
                 if domain.user_id != order.user_id or domain.registrar_id != registrar_order_id:
                     raise RegistrationReviewRequired("The local domain record conflicts with the acknowledged registrar order. Reconciliation is required.")
                 if registry_facts:
-                    for field in ("status", "registered_at", "expires_at", "nameserver1", "nameserver2", "nameserver3", "nameserver4"):
+                    for field in ("status", "registered_at", "expires_at", "registrar_nameservers", "nameserver1", "nameserver2", "nameserver3", "nameserver4"):
                         setattr(domain, field, domain_defaults[field])
-                    domain.save(update_fields=["status", "registered_at", "expires_at", "nameserver1", "nameserver2", "nameserver3", "nameserver4", "updated_at"])
+                    domain.save(update_fields=["status", "registered_at", "expires_at", "registrar_nameservers", "nameserver1", "nameserver2", "nameserver3", "nameserver4", "updated_at"])
             if registry_facts:
                 accepted.registry_status = registry_facts["status"]
                 accepted.registry_checked_at = registry_facts["checked_at"]
@@ -564,6 +565,7 @@ def execute_domain_transfer(transfer_id: int):
             domain, created = Domain.objects.select_for_update().get_or_create(name=current.domain_name, defaults={
                 "user_id": current.user_id, "tld": current.tld, "status": Domain.STATUS_PENDING,
                 "registrar_id": identifier, "auto_renew": current.auto_renew, "dns_provider": current.dns_provider,
+                "registrar_nameservers": list(nameservers),
                 "nameserver1": nameservers[0] if nameservers else "", "nameserver2": nameservers[1] if len(nameservers) > 1 else "",
                 "nameserver3": nameservers[2] if len(nameservers) > 2 else "",
                 "nameserver4": nameservers[3] if len(nameservers) > 3 else "",
@@ -764,4 +766,5 @@ def monitor_registrar_balance():
 # Register the durable verification workers with Celery's standard task discovery.
 from apps.domains.verification_actions import dispatch_verification_actions, run_verification_action, schedule_verification_checks  # noqa: E402,F401
 from apps.domains.contact_change_jobs import dispatch_contact_changes, run_contact_change  # noqa: E402,F401
+from apps.domains.bulk_jobs import dispatch_bulk_items, run_bulk_item  # noqa: E402,F401
 from apps.domains.publication_redaction_jobs import dispatch_publication_redactions, run_publication_redaction  # noqa: E402,F401

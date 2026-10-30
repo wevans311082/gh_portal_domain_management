@@ -16,6 +16,7 @@ from apps.domains.models import (
 )
 from apps.domains.publication_consent import capture_decision, publication_snapshot
 from apps.domains.registrar_policy import ALL_ROLES, policy_for, tld_for_domain, contact_payload_tld
+from apps.domains.bulk_reservations import BulkOperationPaused
 
 OPEN_STATUSES = ("queued", "preparing", "submitting", "awaiting", "unknown")
 MAX_OPEN_CHANGES = 500
@@ -57,7 +58,7 @@ def locked_source(domain):
     return source, attempt, kind
 
 
-def request_contact_change(*, customer, domain_id, key, contacts, publication_choice="redact"):
+def request_contact_change(*, customer, domain_id, key, contacts, publication_choice="redact", bulk_item_id=None):
     """Queue one validated proposal atomically, without provider HTTP or mail.
 
     A reused key returns its original request only for the identical proposal.
@@ -78,6 +79,14 @@ def request_contact_change(*, customer, domain_id, key, contacts, publication_ch
         domain = Domain.objects.select_for_update().filter(pk=domain_id, user=owner).first()
         if domain is None:
             raise PermissionDenied
+        parent = None
+        if bulk_item_id is not None:
+            from apps.domains.bulk_contacts import admitted_parent
+            parent, retained = admitted_parent(owner, domain, bulk_item_id, key, contacts, publication_choice)
+            if retained is not None:
+                return retained
+        from apps.domains.bulk_reservations import assert_no_bulk_operation
+        assert_no_bulk_operation(domain, item_id=parent.pk if parent else None)
         if domain.status != Domain.STATUS_ACTIVE:
             raise ValidationError("Contact changes require an active domain.")
         policy = policy_for(tld_for_domain(domain.name))
@@ -126,6 +135,12 @@ def request_contact_change(*, customer, domain_id, key, contacts, publication_ch
             "previous_remote_ids": dict(source.registrar_contact_ids),
             "publication": publication_snapshot(change, selected["registration_contact"])}
         change.save()
+        if parent is not None:
+            parent.contact_change = change
+            parent.status = "awaiting"
+            parent.message = "Contact proposal queued. Registrar processing and applicable registrant approvals are still pending."
+            parent.save(update_fields=["contact_change", "status", "message", "updated_at"])
+            AuditLog.objects.create(user=owner, action="domain.bulk.contact_linked", model_name="BulkDomainItem", object_id=str(parent.pk), data={"batch_id": parent.batch_id, "contact_change_id": change.pk})
         AuditLog.objects.create(user=owner, action="domain.contact_change.queued", model_name="Domain",
             object_id=str(domain.pk), data={"contact_change_id": change.pk})
         from apps.domains.contact_change_jobs import publish_contact_change
@@ -133,7 +148,7 @@ def request_contact_change(*, customer, domain_id, key, contacts, publication_ch
         return change
 
 
-def _locked_proposal(change_id, *, allow_withdrawn_publication=False):
+def _locked_proposal(change_id, *, allow_withdrawn_publication=False, allow_bulk_paused=False):
     """Re-read all mutable subjects using the same lock order as admission."""
     identity = DomainContactChange.objects.values("user_id", "domain_id").get(pk=change_id)
     owner = User.objects.select_for_update().get(pk=identity["user_id"])
@@ -170,6 +185,8 @@ def _locked_proposal(change_id, *, allow_withdrawn_publication=False):
             and RegistrantPublicationDecision.objects.filter(pk=change.publication_decision_id, withdrawn_at__isnull=False).exists())
         if not withdrawn_after_submission:
             raise ValidationError("The publication choice changed. Review the request.")
+    from apps.domains.bulk_contacts import validate_contact_link
+    validate_contact_link(change, allow_paused=allow_bulk_paused)
     return change, contacts
 
 
@@ -270,6 +287,12 @@ def submit_contact_change(change_id, *, client):
             AuditLog.objects.create(action="domain.contact_change.submitted", model_name="Domain",
                 object_id=str(current.domain_id), data={"contact_change_id": current.pk})
         return "awaiting"
+    except BulkOperationPaused:
+        # Known immutable contact bindings can be reused after a pre-submission
+        # pause. A committed domain-mutation marker is never reopened.
+        DomainContactChange.objects.filter(pk=change_id, token=token, status="preparing", submitted_at__isnull=True).update(status="queued")
+        DomainContactChange.objects.filter(pk=change_id, token=token, status="submitting").update(status="unknown")
+        raise
     except BaseException:
         # Never persist raw provider exceptions or reopen a durable call marker.
         DomainContactChange.objects.filter(pk=change_id, token=token, status="preparing").update(status="failed")

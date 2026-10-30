@@ -93,7 +93,7 @@ def confirm_provider_completed(change_id, *, owner_id, reference, reason, provid
     if not User.objects.filter(pk=owner_id, is_active=True, is_staff=True, is_superuser=True).exists():
         raise ValidationError("An active owner is required for completion review.")
     with transaction.atomic(durable=True):
-        current, contacts = _locked_proposal(change_id, allow_withdrawn_publication=True)
+        current, contacts = _locked_proposal(change_id, allow_withdrawn_publication=True, allow_bulk_paused=True)
         actor = User.objects.select_for_update().filter(pk=owner_id, is_active=True, is_staff=True, is_superuser=True).first()
         now = timezone.now()
         if (actor is None or current.status not in {"awaiting", "unknown"} or not identifier(current.action_id)
