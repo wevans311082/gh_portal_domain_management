@@ -34,6 +34,25 @@ def configured_whm_nameservers(client):
     return tuple(normalized)
 
 
+def zone_creation_options(target, client=None):
+    if target != Domain.DNS_PROVIDER_CPANEL:
+        return {}
+    from apps.core.runtime_settings import get_runtime_setting
+    from ipaddress import IPv4Address
+    value = getattr(client, "dns_zone_ip", None)
+    if value is None:
+        value = get_runtime_setting("WHM_DNS_ZONE_IP", "")
+    if value == "":
+        return {}
+    try:
+        if type(value) is not str:
+            raise ValueError
+        ip = str(IPv4Address(value))
+    except ValueError:
+        raise ValidationError("WHM zone creation requires an owner-reviewed IPv4 address.") from None
+    return {"ip": ip, "template": "simple", "owner": "authenticated_user", "nameservers": list(configured_whm_nameservers(client))}
+
+
 def backend_scope(target, client=None):
     if target == Domain.DNS_PROVIDER_CLOUDFLARE:
         from apps.cloudflare_integration.services import CloudflareService
@@ -110,9 +129,12 @@ def _source(domain, *, dns_change_id=None, source_client=None):
 
 
 def _manifest(change):
-    return _fingerprint({"key": str(change.key), "domain_id": change.domain_id, "user_id": change.user_id, "actor_id": change.requested_by_id,
+    body = {"key": str(change.key), "domain_id": change.domain_id, "user_id": change.user_id, "actor_id": change.requested_by_id,
         "target": change.target_provider, "scope": change.provider_scope, "source": change.source,
-        "request_digest": change.request_digest, "expires_at": change.expires_at.isoformat()})
+        "request_digest": change.request_digest, "expires_at": change.expires_at.isoformat()}
+    if getattr(change, "zone_creation", {}):
+        body["zone_creation"] = change.zone_creation
+    return _fingerprint(body)
 
 
 @transaction.atomic
@@ -133,6 +155,7 @@ def create_dns_preview(*, actor, domain_id, target_provider, key, client=None, s
     source = _source(domain, source_client=source_client)
     change = DomainDNSChange(key=key, domain=domain, user_id=domain.user_id, requested_by=actor,
         target_provider=target_provider, provider_scope=backend_scope(target_provider, client), source=source,
+        zone_creation=zone_creation_options(target_provider, client),
         request_digest=identity, expires_at=timezone.now() + timedelta(minutes=30))
     change.manifest_digest = _manifest(change)
     change.save()
@@ -161,7 +184,8 @@ def confirm_dns_change(*, actor, change_id, manifest_digest, confirmed, client=N
         raise ValidationError("This DNS request is not awaiting confirmation.")
     if change.expires_at <= timezone.now():
         raise ValidationError("The DNS preview expired. Review a new preview.")
-    if _source(domain, source_client=source_client) != change.source or backend_scope(change.target_provider, client) != change.provider_scope:
+    if (_source(domain, source_client=source_client) != change.source or backend_scope(change.target_provider, client) != change.provider_scope
+            or zone_creation_options(change.target_provider, client) != change.zone_creation):
         raise ValidationError("The DNS source or provider configuration changed. Review a new preview.")
     DomainDNSReservation.objects.create(domain=domain, change=change)
     change.confirmed_at = timezone.now()

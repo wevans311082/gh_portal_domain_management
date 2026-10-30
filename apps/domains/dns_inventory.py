@@ -45,6 +45,31 @@ def _delegation(change, registrar):
     return tuple(sorted(observed_nameservers(payload, change.source)))
 
 
+def read_source_receipt(change, source_client, registrar):
+    """Read complete source evidence, shared by admission and pre-apply checks."""
+    if connection.in_atomic_block:
+        raise ValidationError("Read source DNS outside a database transaction.")
+    before = _delegation(change, registrar)
+    if change.source["dns_provider"] == Domain.DNS_PROVIDER_CLOUDFLARE:
+        inventory = read_inventory(zone_id=change.source["cloudflare_zone_id"], domain_name=change.source["name"],
+            client=source_client, expected_scope=change.source["dns_source_scope"])
+        expected_status = "active"
+    elif change.source["dns_provider"] == Domain.DNS_PROVIDER_CPANEL:
+        from apps.provisioning.dns_inventory import read_inventory as read_whm_inventory
+        inventory = read_whm_inventory(domain_name=change.source["name"], client=source_client,
+            expected_scope=change.source["dns_source_scope"])
+        expected_status = "configured"
+    else:
+        raise ValidationError("This DNS source needs a reviewed inventory adapter.")
+    after = _delegation(change, registrar)
+    if (inventory.zone.status != expected_status or before != after
+            or before != tuple(sorted(inventory.zone.nameservers))):
+        raise ValidationError("The DNS source is not the verified authoritative delegation.")
+    return {"version": 1, "zone": asdict(inventory.zone), "records": list(inventory.records),
+        "record_digest": inventory.digest, "unsupported_types": list(inventory.unsupported_types),
+        "registrar_nameservers": list(after)}
+
+
 def _review(change_id, token):
     # Recording a read failure never frees the slot or resets a mutation marker.
     with transaction.atomic():
@@ -96,25 +121,7 @@ def collect_dns_inventory(change_id, *, source_client=None, target_client=None, 
         change.save(update_fields=["inventory_token", "inventory_lease_until", "updated_at"])
         AuditLog.objects.create(user=actor, action="domain.dns.inventory_started", model_name="DomainDNSChange", object_id=str(change.pk), data={})
     try:
-        before = _delegation(change, registrar)
-        if change.source["dns_provider"] == Domain.DNS_PROVIDER_CLOUDFLARE:
-            inventory = read_inventory(zone_id=change.source["cloudflare_zone_id"], domain_name=change.source["name"],
-                client=source_client, expected_scope=change.source["dns_source_scope"])
-            expected_status = "active"
-        elif change.source["dns_provider"] == Domain.DNS_PROVIDER_CPANEL:
-            from apps.provisioning.dns_inventory import read_inventory as read_whm_inventory
-            inventory = read_whm_inventory(domain_name=change.source["name"], client=source_client,
-                expected_scope=change.source["dns_source_scope"])
-            expected_status = "configured"
-        else:
-            raise ValidationError("This DNS source needs a reviewed inventory adapter.")
-        after = _delegation(change, registrar)
-        if (inventory.zone.status != expected_status or before != after
-                or before != tuple(sorted(inventory.zone.nameservers))):
-            raise ValidationError("The DNS source is not the verified authoritative delegation.")
-        receipt = {"version": 1, "zone": asdict(inventory.zone), "records": list(inventory.records),
-            "record_digest": inventory.digest, "unsupported_types": list(inventory.unsupported_types),
-            "registrar_nameservers": list(after)}
+        receipt = read_source_receipt(change, source_client, registrar)
         with transaction.atomic():
             actor, domain, current = _locked(change_id)
             if (current.status != "inventory" or current.inventory_token != token
@@ -128,7 +135,7 @@ def collect_dns_inventory(change_id, *, source_client=None, target_client=None, 
             current.inventory_message = "Source inventory retained. Review the migration plan before provider changes."
             current.save(update_fields=["inventory_receipt", "inventory_digest", "inventory_observed_at", "inventory_token",
                 "inventory_lease_until", "status", "inventory_message", "updated_at"])
-            AuditLog.objects.create(user=actor, action="domain.dns.inventory_observed", model_name="DomainDNSChange", object_id=str(current.pk), data={"record_count": len(inventory.records)})
+            AuditLog.objects.create(user=actor, action="domain.dns.inventory_observed", model_name="DomainDNSChange", object_id=str(current.pk), data={"record_count": len(receipt["records"])})
             return current
     except (ValidationError, PermissionDenied, CloudflareError, ResellerClubError, WHMClientError):
         return _review(change_id, token)

@@ -204,6 +204,24 @@ class RegistrarSettingsForm(forms.Form):
 
 
 class HostingSettingsForm(forms.Form):
+    whm_dns_zone_ip = forms.GenericIPAddressField(
+        protocol="IPv4", required=False, label="DNS zone IPv4 address",
+        help_text="Address used when creating a WHM DNS zone. Generated records require review before switching DNS.",
+    )
+    whm_nameservers = forms.CharField(
+        max_length=3400, required=False, label="WHM nameservers",
+        help_text="Comma-separated authoritative nameservers for WHM DNS.",
+    )
+
+    def clean_whm_nameservers(self):
+        from .setting_schema import SettingValidationError, validate_setting
+
+        try:
+            value, _ = validate_setting("WHM_NAMESERVERS", self.cleaned_data["whm_nameservers"])
+        except SettingValidationError:
+            raise forms.ValidationError("Enter up to 13 distinct, comma-separated nameserver hostnames.") from None
+        return value
+
     whm_host = forms.CharField(max_length=255, label="WHM Hostname / IP", required=False)
     whm_port = forms.IntegerField(label="WHM Port", initial=2087)
     whm_username = forms.CharField(max_length=100, label="WHM Username", initial="root", required=False)
@@ -213,6 +231,11 @@ class HostingSettingsForm(forms.Form):
 
 
 class CloudflareSettingsForm(forms.Form):
+    cloudflare_account_id = forms.RegexField(
+        regex=r"^[a-fA-F0-9]{32}$", max_length=32, required=False,
+        label="Cloudflare account ID",
+        help_text="Account in which new managed DNS zones will be created.",
+    )
     cloudflare_api_token = forms.CharField(
         max_length=255, label="Cloudflare API Token", widget=forms.PasswordInput, required=False,
     )
@@ -304,12 +327,15 @@ _STEP_ENV_KEYS = {
     },
     WizardProgress.STEP_HOSTING: {
         "whm_host": "WHM_HOST",
+        "whm_dns_zone_ip": "WHM_DNS_ZONE_IP",
+        "whm_nameservers": "WHM_NAMESERVERS",
         "whm_port": "WHM_PORT",
         "whm_username": "WHM_USERNAME",
         "whm_api_token": "WHM_API_TOKEN",
     },
     WizardProgress.STEP_CLOUDFLARE: {
         "cloudflare_api_token": "CLOUDFLARE_API_TOKEN",
+        "cloudflare_account_id": "CLOUDFLARE_ACCOUNT_ID",
         "cloudflare_email": "CLOUDFLARE_EMAIL",
     },
 }

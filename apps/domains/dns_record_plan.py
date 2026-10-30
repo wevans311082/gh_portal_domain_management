@@ -182,8 +182,12 @@ def build_record_plan(*, source_provider, target_provider, zone_name, inventory_
             groups.setdefault((record["name"], record["type"]), []).append(entry)
             cnames.setdefault(record["name"], set()).add(record["type"])
     for (name, kind), group in groups.items():
+        options = {}
+        for entry in group:
+            options.setdefault(entry["record"]["rdata_wire"], set()).add(_fingerprint(entry["record"].get("provider_options", {})))
         reason = ("cname_conflict" if "CNAME" in cnames[name] and len(cnames[name]) > 1 else
                   "rrset_ttl_conflict" if len({entry["record"]["ttl"] for entry in group}) > 1 else
+                  "duplicate_provider_options_conflict" if any(len(values) > 1 for values in options.values()) else
                   "multiple_cname_targets" if kind == "CNAME" and len({entry["record"]["rdata_wire"] for entry in group}) > 1 else None)
         seen = {}
         for entry in group:

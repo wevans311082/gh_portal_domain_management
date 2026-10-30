@@ -7,6 +7,30 @@ from django.urls import reverse
 from apps.admin_tools.models import WizardProgress
 
 
+@pytest.mark.parametrize("address", ["192.0.2.44", "", "2001:db8::1", "invalid"])
+def test_hosting_dns_address_requires_ipv4(address):
+    from apps.admin_tools.wizard_views import HostingSettingsForm
+
+    form = HostingSettingsForm(data={"whm_port": 2087, "whm_dns_zone_ip": address})
+    assert form.is_valid() is (address in {"192.0.2.44", ""})
+
+
+@pytest.mark.parametrize("nameservers", ["ns1.example.com,ns2.example.com", "", "ns1.example.com,NS1.example.com", "https://ns1.example.com"])
+def test_hosting_dns_nameservers_are_validated(nameservers):
+    from apps.admin_tools.wizard_views import HostingSettingsForm
+
+    form = HostingSettingsForm(data={"whm_port": 2087, "whm_nameservers": nameservers})
+    assert form.is_valid() is (nameservers in {"ns1.example.com,ns2.example.com", ""})
+
+
+@pytest.mark.parametrize("account", ["a" * 32, "", "not-an-account"])
+def test_cloudflare_zone_account_is_validated(account):
+    from apps.admin_tools.wizard_views import CloudflareSettingsForm
+
+    form = CloudflareSettingsForm(data={"cloudflare_account_id": account})
+    assert form.is_valid() is (account in {"a" * 32, ""})
+
+
 @pytest.mark.django_db
 def test_finished_wizard_still_accessible(client, django_user_model):
     staff = django_user_model.objects.create_user(
@@ -116,11 +140,15 @@ def test_hosting_step_save_does_not_clear_existing_whm_token_when_blank(client, 
             "whm_port": "2087",
             "whm_username": "root",
             "whm_api_token": "",
+            "whm_dns_zone_ip": "192.0.2.44",
+            "whm_nameservers": "ns1.example.com,ns2.example.com",
         },
     )
 
     assert response.status_code == 302
     assert IntegrationSetting.get_value("WHM_API_TOKEN", "") == "saved-token"
+    assert IntegrationSetting.get_value("WHM_DNS_ZONE_IP", "") == "192.0.2.44"
+    assert IntegrationSetting.get_value("WHM_NAMESERVERS", "") == "ns1.example.com,ns2.example.com"
     env_text = env_file.read_text(encoding="utf-8")
     assert 'WHM_API_TOKEN="saved-token"' in env_text
 

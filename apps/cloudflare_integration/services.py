@@ -78,6 +78,16 @@ class CloudflareService:
     def get_zone(self, zone_id):
         return self._request("GET", f"zones/{zone_id}")
 
+    def create_managed_zone(self, zone_name, *, account_id):
+        """Create one explicitly scoped full zone using the current API contract."""
+        return self._request("POST", "zones", json={"name": self._zone_name(zone_name),
+            "account": {"id": self._account_id(account_id)}, "type": "full"})
+
+    def get_dnssec(self, zone_id):
+        if type(zone_id) is not str or re.fullmatch(r"[a-fA-F0-9]{32}", zone_id) is None:
+            raise CloudflareError("Choose a valid Cloudflare zone identifier.")
+        return self._request("GET", f"zones/{zone_id}/dnssec")
+
     def list_dns_records(self, zone_id, *, page=None, per_page=200):
         if page is None:
             return self._request("GET", f"zones/{zone_id}/dns_records")

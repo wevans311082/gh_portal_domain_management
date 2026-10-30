@@ -823,6 +823,7 @@ class DomainDNSChange(TimeStampedModel):
     requested_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="requested_dns_changes")
     target_provider = models.CharField(max_length=16)
     provider_scope = models.CharField(max_length=64)
+    zone_creation = models.JSONField(default=dict, blank=True)
     source = models.JSONField(default=dict)
     request_digest = models.CharField(max_length=64)
     manifest_digest = models.CharField(max_length=64)
@@ -839,18 +840,31 @@ class DomainDNSChange(TimeStampedModel):
     inventory_lease_until = models.DateTimeField(null=True, blank=True)
     inventory_message = models.CharField(max_length=500, blank=True)
     approved_record_plan = models.ForeignKey("DomainDNSRecordPlan", on_delete=models.PROTECT, null=True, blank=True, related_name="approved_changes")
+    approved_apply_plan = models.ForeignKey("DomainDNSApplyPlan", on_delete=models.PROTECT, null=True, blank=True, related_name="approved_changes")
     completed_at = models.DateTimeField(null=True, blank=True)
     cancelled_at = models.DateTimeField(null=True, blank=True)
     cancelled_by = models.ForeignKey(User, on_delete=models.PROTECT, null=True, blank=True, related_name="cancelled_dns_changes")
     cancellation_reason = models.CharField(max_length=32, blank=True)
+    target_receipt = models.JSONField(default=dict, blank=True)
+    target_digest = models.CharField(max_length=64, blank=True)
+    target_observed_at = models.DateTimeField(null=True, blank=True)
+    target_token = models.UUIDField(null=True, blank=True, editable=False)
+    target_lease_until = models.DateTimeField(null=True, blank=True)
+    target_message = models.CharField(max_length=500, blank=True)
+    target_approved_at = models.DateTimeField(null=True, blank=True)
+    target_approved_by = models.ForeignKey(User, on_delete=models.PROTECT, null=True, blank=True, related_name="approved_dns_targets")
+    target_approved_digest = models.CharField(max_length=64, blank=True)
+    target_acknowledgements = models.JSONField(default=list, blank=True)
 
     def save(self, *args, **kwargs):
         if self.pk:
-            fields = ("key", "domain_id", "user_id", "requested_by_id", "target_provider", "provider_scope",
+            fields = ("key", "domain_id", "user_id", "requested_by_id", "target_provider", "provider_scope", "zone_creation",
                       "source", "request_digest", "manifest_digest", "expires_at")
             prior = type(self).objects.filter(pk=self.pk).values(*fields, "confirmed_at", "zone_submitted_at", "zone_id",
-                "inventory_digest", "inventory_receipt", "inventory_observed_at", "approved_record_plan_id",
-                "status", "cancelled_at", "cancelled_by_id", "cancellation_reason").first()
+                "inventory_digest", "inventory_receipt", "inventory_observed_at", "approved_record_plan_id", "approved_apply_plan_id",
+                "status", "cancelled_at", "cancelled_by_id", "cancellation_reason",
+                "target_receipt", "target_digest", "target_observed_at", "target_approved_at",
+                "target_approved_by_id", "target_approved_digest", "target_acknowledgements").first()
             from django.core.exceptions import ValidationError
             if prior and any(prior[field] != getattr(self, field) for field in fields):
                 raise ValidationError("Retain the DNS switch preview. Review a new request for changed choices.")
@@ -865,13 +879,25 @@ class DomainDNSChange(TimeStampedModel):
                 raise ValidationError("Retain the DNS inventory receipt. Review a new request for changed evidence.")
             if prior and prior["approved_record_plan_id"] is not None and prior["approved_record_plan_id"] != self.approved_record_plan_id:
                 raise ValidationError("Retain the approved DNS record plan association.")
+            if prior and prior["approved_apply_plan_id"] is not None and prior["approved_apply_plan_id"] != self.approved_apply_plan_id:
+                raise ValidationError("Retain the approved DNS application plan association.")
             if prior and prior["cancelled_at"] is not None and any(prior[field] != getattr(self, field)
                     for field in ("status", "cancelled_at", "cancelled_by_id", "cancellation_reason")):
                 raise ValidationError("Retain the cancelled DNS request and its original attribution.")
+            if prior and prior["target_digest"] and any(prior[field] != getattr(self, field)
+                    for field in ("target_receipt", "target_digest", "target_observed_at")):
+                raise ValidationError("Retain the target DNS inventory and comparison. Review a new request for changed evidence.")
+            if prior and prior["target_approved_at"] is not None and any(prior[field] != getattr(self, field)
+                    for field in ("target_approved_at", "target_approved_by_id", "target_approved_digest", "target_acknowledgements")):
+                raise ValidationError("Retain the original target DNS plan approval and acknowledgements.")
         if self.approved_record_plan_id is not None and not DomainDNSRecordPlan.objects.filter(
                 pk=self.approved_record_plan_id, change_id=self.pk, approved_at__isnull=False, approved_by__isnull=False).exists():
             from django.core.exceptions import ValidationError
             raise ValidationError("Choose an approved record plan belonging to this DNS request.")
+        if self.approved_apply_plan_id is not None and not DomainDNSApplyPlan.objects.filter(
+                pk=self.approved_apply_plan_id, change_id=self.pk, approved_at__isnull=False, approved_by__isnull=False).exists():
+            from django.core.exceptions import ValidationError
+            raise ValidationError("Choose an approved application plan belonging to this DNS request.")
         super().save(*args, **kwargs)
 
 
@@ -902,6 +928,119 @@ class DomainDNSRecordPlan(TimeStampedModel):
             if previous and previous["approved_at"] is not None and (previous["approved_at"] != self.approved_at or previous["approved_by_id"] != self.approved_by_id):
                 raise ValidationError("Retain the original DNS record plan approval.")
         super().save(*args, **kwargs)
+
+
+class DomainDNSApplyPlan(TimeStampedModel):
+    """Immutable exact record changes, separately approved after zone preparation."""
+    change = models.ForeignKey(DomainDNSChange, on_delete=models.PROTECT, related_name="apply_plans")
+    source_plan = models.ForeignKey(DomainDNSRecordPlan, on_delete=models.PROTECT, related_name="apply_plans")
+    zone_step = models.ForeignKey("DomainDNSExecutionStep", on_delete=models.PROTECT, related_name="apply_plans")
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="created_dns_apply_plans")
+    plan = models.JSONField(default=dict)
+    digest = models.CharField(max_length=64)
+    expires_at = models.DateTimeField()
+    approved_at = models.DateTimeField(null=True, blank=True)
+    approved_by = models.ForeignKey(User, on_delete=models.PROTECT, null=True, blank=True, related_name="approved_dns_apply_plans")
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=("change", "digest"), name="dns_apply_plan_digest_once")]
+
+    def save(self, *args, **kwargs):
+        from django.core.exceptions import ValidationError
+        from .contact_bindings import _fingerprint
+
+        if (self.approved_at is None) != (self.approved_by_id is None):
+            raise ValidationError("Retain both the DNS application approval time and actor.")
+        if self.pk:
+            fields = ("change_id", "source_plan_id", "zone_step_id", "created_by_id", "digest", "expires_at")
+            previous = type(self).objects.filter(pk=self.pk).values(*fields, "plan", "approved_at", "approved_by_id").first()
+            if previous and (any(previous[field] != getattr(self, field) for field in fields)
+                    or _fingerprint(previous["plan"]) != _fingerprint(self.plan)):
+                raise ValidationError("Retain the exact DNS application plan. Review a new revision for changed choices.")
+            if previous and previous["approved_at"] is not None and any(previous[field] != getattr(self, field)
+                    for field in ("approved_at", "approved_by_id")):
+                raise ValidationError("Retain the original DNS application approval.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        from django.core.exceptions import ValidationError
+        raise ValidationError("Retain DNS application plans and their consent history.")
+
+
+class DomainDNSExecutionStep(TimeStampedModel):
+    """Per-stage immutable intent and retained evidence; leases never erase POSTs."""
+    change = models.ForeignKey(DomainDNSChange, on_delete=models.PROTECT, related_name="execution_steps")
+    stage = models.CharField(max_length=16)
+    identity = models.CharField(max_length=255)
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="dns_execution_steps")
+    request = models.JSONField(default=dict)
+    request_digest = models.CharField(max_length=64)
+    status = models.CharField(max_length=20, default="preparing")
+    token = models.UUIDField(null=True, blank=True, editable=False)
+    lease_until = models.DateTimeField(null=True, blank=True)
+    preflights = models.JSONField(default=list, blank=True)
+    observations = models.JSONField(default=list, blank=True)
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    provider_id = models.CharField(max_length=255, blank=True)
+    receipt = models.JSONField(default=dict, blank=True)
+    receipt_digest = models.CharField(max_length=64, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    message = models.CharField(max_length=500, blank=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=("change", "stage", "identity"), name="dns_execution_identity_once")]
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            from .contact_bindings import _fingerprint
+            fields = ("change_id", "stage", "identity", "created_by_id", "request", "request_digest")
+            prior = type(self).objects.filter(pk=self.pk).values(*fields, "submitted_at", "provider_id",
+                "preflights", "observations", "receipt", "receipt_digest", "completed_at", "status").first()
+            from django.core.exceptions import ValidationError
+            def unchanged(field):
+                if field in {"request", "receipt"}:
+                    return _fingerprint(prior[field]) == _fingerprint(getattr(self, field))
+                return prior[field] == getattr(self, field)
+            if prior and any(not unchanged(field) for field in fields):
+                raise ValidationError("Retain the original DNS execution request.")
+            if prior:
+                for field in ("preflights", "observations"):
+                    values = getattr(self, field)
+                    if (type(values) is not list or len(values) > 20
+                            or _fingerprint(values[:len(prior[field])]) != _fingerprint(prior[field])):
+                        raise ValidationError("Retain every DNS execution observation in order.")
+                if prior["submitted_at"] is not None and prior["submitted_at"] != self.submitted_at:
+                    raise ValidationError("Retain the DNS execution submission marker for reconciliation.")
+                if prior["provider_id"] and prior["provider_id"] != self.provider_id:
+                    raise ValidationError("Retain the acknowledged provider association.")
+                if prior["receipt_digest"] and any(not unchanged(field)
+                        for field in ("receipt", "receipt_digest", "completed_at", "status", "submitted_at", "provider_id")):
+                    raise ValidationError("Retain the completed DNS execution receipt.")
+        super().save(*args, **kwargs)
+
+
+class DomainDNSRecoveryEvidence(TimeStampedModel):
+    """Immutable owner observations under replacement credentials, not consent."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    step = models.ForeignKey(DomainDNSExecutionStep, on_delete=models.PROTECT, related_name="recovery_evidence")
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="dns_recovery_evidence")
+    observed_at = models.DateTimeField()
+    provider_scope = models.CharField(max_length=64)
+    body = models.JSONField(default=dict)
+    digest = models.CharField(max_length=64)
+
+    class Meta:
+        ordering = ["-observed_at", "-pk"]
+
+    def save(self, *args, **kwargs):
+        if self.pk and type(self).objects.filter(pk=self.pk).exists():
+            from django.core.exceptions import ValidationError
+            raise ValidationError("Retain the credential-recovery observation. Record new evidence instead.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        from django.core.exceptions import ValidationError
+        raise ValidationError("Credential-recovery history must be retained.")
 
 
 class DomainTransfer(TimeStampedModel):

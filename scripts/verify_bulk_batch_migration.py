@@ -132,7 +132,58 @@ def main():
     assert final.get_model("domains", "DomainDNSRecordPlan").objects.count() == 0
     retained_dns = final.get_model("domains", "DomainDNSChange").objects.get(pk=dns_change.pk)
     assert retained_dns.approved_record_plan_id is None and retained_dns.zone_id == "retained-zone" and retained_dns.zone_submitted_at is not None
-    print("Bulk/DNS upgrades passed through 0040: historical data and uncertain markers retained; no inferred inventory evidence, record plans or approvals; unrelated status choices unchanged.")
+    executor = MigrationExecutor(connection)
+    after = [("domains", "0041_dns_cancellation_history")]
+    executor.migrate(after)
+    final = executor.loader.project_state(after).apps
+    retained_dns = final.get_model("domains", "DomainDNSChange").objects.get(pk=dns_change.pk)
+    assert retained_dns.status == "review" and retained_dns.zone_submitted_at is not None and retained_dns.zone_id == "retained-zone"
+    assert retained_dns.cancelled_at is None and retained_dns.cancelled_by_id is None and retained_dns.cancellation_reason == ""
+    assert final.get_model("domains", "DomainOrder")._meta.get_field("status").deconstruct()[3] == status_definition
+    executor = MigrationExecutor(connection)
+    after = [("domains", "0042_dns_target_receipts")]
+    executor.migrate(after)
+    final = executor.loader.project_state(after).apps
+    retained_dns = final.get_model("domains", "DomainDNSChange").objects.get(pk=dns_change.pk)
+    assert retained_dns.status == "review" and retained_dns.zone_submitted_at is not None and retained_dns.zone_id == "retained-zone"
+    assert retained_dns.target_receipt == {} and retained_dns.target_digest == "" and retained_dns.target_observed_at is None
+    assert retained_dns.target_token is None and retained_dns.target_lease_until is None
+    assert final.get_model("domains", "DomainOrder")._meta.get_field("status").deconstruct()[3] == status_definition
+    executor = MigrationExecutor(connection)
+    after = [("domains", "0043_dns_target_approval")]
+    executor.migrate(after)
+    final = executor.loader.project_state(after).apps
+    retained_dns = final.get_model("domains", "DomainDNSChange").objects.get(pk=dns_change.pk)
+    assert retained_dns.status == "review" and retained_dns.zone_submitted_at is not None and retained_dns.zone_id == "retained-zone"
+    assert retained_dns.target_approved_at is None and retained_dns.target_approved_by_id is None
+    assert retained_dns.target_approved_digest == "" and retained_dns.target_acknowledgements == []
+    assert final.get_model("domains", "DomainOrder")._meta.get_field("status").deconstruct()[3] == status_definition
+    executor = MigrationExecutor(connection)
+    after = [("domains", "0044_dns_execution_steps")]
+    executor.migrate(after)
+    final = executor.loader.project_state(after).apps
+    retained_dns = final.get_model("domains", "DomainDNSChange").objects.get(pk=dns_change.pk)
+    assert retained_dns.status == "review" and retained_dns.zone_submitted_at is not None and retained_dns.zone_id == "retained-zone"
+    assert final.get_model("domains", "DomainDNSExecutionStep").objects.count() == 0
+    assert final.get_model("domains", "DomainOrder")._meta.get_field("status").deconstruct()[3] == status_definition
+    executor = MigrationExecutor(connection)
+    after = [("domains", "0045_dns_recovery_evidence")]
+    executor.migrate(after)
+    final = executor.loader.project_state(after).apps
+    retained_dns = final.get_model("domains", "DomainDNSChange").objects.get(pk=dns_change.pk)
+    assert retained_dns.status == "review" and retained_dns.zone_submitted_at is not None and retained_dns.zone_id == "retained-zone"
+    assert final.get_model("domains", "DomainDNSRecoveryEvidence").objects.count() == 0
+    assert final.get_model("domains", "DomainDNSExecutionStep").objects.count() == 0
+    assert final.get_model("domains", "DomainOrder")._meta.get_field("status").deconstruct()[3] == status_definition
+    executor = MigrationExecutor(connection)
+    after = [("domains", "0046_dns_zone_creation_options")]
+    executor.migrate(after)
+    final = executor.loader.project_state(after).apps
+    retained_dns = final.get_model("domains", "DomainDNSChange").objects.get(pk=dns_change.pk)
+    assert retained_dns.status == "review" and retained_dns.zone_submitted_at is not None and retained_dns.zone_id == "retained-zone"
+    assert retained_dns.zone_creation == {}
+    assert final.get_model("domains", "DomainOrder")._meta.get_field("status").deconstruct()[3] == status_definition
+    print("Bulk/DNS upgrades passed through 0046: historical data and uncertain markers retained; no inferred evidence, approvals, execution jobs, credential recovery or zone-creation inputs; unrelated status choices unchanged.")
     connection.close()
 
 

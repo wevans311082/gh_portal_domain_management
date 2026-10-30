@@ -44,6 +44,7 @@ _add("RESELLERCLUB_RESELLER_ID RESELLERCLUB_CUSTOMER_ID", "identifier", limit=50
 _add("CLOUDFLARE_ACCOUNT_ID", "cloudflare_account", limit=32)
 _add("RESELLERCLUB_API_URL", "url", limit=2048)
 _add("WHM_NAMESERVERS", "hosts", limit=3400)
+_add("WHM_DNS_ZONE_IP", "ipv4", limit=15)
 _add("REGISTRAR_LOW_BALANCE_THRESHOLD", "money", limit=20)
 _add("M365_GRAPH_TIMEOUT_SECONDS", "timeout", limit=3)
 
@@ -84,6 +85,11 @@ def validate_setting(key, value):
             value = str(int(value))
         elif kind == "host":
             _hostname(value)
+        elif kind == "ipv4":
+            parsed_ip = ip_address(value)
+            if parsed_ip.version != 4:
+                raise ValueError
+            value = str(parsed_ip)
         elif kind == "hosts":
             hosts = value.split(",")
             if not 1 <= len(hosts) <= 13 or len(set(host.strip().lower() for host in hosts)) != len(hosts):

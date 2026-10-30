@@ -28,9 +28,4 @@ class Migration(migrations.Migration):
             name='cancelled_by',
             field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='cancelled_dns_changes', to=settings.AUTH_USER_MODEL),
         ),
-        migrations.AlterField(
-            model_name='domainorder',
-            name='status',
-            field=models.CharField(choices=[('draft', 'Draft'), ('pending_payment', 'Pending payment'), ('paid', 'Paid'), ('processing', 'Processing'), ('paused', 'Paused'), ('completed', 'Completed'), ('failed', 'Failed'), ('cancelled', 'Cancelled')], default='draft', max_length=20),
-        ),
     ]

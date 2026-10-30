@@ -143,6 +143,65 @@ class WHMClient:
                     records.append(item)
         return records
 
+    def _strict_dns_api(self, function, params):
+        """One documented DNS API request; isolated transport, no GET retries."""
+        import json
+        def unique_object(pairs):
+            result = {}
+            for key, value in pairs:
+                if key in result:
+                    raise ValueError
+                result[key] = value
+            return result
+        def invalid_constant(value):
+            raise ValueError
+        error = "The WHM DNS API result requires review."
+        try:
+            with requests.Session() as transport:
+                transport.trust_env = False
+                response = transport.get(f"{self.base_url}/{function}", params={"api.version": 1, **params},
+                    headers={"Authorization": f"whm {self.username}:{self.api_token}", "Cache-Control": "no-cache, no-store",
+                        "Accept": "application/json", "Accept-Encoding": "identity"},
+                    timeout=(10, 30), allow_redirects=False, verify=True, stream=True)
+                try:
+                    if (not 200 <= response.status_code < 300
+                            or response.headers.get("Content-Encoding", "identity").lower() not in {"", "identity"}):
+                        raise WHMClientError(error)
+                    chunks, size = [], 0
+                    for chunk in response.iter_content(chunk_size=8192):
+                        size += len(chunk)
+                        if size > 4 * 1024 * 1024:
+                            raise WHMClientError(error)
+                        chunks.append(chunk)
+                    payload = json.loads(b"".join(chunks).decode("utf-8"), object_pairs_hook=unique_object, parse_constant=invalid_constant)
+                finally:
+                    response.close()
+        except (requests.RequestException, ValueError, RecursionError):
+            raise WHMClientError(error) from None
+        metadata = payload.get("metadata") if type(payload) is dict else None
+        if (type(metadata) is not dict or type(metadata.get("result")) is not int or metadata["result"] != 1
+                or metadata.get("command") != function or type(metadata.get("version")) is not int or metadata["version"] != 1):
+            raise WHMClientError(error)
+        return payload
+
+    def list_dns_zones(self):
+        return self._strict_dns_api("listzones", {})
+
+    def create_dns_zone(self, domain, *, ip):
+        from django.core.validators import validate_domain_name
+        from ipaddress import IPv4Address
+        validate_domain_name(domain)
+        if type(ip) is not str:
+            raise WHMClientError("Choose an explicitly reviewed WHM creation IPv4 address.")
+        try:
+            address = str(IPv4Address(ip))
+        except ValueError:
+            raise WHMClientError("Choose an explicitly reviewed WHM creation IPv4 address.") from None
+        self._strict_dns_api("adddns", {"domain": domain.lower().rstrip("."), "ip": address, "template": "simple"})
+        # Ownership follows the documented authenticated-user default. No
+        # cPanel account is inferred from a portal user's name or email.
+        return True
+
     def parse_dns_zone(self, domain: str) -> dict:
         """Read the lossless WHM API 1 zone representation without fallbacks."""
         from django.core.validators import validate_domain_name
@@ -162,6 +221,34 @@ class WHMClient:
                 or metadata.get("command") != "parse_dns_zone" or type(metadata.get("version")) is not int or metadata["version"] != 1):
             raise WHMClientError("WHM DNS inventory response requires review.")
         return payload
+
+    def get_dnssec_status(self, domain: str) -> dict:
+        """Read DNSSEC configuration without returning or logging private keys."""
+        from django.core.validators import validate_domain_name
+        validate_domain_name(domain)
+        domain = domain.lower().rstrip(".")
+        error = "WHM DNSSEC configuration requires review."
+        try:
+            response = self.session.get(f"{self.base_url}/fetch_ds_records_for_domains",
+                params={"api.version": 1, "domain": domain}, timeout=(10, 30), allow_redirects=False)
+            if not 200 <= response.status_code < 300:
+                raise WHMClientError(error)
+            payload = response.json()
+        except (requests.RequestException, ValueError):
+            raise WHMClientError(error) from None
+        metadata = payload.get("metadata") if type(payload) is dict else None
+        if (type(metadata) is not dict or type(metadata.get("result")) is not int or metadata["result"] != 1
+                or metadata.get("command") != "fetch_ds_records_for_domains"
+                or type(metadata.get("version")) is not int or metadata["version"] != 1):
+            raise WHMClientError(error)
+        data = payload.get("data")
+        domains = data.get("domains") if type(data) is dict else None
+        if (type(domains) is not list or len(domains) != 1 or type(domains[0]) is not dict
+                or domains[0].get("domain") != domain or type(domains[0].get("ds_records")) is not dict):
+            raise WHMClientError(error)
+        # The documented nonempty structure can contain privatekey. Never
+        # return it, hash it into a receipt, log it or copy the provider body.
+        return {"domain": domain, "status": "disabled" if domains[0]["ds_records"] == {} else "configured"}
 
     def modify_account_nameservers(self, username: str, nameservers: list[str]) -> dict:
         """Best-effort update of account nameserver fields via modifyacct."""

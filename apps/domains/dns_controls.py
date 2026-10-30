@@ -11,7 +11,7 @@ from .models import DomainDNSChange, DomainDNSReservation
 
 
 CANCELLATION_REASONS = frozenset({"user_cancelled", "replace_expired_plan", "source_changed"})
-PRE_MUTATION_STATES = frozenset({"draft", "inventory", "plan_review", "plan_approved", "review"})
+PRE_MUTATION_STATES = frozenset({"draft", "inventory", "plan_review", "plan_approved", "review", "target_inventory", "target_review", "target_approved"})
 
 
 @transaction.atomic
@@ -35,13 +35,15 @@ def cancel_dns_change(*, actor, change_id, manifest_digest, confirmed, reason):
         raise ValidationError("The retained DNS request requires review before cancellation.")
     if change.inventory_digest and change.inventory_digest != _fingerprint(change.inventory_receipt):
         raise ValidationError("The retained DNS inventory requires review before cancellation.")
+    if change.target_digest and change.target_digest != _fingerprint(change.target_receipt):
+        raise ValidationError("The retained target DNS inventory requires review before cancellation.")
     if change.status == "cancelled" and change.cancelled_at is not None and change.cancelled_by_id is not None:
         if reason != change.cancellation_reason or DomainDNSReservation.objects.filter(change=change).exists():
             raise ValidationError("The retained DNS cancellation requires review.")
         return change
     if (change.status not in PRE_MUTATION_STATES or change.cancelled_at is not None
             or change.zone_submitted_at is not None or change.zone_id or change.zone_observation
-            or change.completed_at is not None):
+            or change.completed_at is not None or change.execution_steps.filter(submitted_at__isnull=False).exists()):
         raise ValidationError("Provider work may have started. Reconcile this DNS request before releasing it.")
     reservation = DomainDNSReservation.objects.select_for_update().filter(domain=domain).first()
     if change.confirmed_at is not None:
@@ -52,9 +54,12 @@ def cancel_dns_change(*, actor, change_id, manifest_digest, confirmed, reason):
     change.status, change.cancelled_at, change.cancelled_by = "cancelled", timezone.now(), actor
     change.cancellation_reason = reason
     change.inventory_token = change.inventory_lease_until = None
+    change.target_token = change.target_lease_until = None
     change.inventory_message = "Cancelled before provider changes. Review a new request to choose DNS settings."
     change.save(update_fields=["status", "cancelled_at", "cancelled_by", "cancellation_reason",
-        "inventory_token", "inventory_lease_until", "inventory_message", "updated_at"])
+        "inventory_token", "inventory_lease_until", "inventory_message", "target_token", "target_lease_until", "updated_at"])
+    change.execution_steps.filter(submitted_at__isnull=True, receipt_digest="").update(
+        status="cancelled", token=None, lease_until=None)
     if reservation is not None and reservation.change_id == change.pk:
         reservation.delete()
     AuditLog.objects.create(user=actor, action="domain.dns.cancelled", model_name="DomainDNSChange",
