@@ -53,6 +53,21 @@ def _body(change, source, step, target, decisions):
                 target_digest=_fingerprint(target), decisions=decisions)}
 
 
+def approved_apply_evidence(change, domain):
+    """Rebuild historical consent; caller separately checks live execution state."""
+    source, step, target = _evidence(change, domain)
+    plan = DomainDNSApplyPlan.objects.select_for_update().filter(pk=change.approved_apply_plan_id, change=change).first()
+    if (plan is None or plan.approved_at is None or plan.approved_by_id is None
+            or plan.source_plan_id != source.pk or plan.zone_step_id != step.pk
+            or type(plan.plan) is not dict or type(plan.plan.get("records")) is not dict
+            or plan.digest != _fingerprint(plan.plan)):
+        raise ValidationError("An intact approved record application plan is required.")
+    rebuilt = _body(change, source, step, target, plan.plan["records"].get("decisions"))
+    if _fingerprint(rebuilt) != plan.digest or rebuilt["records"]["blocked"] is not False:
+        raise ValidationError("The approved record application decisions require review.")
+    return plan
+
+
 @transaction.atomic
 def create_apply_plan(*, actor, change_id, decisions=None, source_client, target_client, registrar_client):
     actor, domain, change = _lock(actor, change_id)

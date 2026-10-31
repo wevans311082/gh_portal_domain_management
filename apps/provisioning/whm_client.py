@@ -187,6 +187,24 @@ class WHMClient:
     def list_dns_zones(self):
         return self._strict_dns_api("listzones", {})
 
+    def apply_dns_batch(self, payload):
+        """One serial-guarded mass edit; a timeout is never automatically retried."""
+        from django.core.validators import validate_domain_name
+        if (type(payload) is not dict or set(payload) != {"zone", "serial", "remove", "add"}
+                or type(payload["serial"]) is not int or not 0 <= payload["serial"] <= 4294967295
+                or type(payload["remove"]) is not list or type(payload["add"]) is not list
+                or any(type(index) is not int or index < 0 for index in payload["remove"])
+                or len(set(payload["remove"])) != len(payload["remove"])
+                or any(type(row) is not str for row in payload["add"])
+                or not 1 <= len(payload["remove"]) + len(payload["add"]) <= 2500):
+            raise WHMClientError("Choose a valid serial-bound WHM record batch.")
+        validate_domain_name(payload["zone"])
+        response = self._strict_dns_api("mass_edit_dns_zone", payload)
+        serial = response.get("data", {}).get("new_serial") if type(response.get("data")) is dict else None
+        if type(serial) is not int or not 0 <= serial <= 4294967295 or serial == payload["serial"]:
+            raise WHMClientError("The WHM record batch acknowledgement requires reconciliation.")
+        return {"new_serial": serial}
+
     def create_dns_zone(self, domain, *, ip):
         from django.core.validators import validate_domain_name
         from ipaddress import IPv4Address

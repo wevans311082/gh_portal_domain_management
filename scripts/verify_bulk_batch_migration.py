@@ -183,7 +183,16 @@ def main():
     assert retained_dns.status == "review" and retained_dns.zone_submitted_at is not None and retained_dns.zone_id == "retained-zone"
     assert retained_dns.zone_creation == {}
     assert final.get_model("domains", "DomainOrder")._meta.get_field("status").deconstruct()[3] == status_definition
-    print("Bulk/DNS upgrades passed through 0046: historical data and uncertain markers retained; no inferred evidence, approvals, execution jobs, credential recovery or zone-creation inputs; unrelated status choices unchanged.")
+    executor = MigrationExecutor(connection)
+    after = [("domains", "0047_dns_apply_plans")]
+    executor.migrate(after)
+    final = executor.loader.project_state(after).apps
+    retained_dns = final.get_model("domains", "DomainDNSChange").objects.get(pk=dns_change.pk)
+    assert retained_dns.status == "review" and retained_dns.zone_submitted_at is not None and retained_dns.zone_id == "retained-zone"
+    assert retained_dns.approved_apply_plan_id is None and retained_dns.zone_creation == {}
+    assert final.get_model("domains", "DomainDNSApplyPlan").objects.count() == 0
+    assert final.get_model("domains", "DomainOrder")._meta.get_field("status").deconstruct()[3] == status_definition
+    print("Bulk/DNS upgrades passed through 0047: historical data and uncertain markers retained; no inferred evidence, approvals, execution jobs, credential recovery, zone-creation inputs or application plans; unrelated status choices unchanged.")
     connection.close()
 
 

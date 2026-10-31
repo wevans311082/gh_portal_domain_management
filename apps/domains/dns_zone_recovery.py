@@ -15,7 +15,7 @@ from .contact_bindings import _fingerprint
 from .dns_controls import CANCELLATION_REASONS
 from .dns_plan_review import _lock
 from .dns_target_inventory import read_target_receipt
-from .dns_target_review import target_evidence
+from .dns_target_review import target_evidence, validate_zone_consent
 from .dns_zone_execution import _intact, _lease, _review, _assert_scope
 from apps.provisioning.whm_client import WHMClientError
 from .models import DomainDNSExecutionStep, DomainDNSReservation, DomainDNSRecoveryEvidence
@@ -23,12 +23,11 @@ from .models import DomainDNSExecutionStep, DomainDNSReservation, DomainDNSRecov
 
 def _binding(change, domain, provider="cloudflare"):
     _, comparison = target_evidence(change)
+    validate_zone_consent(change, comparison)
     if (change.user_id != domain.user_id or change.source["name"] != domain.name
             or change.source["registrar_id"] != domain.registrar_id
             or provider not in {"cloudflare", "cpanel"} or change.target_provider != provider or change.target_approved_at is None
-            or change.target_approved_by_id is None or change.target_approved_digest != change.target_digest
-            or change.target_acknowledgements != comparison["required_acknowledgements"]
-            or comparison["blocked"] is not False):
+            or change.target_approved_by_id is None or change.target_approved_digest != change.target_digest):
         raise ValidationError("The retained DNS owner, source or target consent requires review.")
 
 

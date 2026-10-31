@@ -9,17 +9,17 @@ from .dns_inventory import _locked, read_source_receipt
 from .dns_plan_review import _fresh
 from .dns_security import provider_dnssec, registrar_dnssec
 from .dns_target_inventory import _receipt
-from .dns_target_review import target_evidence
+from .dns_target_review import target_evidence, validate_zone_consent
 from .dns_parent_ds import read_parent_ds
 
 
 def _approved(change, domain, source_client, target_client, registrar):
     plan, comparison = target_evidence(change)
+    validate_zone_consent(change, comparison)
     if (change.status != "target_approved" or change.cancelled_at is not None
             or change.target_approved_at is None or change.target_approved_by_id is None
             or change.target_approved_digest != change.target_digest
-            or change.target_acknowledgements != comparison["required_acknowledgements"]
-            or comparison["blocked"] is not False or plan.expires_at <= timezone.now()
+            or plan.expires_at <= timezone.now()
             or change.target_observed_at + timedelta(minutes=30) <= timezone.now()
             or change.zone_id or change.zone_observation or change.completed_at is not None):
         raise ValidationError("A current approved DNS target plan is required before execution checks.")

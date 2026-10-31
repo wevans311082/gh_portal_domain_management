@@ -18,6 +18,7 @@ from .dns_changes import _manifest, zone_creation_options
 from .dns_plan_review import _lock
 from .dns_preflight import _approved, observe_execution_inputs
 from .dns_target_inventory import _receipt
+from .dns_target_review import DEFER_RECORD_CONFLICTS
 from .models import Domain, DomainDNSChange, DomainDNSExecutionStep
 from .resellerclub_client import ResellerClubError
 from apps.provisioning.whm_client import WHMClientError
@@ -185,7 +186,7 @@ def _prepare_zone(change_id, *, provider, source_client, target_client, registra
         if (not target["exists"] or (mode == "create" and target["zone"]["zone_id"] != step.provider_id)
                 or (mode == "adopt" and _fingerprint(target) != _fingerprint(change.target_receipt["target"]))):
             raise ValidationError("The prepared zone could not be verified against this request.")
-        needs_review = mode == "create" and bool(target["records"])
+        needs_review = (mode == "create" and bool(target["records"])) or DEFER_RECORD_CONFLICTS in change.target_acknowledgements
         receipt = {"version": 1, "mode": mode, "target": target, "record_review_required": needs_review,
             "delegation_updated": False, "provider_action_complete": True, "zone_preparation_complete": True}
         with transaction.atomic():

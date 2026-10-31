@@ -14,6 +14,33 @@ from .dns_target_plan import build_target_plan
 from .models import DomainDNSRecordPlan
 
 
+DEFER_RECORD_CONFLICTS = "defer_record_conflicts_until_separate_approval"
+RESOLVABLE_CONFLICTS = frozenset({"rrset_answers_differ", "ttl_differs", "provider_behaviour_differs", "cname_conflict"})
+
+
+def required_zone_acknowledgements(comparison, *, defer_conflicts=False):
+    """Exact consent to zone preparation, without approving record changes."""
+    expected = list(comparison["required_acknowledgements"])
+    if defer_conflicts:
+        blocked = [action for action in comparison["actions"] if action["action"] == "blocked"]
+        if (comparison["blocked"] is not True or comparison["target_exists"] is not True
+                or comparison["target_plan"]["blocked"] is not False or not blocked
+                or any(action["reason"] not in RESOLVABLE_CONFLICTS for action in blocked)):
+            raise ValidationError("Unsupported or inconsistent target records cannot be deferred for zone adoption.")
+        expected.append(DEFER_RECORD_CONFLICTS)
+    return sorted(expected)
+
+
+def validate_zone_consent(change, comparison):
+    values = change.target_acknowledgements
+    if type(values) is not list or any(type(value) is not str for value in values):
+        raise ValidationError("The retained zone-preparation consent requires review.")
+    deferred = DEFER_RECORD_CONFLICTS in values
+    expected = required_zone_acknowledgements(comparison, defer_conflicts=deferred)
+    if values != expected or (comparison["blocked"] is not False and not deferred):
+        raise ValidationError("Target record conflicts require separate explicit zone-preparation consent.")
+
+
 def target_evidence(change):
     """Validate retained evidence without treating old approval as live consent.
 
@@ -55,7 +82,8 @@ def approve_target_plan(*, actor, change_id, digest, confirmed, acknowledgements
         raise ValidationError("Explicitly confirm the target DNS plan and its required acknowledgements.")
     actor, domain, change = _lock(actor, change_id)
     plan, comparison = target_evidence(change)
-    expected = comparison["required_acknowledgements"]
+    deferred = DEFER_RECORD_CONFLICTS in acknowledgements
+    expected = required_zone_acknowledgements(comparison, defer_conflicts=deferred)
     if (type(digest) is not str or not constant_time_compare(digest, change.target_digest)
             or sorted(acknowledgements) != expected):
         raise ValidationError("The reviewed target DNS plan or its acknowledgements changed.")
@@ -68,7 +96,7 @@ def approve_target_plan(*, actor, change_id, digest, confirmed, acknowledgements
             or plan.expires_at <= timezone.now()
             or change.target_observed_at + timedelta(minutes=30) <= timezone.now()):
         raise ValidationError("This target DNS plan is expired or no longer awaiting approval.")
-    if comparison["blocked"] is not False:
+    if comparison["blocked"] is not False and not deferred:
         raise ValidationError("Resolve every target DNS conflict before approving this plan.")
     if change.target_provider == "cpanel":
         from .dns_changes import configured_whm_nameservers, zone_creation_options
@@ -89,7 +117,8 @@ def approve_target_plan(*, actor, change_id, digest, confirmed, acknowledgements
     change.save(update_fields=["target_approved_at", "target_approved_by", "target_approved_digest",
         "target_acknowledgements", "status", "updated_at"])
     AuditLog.objects.create(user=actor, action="domain.dns.target_approved", model_name="DomainDNSChange",
-        object_id=str(change.pk), data={"source_plan_id": plan.pk, "target_digest": digest, "acknowledgements": expected})
+        object_id=str(change.pk), data={"source_plan_id": plan.pk, "target_digest": digest, "acknowledgements": expected,
+            "scope": "zone_preparation_only", "record_conflicts_deferred": deferred})
     # No provider request or queue publication: execution must re-observe both
     # remote snapshots, DNSSEC and delegation under durable submission fences.
     return change
